@@ -249,12 +249,21 @@ const run = async () => {
     
     console.log(`   📊 Found ${dataArray.length} records for location ID ${locationId}`);
     
-    // Process and save rent-out data
+    // Process and save rent-out data with progress indicator
     let saved = 0;
     let skipped = 0;
     let errors = 0;
+    const progressInterval = Math.max(1, Math.floor(dataArray.length / 10)); // Show progress every 10%
     
-    for (const row of dataArray) {
+    for (let i = 0; i < dataArray.length; i++) {
+      const row = dataArray[i];
+      
+      // Show progress for large datasets
+      if (dataArray.length > 100 && (i % progressInterval === 0 || i === dataArray.length - 1)) {
+        const progress = ((i + 1) / dataArray.length * 100).toFixed(0);
+        process.stdout.write(`\r   ⏳ Processing: ${progress}% (${i + 1}/${dataArray.length})`);
+      }
+      
       // Add store name to the row data for mapping
       const rowWithStore = {
         ...row,
@@ -277,6 +286,10 @@ const run = async () => {
       } else {
         skipped++;
       }
+    }
+    
+    if (dataArray.length > 100) {
+      console.log(); // New line after progress indicator
     }
     
     console.log(`   ✅ Saved/Updated: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);

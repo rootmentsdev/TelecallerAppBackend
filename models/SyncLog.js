@@ -30,8 +30,8 @@ const syncLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster queries
-syncLogSchema.index({ syncType: 1 });
+// Index for faster queries (unique index is already created by unique: true above, so we don't need this)
+// syncLogSchema.index({ syncType: 1 }); // Removed to avoid duplicate index warning
 
 export default mongoose.model("SyncLog", syncLogSchema);
 

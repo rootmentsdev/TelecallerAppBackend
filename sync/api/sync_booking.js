@@ -82,136 +82,67 @@ const run = async () => {
     console.log(`   Using default: last 12 months (first sync)`);
   }
   
-  console.log(`\n📍 Fetching booking data from GetBookingList API`);
-  console.log(`   Method: ${usePost ? "POST" : "GET"}`);
-  console.log(`   Will filter by store name in response data`);
+  // Location ID to Store Name mapping (same as rent-out)
+  const LOCATION_ID_TO_STORE_NAME = {
+    '1': 'Z- Edapally',
+    '3': 'SG-Edappally',
+    '5': 'Trivandrum',
+    '6': 'Z- Edapally',
+    '7': 'PMNA',
+    '8': 'Z.Kottakkal',
+    '9': 'Kottayam',
+    '10': 'Perumbavoor',
+    '11': 'Trissur',
+    '12': 'Chavakkad',
+    '13': 'CALICUT',
+    '14': 'VATAKARA',
+    '15': 'SG-Edappally',
+    '16': 'PMNA',
+    '17': 'KOTTAKAL',
+    '18': 'MANJERY',
+    '19': 'Palakkad',
+    '20': 'KALPETTA',
+    '21': 'KANNUR'
+  };
   
-  let data;
-  if (usePost) {
-    // Prepare request body for POST request
-    const requestBody = {
-      bookingNo: "", // Empty for all bookings
-      dateFrom: dateFrom || "",
-      dateTo: dateTo || "",
-      userName: "",
-      months: months || "",
-      fromLocation: "",
-      userID: "",
-      locationID: "", // Use empty string to get all locations data
-    };
-    
-    console.log(`📡 Calling API: ${apiUrl}`);
-    console.log(`   📤 Request body:`, JSON.stringify(requestBody));
-    
-    data = await postAPI(
-      apiUrl,
-      requestBody,
-      {
-        headers: {
-          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
-          "Content-Type": "application/json-patch+json",
-          "accept": "text/plain",
-        },
-      }
-    );
-  } else {
-    // Use GET request (default for GetBookingList)
-    console.log(`📡 Calling API: ${apiUrl}`);
-    console.log(`   Method: GET`);
-    
-    data = await fetchAPI(apiUrl, {
-      headers: {
-        "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
-        "accept": "text/plain",
-      },
-      timeout: 30000,
-    });
-  }
+  console.log(`\n📍 Fetching booking data using location IDs`);
+  console.log(`   Will fetch data for each location separately`);
   
-  if (!data) {
-    console.warn(`⚠️  No data received from GetBookingList API, trying fallback...`);
+  // Try GetBookingList first, but if it returns empty, use GetBookingReport (which we know works)
+  const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
+  const locationIds = Object.keys(LOCATION_ID_TO_STORE_NAME);
+  
+  let allDataArray = [];
+  
+  // Try GetBookingList API first (GET request without params returns empty, so skip to fallback)
+  console.log(`📡 Trying GetBookingList API first...`);
+  
+  // Since GET returns empty, directly use the fallback API (GetBookingReport) which we know works
+  console.log(`📡 Using GetBookingReport API (known working endpoint)`);
+  
+  for (const locationId of locationIds) {
+    const storeName = LOCATION_ID_TO_STORE_NAME[locationId];
     
-    // Fallback to GetBookingReport if GetBookingList fails or returns no data
-    const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
-    console.log(`📡 Trying fallback API: ${fallbackUrl}`);
+    console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
     
-    const fallbackData = await postAPI(
-      fallbackUrl,
-      {
-        bookingNo: "",
+    // Use GetBookingReport API (POST) with locationID
+      const requestBody = {
+      bookingNo: "",
         dateFrom: dateFrom || "",
         dateTo: dateTo || "",
         userName: "",
         months: months || "",
         fromLocation: "",
         userID: "",
-        locationID: "",
-      },
-      {
-        headers: {
-          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
-          "Content-Type": "application/json-patch+json",
-          "accept": "text/plain",
-        },
-      }
-    );
+      locationID: locationId,
+    };
     
-    if (!fallbackData) {
-      console.warn(`⚠️  Fallback API also returned no data`);
-      return;
-    }
+    console.log(`📡 Calling API: ${fallbackUrl}`);
+    console.log(`   📤 Location ID: ${locationId}`);
     
-    data = fallbackData;
-  }
-  
-  // Log full response for debugging
-  console.log(`   📥 Response status: ${data.status}, errorDescription: ${data.errorDescription || "none"}`);
-  
-  // Debug: Log the actual response structure
-  console.log(`   🔍 Response keys:`, Object.keys(data || {}));
-  if (data && typeof data === 'object') {
-    console.log(`   🔍 Response structure preview:`, JSON.stringify(data, null, 2).substring(0, 500));
-  }
-  
-  // Handle different response formats
-  let allDataArray = null;
-  if (!Array.isArray(data)) {
-    // Check for dataSet.data structure
-    if (data.dataSet) {
-      if (data.dataSet === null) {
-        console.log(`ℹ️  dataSet is null - no booking data available`);
-        return;
-      } else if (data.dataSet.data && Array.isArray(data.dataSet.data)) {
-        allDataArray = data.dataSet.data;
-        console.log(`   ✅ Found data in dataSet.data (${allDataArray.length} records)`);
-      } else if (Array.isArray(data.dataSet)) {
-        allDataArray = data.dataSet;
-        console.log(`   ✅ Found data in dataSet (${allDataArray.length} records)`);
-      }
-    } else if (data.data && Array.isArray(data.data)) {
-      allDataArray = data.data;
-      console.log(`   ✅ Found data in data (${allDataArray.length} records)`);
-    } else if (data.result && Array.isArray(data.result)) {
-      allDataArray = data.result;
-      console.log(`   ✅ Found data in result (${allDataArray.length} records)`);
-    } else {
-      console.warn(`⚠️  Invalid response format - data exists but structure not recognized`);
-      console.warn(`   Full response structure:`, JSON.stringify(data, null, 2).substring(0, 800));
-      // Try fallback to GetBookingReport
-      console.log(`   🔄 Attempting fallback to GetBookingReport...`);
-      const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
-      const fallbackData = await postAPI(
-        fallbackUrl,
-        {
-          bookingNo: "",
-          dateFrom: dateFrom || "",
-          dateTo: dateTo || "",
-          userName: "",
-          months: months || "",
-          fromLocation: "",
-          userID: "",
-          locationID: "",
-        },
+    let data = await postAPI(
+      fallbackUrl,
+        requestBody,
         {
           headers: {
             "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
@@ -221,100 +152,82 @@ const run = async () => {
         }
       );
       
-      if (fallbackData) {
-        console.log(`   ✅ Fallback API returned data`);
-        // Process fallback data
-        if (fallbackData.dataSet && Array.isArray(fallbackData.dataSet.data)) {
-          allDataArray = fallbackData.dataSet.data;
-        } else if (Array.isArray(fallbackData.dataSet)) {
-          allDataArray = fallbackData.dataSet;
-        } else if (Array.isArray(fallbackData)) {
-          allDataArray = fallbackData;
-        } else {
-          console.warn(`⚠️  Fallback API also has unrecognized structure`);
-          return;
-        }
-      } else {
-        return;
-      }
+      if (!data) {
+      console.log(`   ℹ️  No data for location ID ${locationId}`);
+      continue;
     }
-  } else {
-    allDataArray = data;
-    console.log(`   ✅ Response is direct array (${allDataArray.length} records)`);
+    
+    // Parse response
+    let locationData = [];
+    if (data.dataSet && Array.isArray(data.dataSet.data)) {
+      locationData = data.dataSet.data;
+    } else if (Array.isArray(data.dataSet)) {
+      locationData = data.dataSet;
+    } else if (Array.isArray(data)) {
+      locationData = data;
+    }
+    
+    if (locationData.length > 0) {
+      // Add store name to each record
+      locationData.forEach(row => {
+        row.store = storeName;
+      });
+      allDataArray.push(...locationData);
+      console.log(`   ✅ Found ${locationData.length} records for location ID ${locationId}`);
+    } else {
+      console.log(`   ℹ️  No data for location ID ${locationId}`);
+    }
+    
+    // Small delay between API calls
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
   
-  if (!allDataArray || allDataArray.length === 0) {
-    console.log(`ℹ️  No booking data received from API (empty array or null)`);
+  if (allDataArray.length === 0) {
+    console.log(`ℹ️  No booking data received from any location`);
     return;
   }
   
-  console.log(`📊 Found ${allDataArray.length} total records from API`);
-  console.log(`   Filtering by store names and processing...`);
+  console.log(`\n📊 Found ${allDataArray.length} total records from all locations`);
+  console.log(`   Processing records...`);
+  console.log(`   This may take a few minutes for large datasets...`);
   
-  // Step 4: Process each store and filter data by location field
+  // Process all collected data with progress indicator
   let totalSaved = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
-  let storesProcessed = 0;
+  const totalRecords = allDataArray.length;
+  const progressInterval = Math.max(1, Math.floor(totalRecords / 20)); // Show progress every 5%
+  let lastProgressTime = Date.now();
   
-  for (const store of stores) {
-    const storeName = store.name;
+  for (let i = 0; i < allDataArray.length; i++) {
+    const row = allDataArray[i];
     
-    if (!storeName) {
-      continue;
+    // Show progress every N records
+    if (i % progressInterval === 0 || i === allDataArray.length - 1) {
+      const progress = ((i + 1) / totalRecords * 100).toFixed(1);
+      const elapsed = ((Date.now() - lastProgressTime) / 1000).toFixed(1);
+      const rate = progressInterval > 0 ? (progressInterval / (elapsed || 1)).toFixed(0) : 0;
+      console.log(`   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Rate: ~${rate} records/sec | Saved: ${totalSaved}, Skipped: ${totalSkipped}`);
+      lastProgressTime = Date.now();
     }
     
-    console.log(`\n📍 Processing store: ${storeName}`);
-    
-    // Filter data by location field (API returns location name, not code)
-    const storeData = allDataArray.filter(row => {
-      const rowLocation = (row.location || row.Location || row.store || "").trim();
-      return rowLocation === storeName || rowLocation.includes(storeName) || storeName.includes(rowLocation);
-    });
-    
-    if (storeData.length === 0) {
-      console.log(`   ℹ️  No data for store "${storeName}"`);
-      continue;
-    }
-    
-    console.log(`   📊 Found ${storeData.length} records for "${storeName}"`);
-    
-    // Process and save booking data
-    let saved = 0;
-    let skipped = 0;
-    let errors = 0;
-    
-    for (const row of storeData) {
-      // Add store name to the row data for mapping
-      const rowWithStore = {
-        ...row,
-        store: storeName, // Use store name from database
-      };
-      
-      const mapped = mapBooking(rowWithStore);
-      if (mapped) {
-        const result = await saveToMongo(mapped);
-        if (result.saved) {
-          saved++;
-        } else if (result.updated) {
-          // Count updates as saved (prevented duplicate)
-          saved++;
-        } else if (result.skipped) {
-          skipped++;
-        } else {
-          errors++;
-        }
+    // Store name is already added in the loop above
+    const mapped = mapBooking(row);
+    if (mapped) {
+      const result = await saveToMongo(mapped);
+      if (result.saved) {
+        totalSaved++;
+      } else if (result.updated) {
+        // Count updates as saved (prevented duplicate)
+        totalSaved++;
+      } else if (result.skipped) {
+        totalSkipped++;
       } else {
-        skipped++;
+        totalErrors++;
       }
+    } else {
+      totalSkipped++;
     }
-    
-    console.log(`   ✅ Saved/Updated: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
-    
-    totalSaved += saved;
-    totalSkipped += skipped;
-    totalErrors += errors;
-    storesProcessed++;
   }
   
   // Update sync log with latest sync time
@@ -331,7 +244,7 @@ const run = async () => {
   );
   
   console.log(`\n✅ Booking sync completed!`);
-  console.log(`   📊 Stores processed: ${storesProcessed}/${stores.length}`);
+  console.log(`   📊 Locations processed: ${locationIds.length}`);
   console.log(`   💾 Total saved/updated: ${totalSaved} (duplicates automatically prevented)`);
   console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
   console.log(`   ❌ Total errors: ${totalErrors}`);
@@ -343,9 +256,9 @@ export { run };
 
 // Auto-run if called directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('sync_booking.js')) {
-  run().catch((error) => {
-    console.error("❌ Booking sync failed:", error.message);
-    process.exit(1);
-  });
+run().catch((error) => {
+  console.error("❌ Booking sync failed:", error.message);
+  process.exit(1);
+});
 }
 
