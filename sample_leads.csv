@@ -1,0 +1,7 @@
+name,phone,store,source,enquiryType,leadType,remarks
+John Doe,9876543210,Store A,Instagram,Wedding Suit,general,Interested in wedding suits
+Jane Smith,9876543211,Store B,JustDial,Bridal,justDial,Looking for bridal collection
+Bob Johnson,9876543212,Store A,Walk-in,Rent-out,rentOutFeedback,Need rental for 3 days
+Alice Brown,9876543213,Store C,Facebook,Wedding Suit,general,Enquiry about pricing
+Charlie Wilson,9876543214,Store B,JustDial,Bridal,justDial,Follow up needed
+
