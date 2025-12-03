@@ -62,11 +62,14 @@ export const login = async (req, res) => {
 
         // Step 1: ALWAYS verify credentials with external API first
         // This is the ONLY source of truth for authentication
+        // Login is ONLY allowed if external API verifies the credentials
         const verifyApiUrl = process.env.VERIFY_EMPLOYEE_API_URL || "https://rootments.in/api/verify_employee";
         const verifyApiToken = process.env.VERIFY_EMPLOYEE_API_TOKEN || "RootX-production-9d17d9485eb772e79df8564004d4a4d4";
 
         console.log(`🔐 Verifying credentials with external API for: ${employeeId}`);
 
+        // Call external API to verify credentials
+        // CRITICAL: Login is ONLY allowed if external API verifies credentials successfully
         const apiResponse = await postAPI(
             verifyApiUrl,
             {
@@ -75,15 +78,41 @@ export const login = async (req, res) => {
             },
             {
                 headers: {
-                    Authorization: `Bearer ${verifyApiToken}`
-                }
+                    Authorization: `Bearer ${verifyApiToken}`,
+                    "Content-Type": "application/json"
+                },
+                timeout: 10000 // 10 second timeout
             }
         );
 
         // Step 2: Check if external API verification failed
-        // If API says credentials are invalid, reject login immediately
-        if (!apiResponse || apiResponse.status !== "success" || !apiResponse.data) {
-            console.log(`❌ External API verification failed for: ${employeeId}`);
+        // CRITICAL: If API response is null (network error, timeout, etc.), reject login
+        if (!apiResponse) {
+            console.log(`❌ External API unavailable or returned null response for: ${employeeId}`);
+            return res.status(503).json({ 
+                message: "Unable to verify credentials. Authentication service is temporarily unavailable. Please try again later.",
+                success: false,
+                error: "External API unavailable"
+            });
+        }
+
+        // Check if API returned an error status (401/403 from API)
+        if (apiResponse.status === "error" || !apiResponse.data) {
+            console.log(`❌ External API verification failed for: ${employeeId}`, {
+                status: apiResponse.status,
+                hasData: !!apiResponse.data
+            });
+            return res.status(401).json({ 
+                message: "Invalid Employee ID or Password",
+                success: false
+            });
+        }
+
+        // Check if status is not "success"
+        if (apiResponse.status !== "success") {
+            console.log(`❌ External API verification failed for: ${employeeId}`, {
+                status: apiResponse.status
+            });
             return res.status(401).json({ 
                 message: "Invalid Employee ID or Password",
                 success: false
@@ -91,7 +120,7 @@ export const login = async (req, res) => {
         }
 
         // Step 3: External API confirmed credentials are valid
-        // Now we can proceed with login
+        // Only now can we proceed with login
         console.log(`✅ External API verification successful for: ${employeeId}`);
 
         const apiUserData = apiResponse.data;
@@ -99,8 +128,17 @@ export const login = async (req, res) => {
         // Step 4: Map API response to our User model
         const mappedRole = mapRoleFromAPI(apiUserData.role);
         const store = apiUserData.Store || apiUserData.store || "No Store";
-        const employeeIdFromAPI = apiUserData.employeeId || apiUserData.employeeld || employeeId; // Handle both spellings
+        const employeeIdFromAPI = apiUserData.employeeId || apiUserData.employeeld || employeeId;
         const name = apiUserData.name || "";
+
+        // Validate that we have essential data from API
+        if (!employeeIdFromAPI || !name) {
+            console.error(`⚠️ External API response missing essential data for: ${employeeId}`, apiUserData);
+            return res.status(500).json({ 
+                message: "Invalid response from authentication service",
+                success: false
+            });
+        }
 
         // Step 5: Store or update user in MongoDB with data from external API
         let user = await User.findOne({ employeeId: employeeIdFromAPI });
@@ -152,8 +190,9 @@ export const login = async (req, res) => {
     } catch (error) {
         console.error("Login error:", error.message);
         res.status(500).json({ 
-            message: error.message || "Login failed",
-            success: false
+            message: "An error occurred during login. Please try again.",
+            success: false,
+            error: process.env.NODE_ENV === "development" ? error.message : undefined
         });
     }
 };

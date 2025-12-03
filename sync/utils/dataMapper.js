@@ -1,8 +1,24 @@
 // Helper function to clean phone number (keep only digits)
+// Handles international formats by extracting last 10 digits
 const cleanPhone = (phone) => {
   if (!phone) return null;
   const cleaned = String(phone).replace(/\D/g, "");
-  return cleaned.length === 10 ? cleaned : null;
+  
+  // If exactly 10 digits, return as is
+  if (cleaned.length === 10) return cleaned;
+  
+  // If more than 10 digits (international format), extract last 10 digits
+  if (cleaned.length > 10) {
+    return cleaned.slice(-10);
+  }
+  
+  // If less than 10 digits, try to pad with leading zero (for numbers like 813969469 -> 0813969469)
+  if (cleaned.length === 9) {
+    return '0' + cleaned;
+  }
+  
+  // If still not 10 digits, return null (invalid)
+  return null;
 };
 
 // Helper function to parse date
@@ -35,17 +51,19 @@ const parseDate = (dateStr) => {
 // Map Walk-in CSV data to Lead model
 // CSV Fields: #, Date, Customer Name, Contact, Function Date, Staff, Status, Category, Sub Category, Repeat count, Remarks
 export const mapWalkin = (row) => {
-  // Handle different column name variations
+  // Handle different column name variations (including Excel column names)
   const phone = cleanPhone(
     row.phone || row.Phone || row.PHONE || 
-    row.Contact || row.contact || row.CONTACT
+    row.Contact || row.contact || row.CONTACT ||
+    row["__EMPTY_2"] || row["Contact"] // Excel column name
   );
   if (!phone) return null;
 
   const name = (
     row.name || row.Name || row.NAME || 
     row["Customer Name"] || row["customer name"] || row["CUSTOMER NAME"] ||
-    row.CustomerName || row.customerName
+    row.CustomerName || row.customerName ||
+    row["__EMPTY_1"] || row["Customer Name"] // Excel column name
   )?.trim();
 
   if (!name) return null; // Name is required
@@ -57,34 +75,40 @@ export const mapWalkin = (row) => {
   )?.trim() || "Default Store"; // Default if not provided
 
   // Date field mapping (enquiryDate)
-  const date = row.Date || row.date || row.DATE || row["Date"];
+  const date = row.Date || row.date || row.DATE || row["Date"] ||
+    row["__EMPTY"] || row["Date"]; // Excel column name
   
   // Function Date mapping
   const functionDate = (
     row["Function Date"] || row["function date"] || row["FUNCTION DATE"] ||
-    row.functionDate || row.FunctionDate
+    row.functionDate || row.FunctionDate ||
+    row["__EMPTY_3"] || row["Function Date"] // Excel column name
   );
 
   // Staff/Attended By
   const staff = (
     row.Staff || row.staff || row.STAFF ||
-    row.attendedBy || row.AttendedBy
+    row.attendedBy || row.AttendedBy ||
+    row["__EMPTY_4"] || row["Staff"] // Excel column name
   )?.trim();
 
   // Status/Closing Status
   const status = (
     row.Status || row.status || row.STATUS ||
-    row.closingStatus || row.ClosingStatus
+    row.closingStatus || row.ClosingStatus ||
+    row["__EMPTY_5"] || row["Status"] // Excel column name
   )?.trim();
 
   // Category and Sub Category for enquiryType
   const category = (
-    row.Category || row.category || row.CATEGORY
+    row.Category || row.category || row.CATEGORY ||
+    row["__EMPTY_6"] || row["Category"] // Excel column name
   )?.trim();
   
   const subCategory = (
     row["Sub Category"] || row["sub category"] || row["SUB CATEGORY"] ||
-    row.SubCategory || row.subCategory
+    row.SubCategory || row.subCategory ||
+    row["__EMPTY_7"] || row["Sub Category"] // Excel column name
   )?.trim();
 
   // Combine category and sub-category for enquiryType
@@ -96,7 +120,8 @@ export const mapWalkin = (row) => {
   // Remarks
   const remarks = (
     row.remarks || row.Remarks || row.REMARKS ||
-    row.Notes || row.notes
+    row.Notes || row.notes ||
+    row["__EMPTY_9"] || row["Remarks"] // Excel column name
   )?.trim() || "";
 
   // Build complete lead object with all fields
@@ -238,41 +263,58 @@ export const mapLossOfSale = (row) => {
 
 // Map Booking API data to Lead model
 export const mapBooking = (row) => {
-  const phone = cleanPhone(row.phone || row.Phone || row.customerPhone || row.mobile || row.Mobile);
+  // Phone field: API uses 'phoneNo'
+  const phone = cleanPhone(
+    row.phoneNo || row.phone || row.Phone || row.customerPhone || 
+    row.mobile || row.Mobile || row.contact || row.Contact
+  );
   if (!phone) return null;
 
   return {
     name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
     phone: phone,
-    store: (row.store || row.Store || row.storeName || row.StoreName || "").trim(),
+    store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
     source: "Booking",
     leadType: "bookingConfirmation",
-    enquiryType: (row.enquiryType || row.type || "").trim(),
+    enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
     bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),
-    securityAmount: row.securityAmount || row.security || row.SecurityAmount ? parseFloat(row.securityAmount || row.security || row.SecurityAmount) : undefined,
+    // Security Amount: API uses 'price' field
+    securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit 
+      ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit) 
+      : undefined,
     enquiryDate: parseDate(row.enquiryDate || row.bookingDate || row.date),
-    functionDate: parseDate(row.functionDate || row.eventDate || row.function_date),
+    // Function Date: API uses 'deliveryDate' or 'trialDate'
+    functionDate: parseDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
     remarks: (row.remarks || row.notes || row.Remarks || "").trim(),
   };
 };
 
 // Map Rent-Out API data to Lead model
 export const mapRentOut = (row) => {
-  const phone = cleanPhone(row.phone || row.Phone || row.customerPhone || row.mobile || row.Mobile);
+  // Phone field: API uses 'phoneNo'
+  const phone = cleanPhone(
+    row.phoneNo || row.phone || row.Phone || row.customerPhone || 
+    row.mobile || row.Mobile || row.contact || row.Contact
+  );
   if (!phone) return null;
 
   return {
     name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
     phone: phone,
-    store: (row.store || row.Store || row.storeName || row.StoreName || "").trim(),
+    store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
     source: "Rent-out",
     leadType: "rentOutFeedback",
-    enquiryType: (row.enquiryType || row.type || "").trim(),
+    enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
     bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),
-    securityAmount: row.securityAmount || row.security || row.SecurityAmount ? parseFloat(row.securityAmount || row.security || row.SecurityAmount) : undefined,
-    returnDate: parseDate(row.returnDate || row.return_date || row.returnDate),
-    enquiryDate: parseDate(row.enquiryDate || row.rentDate || row.rent_date),
-    functionDate: parseDate(row.functionDate || row.eventDate || row.function_date),
+    // Security Amount: API uses 'price' field
+    securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit 
+      ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit) 
+      : undefined,
+    returnDate: parseDate(row.returnDate || row.return_date || row.expectedReturnDate),
+    enquiryDate: parseDate(row.enquiryDate || row.rentDate || row.rentOutDate || row.rent_date),
+    functionDate: parseDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
+    // Attended By: API uses 'bookingBy'
+    attendedBy: (row.attendedBy || row.attended_by || row.staff || row.Staff || row.bookingBy || row.handledBy || "").trim() || undefined,
     remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
   };
 };

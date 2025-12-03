@@ -1,8 +1,9 @@
-import { postAPI } from "../utils/apiClient.js";
+import { postAPI, fetchAPI } from "../utils/apiClient.js";
 import { mapBooking } from "../utils/dataMapper.js";
 import { saveToMongo } from "../utils/saveToMongo.js";
 import Store from "../../models/Store.js";
 import Lead from "../../models/Lead.js";
+import SyncLog from "../../models/SyncLog.js";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
@@ -40,97 +41,177 @@ const run = async () => {
   
   console.log(`✅ Found ${stores.length} active stores`);
   
-  // Step 2: Fetch rent-out data to get booking numbers
-  console.log("\n📋 Fetching rent-out data to extract booking numbers...");
-  const rentOutLeads = await Lead.find({
-    leadType: "rentOutFeedback",
-    bookingNo: { $exists: true, $ne: "" }
-  }).select("bookingNo store");
-  
-  console.log(`✅ Found ${rentOutLeads.length} rent-out leads with booking numbers`);
-  
-  // Group booking numbers by store/location
-  const bookingNumbersByStore = {};
-  rentOutLeads.forEach(lead => {
-    if (lead.bookingNo && lead.store) {
-      if (!bookingNumbersByStore[lead.store]) {
-        bookingNumbersByStore[lead.store] = [];
-      }
-      if (!bookingNumbersByStore[lead.store].includes(lead.bookingNo)) {
-        bookingNumbersByStore[lead.store].push(lead.bookingNo);
-      }
-    }
-  });
-  
-  // Step 3: API configuration
-  const baseUrl = process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || "https://rentalapi.rootments.live";
-  const endpoint = "/api/Reports/GetBookingReport";
+  // Step 2: API configuration
+  // Use new API base URL for booking confirmation
+  const baseUrl = process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || "http://15.207.90.158:5000";
+  const endpoint = process.env.BOOKING_API_ENDPOINT || "/api/GetBooking/GetBookingList";
   const apiUrl = `${baseUrl}${endpoint}`;
   const apiToken = process.env.BOOKING_API_KEY || process.env.API_TOKEN;
+  const usePost = process.env.BOOKING_USE_POST === "true" || false;
   
-  // Step 4: Date range configuration (optional - can be empty strings for all data)
-  const dateFrom = process.env.BOOKING_DATE_FROM || "";
-  const dateTo = process.env.BOOKING_DATE_TO || "";
-  const months = process.env.BOOKING_MONTHS || "";
+  // Step 3: Get last sync time for incremental sync (only fetch new/updated records)
+  let lastSyncAt = null;
+  let syncLog = await SyncLog.findOne({ syncType: "booking" });
   
-  // Step 5: Process each store location
-  let totalSaved = 0;
-  let totalSkipped = 0;
-  let totalErrors = 0;
-  let storesProcessed = 0;
+  if (syncLog && syncLog.lastSyncAt) {
+    lastSyncAt = syncLog.lastSyncAt;
+    console.log(`📅 Last sync: ${lastSyncAt.toISOString()}`);
+    console.log(`   Will fetch only records updated after this time`);
+  } else {
+    console.log(`📅 First sync - will fetch all records`);
+  }
   
-  for (const store of stores) {
-    const locationCode = store.code;
-    const storeName = store.name;
+  // Step 4: Date range configuration - use last sync time for incremental sync
+  let dateFrom = process.env.BOOKING_DATE_FROM || "";
+  let dateTo = process.env.BOOKING_DATE_TO || "";
+  let months = process.env.BOOKING_MONTHS || "";
+  
+  // If last sync exists, use it as dateFrom for incremental sync
+  if (lastSyncAt && !dateFrom) {
+    // Format date as DD-MM-YYYY for API
+    const day = String(lastSyncAt.getDate()).padStart(2, '0');
+    const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
+    const year = lastSyncAt.getFullYear();
+    dateFrom = `${day}-${month}-${year}`;
+    console.log(`   Using incremental sync from: ${dateFrom}`);
+  }
+  
+  // If no date range specified and no last sync, default to last 12 months (first sync)
+  if (!dateFrom && !dateTo && !months && !lastSyncAt) {
+    months = "12";
+    console.log(`   Using default: last 12 months (first sync)`);
+  }
+  
+  console.log(`\n📍 Fetching booking data from GetBookingList API`);
+  console.log(`   Method: ${usePost ? "POST" : "GET"}`);
+  console.log(`   Will filter by store name in response data`);
+  
+  let data;
+  if (usePost) {
+    // Prepare request body for POST request
+    const requestBody = {
+      bookingNo: "", // Empty for all bookings
+      dateFrom: dateFrom || "",
+      dateTo: dateTo || "",
+      userName: "",
+      months: months || "",
+      fromLocation: "",
+      userID: "",
+      locationID: "", // Use empty string to get all locations data
+    };
     
-    if (!locationCode) {
-      console.log(`⏭️  Skipping store "${storeName}" - no location code`);
-      continue;
-    }
+    console.log(`📡 Calling API: ${apiUrl}`);
+    console.log(`   📤 Request body:`, JSON.stringify(requestBody));
     
-    console.log(`\n📍 Processing store: ${storeName} (Location Code: ${locationCode})`);
+    data = await postAPI(
+      apiUrl,
+      requestBody,
+      {
+        headers: {
+          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
+          "Content-Type": "application/json-patch+json",
+          "accept": "text/plain",
+        },
+      }
+    );
+  } else {
+    // Use GET request (default for GetBookingList)
+    console.log(`📡 Calling API: ${apiUrl}`);
+    console.log(`   Method: GET`);
     
-    // Get booking numbers from rent-out data for this store
-    const bookingNumbers = bookingNumbersByStore[storeName] || [];
+    data = await fetchAPI(apiUrl, {
+      headers: {
+        "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
+        "accept": "text/plain",
+      },
+      timeout: 30000,
+    });
+  }
+  
+  if (!data) {
+    console.warn(`⚠️  No data received from GetBookingList API, trying fallback...`);
     
-    if (bookingNumbers.length > 0) {
-      console.log(`   📋 Found ${bookingNumbers.length} booking number(s) from rent-out data: ${bookingNumbers.join(", ")}`);
-    } else {
-      console.log(`   ℹ️  No booking numbers found in rent-out data for this store - will fetch all bookings for this location`);
-    }
+    // Fallback to GetBookingReport if GetBookingList fails or returns no data
+    const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
+    console.log(`📡 Trying fallback API: ${fallbackUrl}`);
     
-    // Process each booking number separately, or all at once if API supports it
-    const bookingsToProcess = bookingNumbers.length > 0 ? bookingNumbers : [""]; // Empty string means get all
-    
-    let saved = 0;
-    let skipped = 0;
-    let errors = 0;
-    
-    for (const bookingNo of bookingsToProcess) {
-      console.log(`📡 Calling API: ${apiUrl}`);
-      
-      // Prepare request body for GetBookingReport API
-      // Use booking number from rent-out data if available, otherwise use empty string for all
-      const requestBody = {
-        bookingNo: bookingNo, // Single booking number or empty for all
+    const fallbackData = await postAPI(
+      fallbackUrl,
+      {
+        bookingNo: "",
         dateFrom: dateFrom || "",
         dateTo: dateTo || "",
         userName: "",
         months: months || "",
         fromLocation: "",
         userID: "",
-        locationID: locationCode.toString(), // Ensure it's a string
-      };
-      
-      if (bookingNo) {
-        console.log(`   📤 Request body (bookingNo: ${bookingNo}):`, JSON.stringify(requestBody));
-      } else {
-        console.log(`   📤 Request body (all bookings):`, JSON.stringify(requestBody));
+        locationID: "",
+      },
+      {
+        headers: {
+          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
+          "Content-Type": "application/json-patch+json",
+          "accept": "text/plain",
+        },
       }
-      
-      const data = await postAPI(
-        apiUrl,
-        requestBody,
+    );
+    
+    if (!fallbackData) {
+      console.warn(`⚠️  Fallback API also returned no data`);
+      return;
+    }
+    
+    data = fallbackData;
+  }
+  
+  // Log full response for debugging
+  console.log(`   📥 Response status: ${data.status}, errorDescription: ${data.errorDescription || "none"}`);
+  
+  // Debug: Log the actual response structure
+  console.log(`   🔍 Response keys:`, Object.keys(data || {}));
+  if (data && typeof data === 'object') {
+    console.log(`   🔍 Response structure preview:`, JSON.stringify(data, null, 2).substring(0, 500));
+  }
+  
+  // Handle different response formats
+  let allDataArray = null;
+  if (!Array.isArray(data)) {
+    // Check for dataSet.data structure
+    if (data.dataSet) {
+      if (data.dataSet === null) {
+        console.log(`ℹ️  dataSet is null - no booking data available`);
+        return;
+      } else if (data.dataSet.data && Array.isArray(data.dataSet.data)) {
+        allDataArray = data.dataSet.data;
+        console.log(`   ✅ Found data in dataSet.data (${allDataArray.length} records)`);
+      } else if (Array.isArray(data.dataSet)) {
+        allDataArray = data.dataSet;
+        console.log(`   ✅ Found data in dataSet (${allDataArray.length} records)`);
+      }
+    } else if (data.data && Array.isArray(data.data)) {
+      allDataArray = data.data;
+      console.log(`   ✅ Found data in data (${allDataArray.length} records)`);
+    } else if (data.result && Array.isArray(data.result)) {
+      allDataArray = data.result;
+      console.log(`   ✅ Found data in result (${allDataArray.length} records)`);
+    } else {
+      console.warn(`⚠️  Invalid response format - data exists but structure not recognized`);
+      console.warn(`   Full response structure:`, JSON.stringify(data, null, 2).substring(0, 800));
+      // Try fallback to GetBookingReport
+      console.log(`   🔄 Attempting fallback to GetBookingReport...`);
+      const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
+      const fallbackData = await postAPI(
+        fallbackUrl,
+        {
+          bookingNo: "",
+          dateFrom: dateFrom || "",
+          dateTo: dateTo || "",
+          userName: "",
+          months: months || "",
+          fromLocation: "",
+          userID: "",
+          locationID: "",
+        },
         {
           headers: {
             "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
@@ -140,117 +221,131 @@ const run = async () => {
         }
       );
       
-      if (!data) {
-        console.warn(`⚠️  No data received for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""}`);
-        errors++;
-        continue; // Continue to next booking number
-      }
-      
-      // Log full response for debugging
-      console.log(`   📥 Response status: ${data.status}, errorDescription: ${data.errorDescription || "none"}`);
-      
-      // Check for API error status
-      if (data.status === false) {
-        const errorMsg = data.errorDescription || "Unknown error";
-        if (errorMsg && errorMsg.trim() !== "") {
-          console.warn(`⚠️  API error for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""}: ${errorMsg}`);
-          
-          // If error mentions "Unknown column", the request format might be wrong
-          if (errorMsg.includes("Unknown column")) {
-            console.log(`   💡 This might indicate the API expects different parameter names or format`);
-          }
-        }
-        
-        // Check if there's still data despite error status
-        if (!data.dataSet || data.dataSet === null || !data.dataSet.data || data.dataSet.data.length === 0) {
-          console.log(`ℹ️  No booking data for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""}`);
-          continue; // Continue to next booking number
-        }
-      }
-      
-      // Handle different response formats
-      let dataArray = null;
-      if (!Array.isArray(data)) {
-        // Check for dataSet.data structure
-        if (data.dataSet) {
-          if (data.dataSet === null) {
-            console.log(`ℹ️  dataSet is null for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""} - no booking data available`);
-            continue; // Continue to next booking number
-          } else if (data.dataSet.data && Array.isArray(data.dataSet.data)) {
-            dataArray = data.dataSet.data;
-          } else if (Array.isArray(data.dataSet)) {
-            // dataSet might be directly an array
-            dataArray = data.dataSet;
-          }
-        } else if (data.data && Array.isArray(data.data)) {
-          dataArray = data.data;
-        } else if (data.result && Array.isArray(data.result)) {
-          dataArray = data.result;
+      if (fallbackData) {
+        console.log(`   ✅ Fallback API returned data`);
+        // Process fallback data
+        if (fallbackData.dataSet && Array.isArray(fallbackData.dataSet.data)) {
+          allDataArray = fallbackData.dataSet.data;
+        } else if (Array.isArray(fallbackData.dataSet)) {
+          allDataArray = fallbackData.dataSet;
+        } else if (Array.isArray(fallbackData)) {
+          allDataArray = fallbackData;
         } else {
-          console.warn(`⚠️  Invalid response format for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""}`);
-          console.warn(`   Response structure:`, JSON.stringify(data, null, 2).substring(0, 300));
-          errors++;
-          continue; // Continue to next booking number
+          console.warn(`⚠️  Fallback API also has unrecognized structure`);
+          return;
         }
       } else {
-        dataArray = data;
+        return;
       }
-      
-      if (!dataArray || dataArray.length === 0) {
-        console.log(`ℹ️  No booking data for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""}`);
-        continue; // Continue to next booking number
-      }
-      
-      console.log(`📊 Found ${dataArray.length} booking records for location ${locationCode}${bookingNo ? ` (bookingNo: ${bookingNo})` : ""}`);
-      
-      // Process and save booking data
-      for (const row of dataArray) {
-        // Add store name to the row data for mapping
-        const rowWithStore = {
-          ...row,
-          store: storeName, // Use store name from database
-          storeCode: locationCode, // Keep location code for reference
-        };
-        
-        const mapped = mapBooking(rowWithStore);
-        if (mapped) {
-          const result = await saveToMongo(mapped);
-          if (result.saved) {
-            saved++;
-          } else if (result.skipped) {
-            skipped++;
-          } else {
-            errors++;
-          }
-        } else {
-          skipped++;
-        }
-      }
-      
-      // Small delay between API calls to avoid overwhelming the server
-      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  } else {
+    allDataArray = data;
+    console.log(`   ✅ Response is direct array (${allDataArray.length} records)`);
+  }
+  
+  if (!allDataArray || allDataArray.length === 0) {
+    console.log(`ℹ️  No booking data received from API (empty array or null)`);
+    return;
+  }
+  
+  console.log(`📊 Found ${allDataArray.length} total records from API`);
+  console.log(`   Filtering by store names and processing...`);
+  
+  // Step 4: Process each store and filter data by location field
+  let totalSaved = 0;
+  let totalSkipped = 0;
+  let totalErrors = 0;
+  let storesProcessed = 0;
+  
+  for (const store of stores) {
+    const storeName = store.name;
+    
+    if (!storeName) {
+      continue;
     }
     
-    console.log(`   ✅ Saved: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
+    console.log(`\n📍 Processing store: ${storeName}`);
+    
+    // Filter data by location field (API returns location name, not code)
+    const storeData = allDataArray.filter(row => {
+      const rowLocation = (row.location || row.Location || row.store || "").trim();
+      return rowLocation === storeName || rowLocation.includes(storeName) || storeName.includes(rowLocation);
+    });
+    
+    if (storeData.length === 0) {
+      console.log(`   ℹ️  No data for store "${storeName}"`);
+      continue;
+    }
+    
+    console.log(`   📊 Found ${storeData.length} records for "${storeName}"`);
+    
+    // Process and save booking data
+    let saved = 0;
+    let skipped = 0;
+    let errors = 0;
+    
+    for (const row of storeData) {
+      // Add store name to the row data for mapping
+      const rowWithStore = {
+        ...row,
+        store: storeName, // Use store name from database
+      };
+      
+      const mapped = mapBooking(rowWithStore);
+      if (mapped) {
+        const result = await saveToMongo(mapped);
+        if (result.saved) {
+          saved++;
+        } else if (result.updated) {
+          // Count updates as saved (prevented duplicate)
+          saved++;
+        } else if (result.skipped) {
+          skipped++;
+        } else {
+          errors++;
+        }
+      } else {
+        skipped++;
+      }
+    }
+    
+    console.log(`   ✅ Saved/Updated: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
     
     totalSaved += saved;
     totalSkipped += skipped;
     totalErrors += errors;
     storesProcessed++;
-    
-    // Small delay between stores
-    await new Promise(resolve => setTimeout(resolve, 500));
   }
+  
+  // Update sync log with latest sync time
+  const syncEndTime = new Date();
+  await SyncLog.findOneAndUpdate(
+    { syncType: "booking" },
+    {
+      lastSyncAt: syncEndTime,
+      lastSyncCount: totalSaved,
+      status: totalErrors > 0 ? "partial" : "success",
+      errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : null,
+    },
+    { upsert: true, new: true }
+  );
   
   console.log(`\n✅ Booking sync completed!`);
   console.log(`   📊 Stores processed: ${storesProcessed}/${stores.length}`);
-  console.log(`   💾 Total saved: ${totalSaved}`);
+  console.log(`   💾 Total saved/updated: ${totalSaved} (duplicates automatically prevented)`);
   console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
   console.log(`   ❌ Total errors: ${totalErrors}`);
+  console.log(`   📅 Next sync will fetch records updated after: ${syncEndTime.toISOString()}`);
 };
 
-run().catch((error) => {
-  console.error("❌ Booking sync failed:", error.message);
-  process.exit(1);
-});
+// Export run function for use in runAll.js
+export { run };
+
+// Auto-run if called directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('sync_booking.js')) {
+  run().catch((error) => {
+    console.error("❌ Booking sync failed:", error.message);
+    process.exit(1);
+  });
+}
 

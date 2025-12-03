@@ -114,8 +114,14 @@ const run = async () => {
   console.log(`✅ Store List sync completed: ${saved} saved, ${updated} updated, ${skipped} skipped, ${errors} errors`);
 };
 
-run().catch((error) => {
-  console.error("❌ Store List sync failed:", error.message);
-  process.exit(1);
-});
+// Export run function for use in runAll.js
+export { run };
+
+// Auto-run if called directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('sync_storelist.js')) {
+  run().catch((error) => {
+    console.error("❌ Store List sync failed:", error.message);
+    process.exit(1);
+  });
+}
 

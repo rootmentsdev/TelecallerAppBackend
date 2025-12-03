@@ -2,56 +2,59 @@ import mongoose from "mongoose";
 
 const leadSchema = new mongoose.Schema(
   {
+    // Basic Information (Required)
     name: { type: String, required: true },
     phone: { type: String, required: true },
-
-    source: { type: String },          // Instagram, JustDial, Walk-in, etc.
-    enquiryType: { type: String },     // Wedding Suit, Bridal, Rent-out, etc.
     store: { type: String, required: true },
-
-    // Call category for reports & UI tabs
-    // "lossOfSale", "rentOutFeedback", "bookingConfirmation", "justDial", "general"
-    leadType: {
-      type: String,
-      default: "general",
+    
+    // Source and Type
+    source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.
+    leadType: { 
+      type: String, 
+      enum: ["lossOfSale", "rentOutFeedback", "bookingConfirmation", "justDial", "general"],
+      default: "general" 
     },
-
-    // Booking / rent-out specific fields (optional)
+    brand: { type: String }, // For Add Lead page
+    
+    // Dates
     enquiryDate: { type: Date },
+    visitDate: { type: Date }, // For Loss of Sale page
     functionDate: { type: Date },
+    returnDate: { type: Date }, // For Rent-Out page
+    callDate: { type: Date }, // Date when call was made
+    followUpDate: { type: Date },
+    
+    // Booking/Rent-Out Information
     bookingNo: { type: String },
     securityAmount: { type: Number },
-    returnDate: { type: Date },
-    closingStatus: { type: String },     // Already Visited, Not Interested, etc.
-    reason: { type: String },            // Reason collected from store
-    rating: { type: Number, min: 1, max: 5 },
-
-    // Call updates
-    callStatus: { type: String, default: "Not Called" }, // Connected, Not Connected, Busy, etc.
-    leadStatus: { type: String, default: "No Status" },  // Interested, Not Interested, etc.
-
-    remarks: { type: String, default: "" },
-
+    
+    // Status Fields
+    callStatus: { type: String, default: "Not Called" },
+    leadStatus: { type: String, default: "No Status" },
+    closingStatus: { type: String }, // For Just Dial page
+    
     // Follow-up
-    followUpDate: { type: Date },
-
-    // For completed calls / attended by
+    followUpFlag: { type: Boolean, default: false },
+    
+    // Additional Information
+    reason: { type: String }, // For Just Dial page
+    reasonCollectedFromStore: { type: String }, // For Loss of Sale page
+    rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
     attendedBy: { type: String },
-
-    // who created the lead in app
+    remarks: { type: String, default: "" },
+    
+    // User Tracking
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-    // Lead assignment
-    assignedTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    assignedAt: {
-      type: Date,
-    },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    assignedAt: { type: Date },
   },
   { timestamps: true }
 );
+
+// Index for faster queries
+leadSchema.index({ phone: 1 });
+leadSchema.index({ leadType: 1 });
+leadSchema.index({ store: 1 });
+leadSchema.index({ assignedTo: 1 });
 
 export default mongoose.model("Lead", leadSchema);

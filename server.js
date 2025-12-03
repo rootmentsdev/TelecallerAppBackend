@@ -5,11 +5,9 @@ dotenv.config();
 
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
-import leadRoutes from './routes/leadRoutes.js';
-import followUpRoutes from './routes/followUpRoutes.js';
-import callLogRoutes from './routes/callLogRoutes.js';
 import assignmentRoutes from './routes/assignmentRoutes.js';
 import csvImportRoutes from './routes/csvImportRoutes.js';
+import pageRoutes from './routes/pageRoutes.js';
 
 const app = express();
 app.use(express.json());
@@ -32,11 +30,9 @@ app.use(cors({
 connectDB();
 
 app.use('/api/auth', authRoutes);
-app.use('/api/leads', leadRoutes);
-app.use('/api/followups', followUpRoutes);
-app.use('/api/calls', callLogRoutes);
 app.use('/api/assign', assignmentRoutes);
 app.use('/api/import', csvImportRoutes);
+app.use('/api/pages', pageRoutes);
 
 // Health check endpoint for Render
 app.get('/health', (req, res) => {
