@@ -202,29 +202,29 @@ const run = async () => {
   for (let i = 0; i < allDataArray.length; i++) {
     const row = allDataArray[i];
     
-    // Show progress every N records
-    if (i % progressInterval === 0 || i === allDataArray.length - 1) {
-      const progress = ((i + 1) / totalRecords * 100).toFixed(1);
-      const elapsed = ((Date.now() - lastProgressTime) / 1000).toFixed(1);
-      const rate = progressInterval > 0 ? (progressInterval / (elapsed || 1)).toFixed(0) : 0;
-      console.log(`   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Rate: ~${rate} records/sec | Saved: ${totalSaved}, Skipped: ${totalSkipped}`);
-      lastProgressTime = Date.now();
-    }
-    
     // Store name is already added in the loop above
     const mapped = mapBooking(row);
-        if (mapped) {
-          const result = await saveToMongo(mapped);
-          if (result.saved) {
+    if (mapped) {
+      const result = await saveToMongo(mapped);
+      if (result.saved) {
         totalSaved++;
-          } else if (result.skipped) {
+      } else if (result.skipped) {
         // Record already exists - skipped (not updated)
         totalSkipped++;
-          } else {
+      } else {
         totalErrors++;
       }
     } else {
       totalSkipped++;
+    }
+    
+    // Show progress AFTER processing (so counters are accurate)
+    if (i % progressInterval === 0 || i === allDataArray.length - 1) {
+      const progress = ((i + 1) / totalRecords * 100).toFixed(1);
+      const elapsed = ((Date.now() - lastProgressTime) / 1000).toFixed(1);
+      const rate = progressInterval > 0 ? (progressInterval / (elapsed || 1)).toFixed(0) : 0;
+      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Rate: ~${rate} records/sec | Saved: ${totalSaved}, Skipped: ${totalSkipped}, Errors: ${totalErrors}`);
+      lastProgressTime = Date.now();
     }
   }
   

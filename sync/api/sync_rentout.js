@@ -253,16 +253,11 @@ const run = async () => {
     let saved = 0;
     let skipped = 0;
     let errors = 0;
-    const progressInterval = Math.max(1, Math.floor(dataArray.length / 10)); // Show progress every 10%
+    const totalRecordsInLocation = dataArray.length;
+    const progressInterval = Math.max(1, Math.floor(totalRecordsInLocation / 20)); // Update every 5%
     
-    for (let i = 0; i < dataArray.length; i++) {
+    for (let i = 0; i < totalRecordsInLocation; i++) {
       const row = dataArray[i];
-      
-      // Show progress for large datasets
-      if (dataArray.length > 100 && (i % progressInterval === 0 || i === dataArray.length - 1)) {
-        const progress = ((i + 1) / dataArray.length * 100).toFixed(0);
-        process.stdout.write(`\r   ⏳ Processing: ${progress}% (${i + 1}/${dataArray.length})`);
-      }
       
       // Add store name to the row data for mapping
       const rowWithStore = {
@@ -284,10 +279,16 @@ const run = async () => {
       } else {
         skipped++;
       }
+      
+      // Show progress AFTER processing (so counters are accurate)
+      if (totalRecordsInLocation > 100 && (i % progressInterval === 0 || i === totalRecordsInLocation - 1)) {
+        const progress = ((i + 1) / totalRecordsInLocation * 100).toFixed(1);
+        process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecordsInLocation}) | Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`);
+      }
     }
     
-    if (dataArray.length > 100) {
-      console.log(); // New line after progress indicator
+    if (totalRecordsInLocation > 100) {
+      process.stdout.write('\n'); // New line after progress indicator
     }
     
     console.log(`   ✅ New records saved: ${saved}, ⏭️  Skipped (exists): ${skipped}, ❌ Errors: ${errors}`);

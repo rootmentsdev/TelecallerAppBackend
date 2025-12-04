@@ -13,6 +13,8 @@
     "sync:all": "node sync/runAll.js",
     "import:walkin": "node sync/csv/import_walkin.js",
     "import:lossofsale": "node sync/csv/import_lossofsale.js",
+    "import:all:walkin": "node sync/csv/import_all_walkin.js",
+    "import:all:lossofsale": "node sync/csv/import_all_lossofsale.js",
     "sync:booking": "node sync/api/sync_booking.js",
     "sync:rentout": "node sync/api/sync_rentout.js",
     "sync:stores": "node sync/api/sync_storelist.js",
