@@ -33,54 +33,56 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Missing required fields" };
     }
 
-    // For booking confirmation and rent-out, check for duplicates to prevent the same booking from being imported multiple times
-    if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") {
+    // For booking confirmation, rent-out, and loss of sale, check for duplicates
+    // to prevent the same record from being imported multiple times
+    if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback" || leadData.leadType === "lossOfSale") {
       let duplicateQuery = null;
       
-      // Primary check: bookingNo + phone + leadType (most reliable)
-      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        duplicateQuery = {
-          bookingNo: leadData.bookingNo.trim(),
-          phone: leadData.phone,
-          leadType: leadData.leadType,
-        };
-      } else {
-        // Fallback: phone + name + leadType + store (if bookingNo is missing)
+      if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") {
+        // For booking/rent-out: Primary check: bookingNo + phone + leadType (most reliable)
+        if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+          duplicateQuery = {
+            bookingNo: leadData.bookingNo.trim(),
+            phone: leadData.phone,
+            leadType: leadData.leadType,
+          };
+        } else {
+          // Fallback: phone + name + leadType + store (if bookingNo is missing)
+          duplicateQuery = {
+            phone: leadData.phone,
+            name: leadData.name,
+            leadType: leadData.leadType,
+            store: leadData.store,
+          };
+        }
+      } else if (leadData.leadType === "lossOfSale") {
+        // For loss of sale: Check phone + name + store + leadType + enquiryDate (if available)
+        // This prevents the same loss of sale record from being imported multiple times
         duplicateQuery = {
           phone: leadData.phone,
           name: leadData.name,
           leadType: leadData.leadType,
           store: leadData.store,
         };
+        
+        // If enquiryDate is available, include it in the duplicate check for more accuracy
+        if (leadData.enquiryDate) {
+          duplicateQuery.enquiryDate = leadData.enquiryDate;
+        }
+        // Alternative: if functionDate is available and enquiryDate is not, use functionDate
+        else if (leadData.functionDate) {
+          duplicateQuery.functionDate = leadData.functionDate;
+        }
       }
       
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
-        // Duplicate found - update existing lead instead of creating duplicate
-        // Preserve user-edited fields (callStatus, leadStatus, remarks, etc.) if they exist
-        const updateData = {
-          ...leadData,
-          // Don't overwrite user-edited fields if they exist and new data doesn't have them
-          callStatus: leadData.callStatus || existing.callStatus,
-          leadStatus: leadData.leadStatus || existing.leadStatus,
-          remarks: leadData.remarks || existing.remarks,
-          followUpDate: leadData.followUpDate || existing.followUpDate,
-          followUpFlag: leadData.followUpFlag !== undefined ? leadData.followUpFlag : existing.followUpFlag,
-          assignedTo: leadData.assignedTo || existing.assignedTo,
-          updatedAt: new Date(), // Ensure updatedAt is refreshed
-        };
-        
-        const updated = await Lead.findByIdAndUpdate(
-          existing._id,
-          updateData,
-          { new: true }
-        );
-        // Return updated flag to indicate duplicate was prevented
-        return { updated: true, leadId: updated._id, name: updated.name, phone: updated.phone, bookingNo: updated.bookingNo };
+        // Record already exists - skip it (don't update to preserve user edits and avoid unnecessary updates)
+        return { skipped: true, leadId: existing._id, name: existing.name, phone: existing.phone, bookingNo: existing.bookingNo, reason: "Already exists" };
       }
     }
 
-    // For other lead types (walk-in, loss of sale, etc.), allow duplicates for tracking revisits
+    // For other lead types (walk-in, justDial, general), allow duplicates for tracking revisits
     // Create new lead
     const lead = await Lead.create(leadData);
     return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
@@ -108,9 +110,8 @@ export const saveStoreToMongo = async (storeData) => {
 
     const existing = await Store.findOne(query);
     if (existing) {
-      // Update existing store
-      const updated = await Store.findByIdAndUpdate(existing._id, storeData, { new: true });
-      return { updated: true, storeId: updated._id, name: updated.name };
+      // Store already exists - skip it (don't update to avoid unnecessary changes)
+      return { skipped: true, storeId: existing._id, name: existing.name, reason: "Already exists" };
     }
 
     // Create new store

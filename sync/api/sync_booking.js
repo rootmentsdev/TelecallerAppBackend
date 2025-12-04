@@ -213,16 +213,14 @@ const run = async () => {
     
     // Store name is already added in the loop above
     const mapped = mapBooking(row);
-    if (mapped) {
-      const result = await saveToMongo(mapped);
-      if (result.saved) {
+        if (mapped) {
+          const result = await saveToMongo(mapped);
+          if (result.saved) {
         totalSaved++;
-      } else if (result.updated) {
-        // Count updates as saved (prevented duplicate)
-        totalSaved++;
-      } else if (result.skipped) {
+          } else if (result.skipped) {
+        // Record already exists - skipped (not updated)
         totalSkipped++;
-      } else {
+          } else {
         totalErrors++;
       }
     } else {
@@ -245,8 +243,8 @@ const run = async () => {
   
   console.log(`\n✅ Booking sync completed!`);
   console.log(`   📊 Locations processed: ${locationIds.length}`);
-  console.log(`   💾 Total saved/updated: ${totalSaved} (duplicates automatically prevented)`);
-  console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
+  console.log(`   💾 Total new records saved: ${totalSaved}`);
+  console.log(`   ⏭️  Total skipped (already exists): ${totalSkipped}`);
   console.log(`   ❌ Total errors: ${totalErrors}`);
   console.log(`   📅 Next sync will fetch records updated after: ${syncEndTime.toISOString()}`);
 };

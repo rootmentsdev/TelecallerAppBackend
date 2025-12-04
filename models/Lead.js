@@ -56,5 +56,8 @@ leadSchema.index({ phone: 1 });
 leadSchema.index({ leadType: 1 });
 leadSchema.index({ store: 1 });
 leadSchema.index({ assignedTo: 1 });
+// Compound index for duplicate checking (loss of sale, booking, rent-out)
+leadSchema.index({ phone: 1, name: 1, leadType: 1, store: 1 });
+leadSchema.index({ bookingNo: 1, phone: 1, leadType: 1 });
 
 export default mongoose.model("Lead", leadSchema);

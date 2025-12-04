@@ -163,21 +163,24 @@ export const mapWalkin = (row) => {
 // Map Loss of Sale CSV data to Lead model
 // CSV Fields: name, phone, store, source, enquiryType, leadType, reason, closingStatus, remarks
 export const mapLossOfSale = (row) => {
-  // Handle different column name variations
+  // Handle different column name variations (including Excel column names)
   const phone = cleanPhone(
     row.phone || row.Phone || row.PHONE || 
-    row.customerPhone || row.CustomerPhone || row.Contact || row.contact
+    row.customerPhone || row.CustomerPhone || row.Contact || row.contact ||
+    row.NUMBER || row.Number || row["NUMBER"] || // Excel column name
+    row["Contact"] || row["CONTACT"] // Excel column name variations
   );
   if (!phone) return null;
 
   const name = (
     row.name || row.Name || row.NAME || 
-    row.customerName || row.CustomerName || row["Customer Name"]
+    row.customerName || row.CustomerName || row["Customer Name"] ||
+    row["CUSTOMER NAME"] || row["customer name"] // Excel column name
   )?.trim();
 
   if (!name) return null; // Name is required
 
-  // Store is required - use from row or default
+  // Store is required - use from row or default (should be set by import script)
   const store = (
     row.store || row.Store || row.STORE || 
     row.StoreName || row.storeName
@@ -200,7 +203,8 @@ export const mapLossOfSale = (row) => {
 
   // Reason (specific to loss of sale - important field)
   const reason = (
-    row.reason || row.Reason || row.REASON
+    row.reason || row.Reason || row.REASON ||
+    row["REASON"] // Excel column name
   )?.trim();
 
   // Closing Status
@@ -209,21 +213,50 @@ export const mapLossOfSale = (row) => {
     row.status || row.Status || row.STATUS
   )?.trim();
 
-  // Remarks
+  // Remarks - combine multiple comment fields
   const remarks = (
-    row.remarks || row.Remarks || row.REMARKS || row.notes || row.Notes
+    row.remarks || row.Remarks || row.REMARKS || row.notes || row.Notes ||
+    row.COMMENTS || row["COMMENTS"] || row["OTHER COMMENTS"] || // Excel column names
+    row["Comments"] || row["Other Comments"] ||
+    (row.COMMENTS && row["OTHER COMMENTS"] 
+      ? `${row.COMMENTS || ''} ${row["OTHER COMMENTS"] || ''}`.trim()
+      : (row.COMMENTS || row["OTHER COMMENTS"] || ''))
   )?.trim() || "";
 
-  // Date fields (if present in CSV)
-  const enquiryDate = parseDate(
-    row.enquiryDate || row["enquiry date"] || row["Enquiry Date"] ||
-    row.date || row.Date || row.DATE
-  );
+  // Attended By (Staff Name)
+  const attendedBy = (
+    row.attendedBy || row.AttendedBy || row.attended_by ||
+    row["STAFF NAME"] || row["Staff Name"] || row.staffName || row.StaffName ||
+    row.staff || row.Staff || row.STAFF
+  )?.trim();
 
-  const functionDate = parseDate(
-    row.functionDate || row["function date"] || row["Function Date"] ||
-    row["functionDate"] || row.FunctionDate
-  );
+  // Date fields (if present in CSV)
+  // Excel stores dates as numbers (days since 1900-01-01), convert to date
+  let enquiryDateValue = row.enquiryDate || row["enquiry date"] || row["Enquiry Date"] ||
+    row.date || row.Date || row.DATE;
+  
+  // If it's an Excel date number, convert it
+  if (enquiryDateValue && typeof enquiryDateValue === 'number') {
+    // Excel date: days since 1900-01-01 (Excel incorrectly treats 1900 as leap year, so we use Dec 30, 1899 as epoch)
+    // Subtract 2 days to account for Excel's leap year bug
+    const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+    const date = new Date(excelEpoch.getTime() + (enquiryDateValue - 2) * 24 * 60 * 60 * 1000);
+    enquiryDateValue = date; // Pass Date object directly
+  }
+  
+  const enquiryDate = enquiryDateValue instanceof Date ? enquiryDateValue : parseDate(enquiryDateValue);
+
+  let functionDateValue = row.functionDate || row["function date"] || row["Function Date"] ||
+    row["functionDate"] || row.FunctionDate || row["FUNCTION DATE"];
+  
+  // If it's an Excel date number, convert it
+  if (functionDateValue && typeof functionDateValue === 'number') {
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + (functionDateValue - 2) * 24 * 60 * 60 * 1000);
+    functionDateValue = date; // Pass Date object directly
+  }
+  
+  const functionDate = functionDateValue instanceof Date ? functionDateValue : parseDate(functionDateValue);
 
   // Build complete lead object with all fields
   const leadData = {
@@ -241,7 +274,11 @@ export const mapLossOfSale = (row) => {
     
     // Loss of Sale specific fields
     reason: reason || undefined,
+    reasonCollectedFromStore: reason || undefined, // Map reason to reasonCollectedFromStore
     closingStatus: closingStatus || undefined,
+    
+    // Attended By (Staff Name)
+    attendedBy: attendedBy || undefined,
     
     // Dates (if available)
     enquiryDate: enquiryDate,

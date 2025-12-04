@@ -275,10 +275,8 @@ const run = async () => {
         const result = await saveToMongo(mapped);
         if (result.saved) {
           saved++;
-        } else if (result.updated) {
-          // Count updates as saved (prevented duplicate)
-          saved++;
         } else if (result.skipped) {
+          // Record already exists - skipped (not updated)
           skipped++;
         } else {
           errors++;
@@ -292,7 +290,7 @@ const run = async () => {
       console.log(); // New line after progress indicator
     }
     
-    console.log(`   ✅ Saved/Updated: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
+    console.log(`   ✅ New records saved: ${saved}, ⏭️  Skipped (exists): ${skipped}, ❌ Errors: ${errors}`);
     
     totalSaved += saved;
     totalSkipped += skipped;
@@ -318,8 +316,8 @@ const run = async () => {
   
   console.log(`\n✅ Rent-Out sync completed!`);
   console.log(`   📊 Locations processed: ${locationsProcessed}/${locationIds.length}`);
-  console.log(`   💾 Total saved/updated: ${totalSaved} (duplicates automatically prevented)`);
-  console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
+  console.log(`   💾 Total new records saved: ${totalSaved}`);
+  console.log(`   ⏭️  Total skipped (already exists): ${totalSkipped}`);
   console.log(`   ❌ Total errors: ${totalErrors}`);
   console.log(`   📅 Next sync will fetch records updated after: ${syncEndTime.toISOString()}`);
 };

@@ -67,7 +67,6 @@ const run = async () => {
   }
 
   let saved = 0;
-  let updated = 0;
   let skipped = 0;
   let errors = 0;
 
@@ -102,16 +101,15 @@ const run = async () => {
     const result = await saveStoreToMongo(storeData);
     if (result.saved) {
       saved++;
-    } else if (result.updated) {
-      updated++;
     } else if (result.skipped) {
+      // Store already exists - skipped (not updated)
       skipped++;
     } else {
       errors++;
     }
   }
 
-  console.log(`✅ Store List sync completed: ${saved} saved, ${updated} updated, ${skipped} skipped, ${errors} errors`);
+  console.log(`✅ Store List sync completed: ${saved} new saved, ${skipped} skipped (already exists), ${errors} errors`);
 };
 
 // Export run function for use in runAll.js

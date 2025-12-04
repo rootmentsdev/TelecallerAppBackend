@@ -47,34 +47,53 @@ export const getLeads = async (req, res) => {
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
+    // Select fields based on lead type for better data retrieval
+    const selectFields = "name phone store leadType callStatus leadStatus bookingNo functionDate enquiryDate visitDate returnDate createdAt assignedTo reasonCollectedFromStore attendedBy";
+    
     const leads = await Lead.find(query)
       .populate("assignedTo", "name employeeId")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select("name phone store leadType callStatus leadStatus bookingNo functionDate enquiryDate createdAt assignedTo");
+      .select(selectFields);
 
     const total = await Lead.countDocuments(query);
 
-    // Map to API response format
-    const mappedLeads = leads.map(lead => ({
-      id: lead._id,
-      lead_name: lead.name,
-      phone_number: lead.phone,
-      store: lead.store,
-      lead_type: lead.leadType,
-      call_status: lead.callStatus,
-      lead_status: lead.leadStatus,
-      booking_number: lead.bookingNo,
-      function_date: lead.functionDate,
-      enquiry_date: lead.enquiryDate,
-      created_at: lead.createdAt,
-      assigned_to: lead.assignedTo ? {
-        id: lead.assignedTo._id,
-        name: lead.assignedTo.name,
-        employee_id: lead.assignedTo.employeeId
-      } : null
-    }));
+    // Map to API response format with type-specific fields
+    const mappedLeads = leads.map(lead => {
+      const baseLead = {
+        id: lead._id,
+        lead_name: lead.name,
+        phone_number: lead.phone,
+        store: lead.store,
+        lead_type: lead.leadType,
+        call_status: lead.callStatus,
+        lead_status: lead.leadStatus,
+        function_date: lead.functionDate,
+        enquiry_date: lead.enquiryDate,
+        created_at: lead.createdAt,
+        assigned_to: lead.assignedTo ? {
+          id: lead.assignedTo._id,
+          name: lead.assignedTo.name,
+          employee_id: lead.assignedTo.employeeId
+        } : null
+      };
+
+      // Add type-specific fields
+      if (lead.leadType === "lossOfSale") {
+        baseLead.visit_date = lead.visitDate;
+        baseLead.reason_collected_from_store = lead.reasonCollectedFromStore;
+        baseLead.attended_by = lead.attendedBy;
+      } else if (lead.leadType === "rentOutFeedback") {
+        baseLead.booking_number = lead.bookingNo;
+        baseLead.return_date = lead.returnDate;
+        baseLead.attended_by = lead.attendedBy;
+      } else if (lead.leadType === "bookingConfirmation") {
+        baseLead.booking_number = lead.bookingNo;
+      }
+
+      return baseLead;
+    });
 
     res.json({
       leads: mappedLeads,
