@@ -61,7 +61,7 @@ const run = async () => {
   // Step 4: Get last sync time for incremental sync (only fetch new/updated records)
   let lastSyncAt = null;
   let syncLog = await SyncLog.findOne({ syncType: "rentout" });
-  
+
   if (syncLog && syncLog.lastSyncAt) {
     lastSyncAt = syncLog.lastSyncAt;
     console.log(`📅 Last sync: ${lastSyncAt.toISOString()}`);
@@ -69,40 +69,29 @@ const run = async () => {
   } else {
     console.log(`📅 First sync - will fetch all records`);
   }
-  
+
   // Step 5: Date range configuration - use last sync time for incremental sync
   let dateFrom = process.env.RENTOUT_DATE_FROM || "";
   let dateTo = process.env.RENTOUT_DATE_TO || "";
   let months = process.env.RENTOUT_MONTHS || "";
-  
-  // If last sync exists, use it as dateFrom for incremental sync
-  if (lastSyncAt && !dateFrom) {
-    const now = new Date();
-    const daysSinceLastSync = Math.floor((now - lastSyncAt) / (1000 * 60 * 60 * 24));
-    
-    // If last sync was today or very recent (less than 1 day), use last 7 days to catch any updates
-    if (daysSinceLastSync < 1) {
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const day = String(sevenDaysAgo.getDate()).padStart(2, '0');
-      const month = String(sevenDaysAgo.getMonth() + 1).padStart(2, '0');
-      const year = sevenDaysAgo.getFullYear();
-      dateFrom = `${day}-${month}-${year}`;
-      console.log(`   Last sync was today - using last 7 days to catch updates: ${dateFrom}`);
-    } else {
-      // Format date as DD-MM-YYYY for API
-      const day = String(lastSyncAt.getDate()).padStart(2, '0');
-      const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
-      const year = lastSyncAt.getFullYear();
-      dateFrom = `${day}-${month}-${year}`;
-      console.log(`   Using incremental sync from: ${dateFrom}`);
-    }
-  }
-  
-  // If no date range specified and no last sync, default to last 12 months (first sync)
-  if (!dateFrom && !dateTo && !months && !lastSyncAt) {
+
+  // If last sync exists and no date range specified, use last sync date for incremental sync
+  if (lastSyncAt && !dateFrom && !dateTo && !months) {
+    // Format date as DD-MM-YYYY for API
+    const day = String(lastSyncAt.getDate()).padStart(2, '0');
+    const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
+    const year = lastSyncAt.getFullYear();
+    dateFrom = `${day}-${month}-${year}`;
+    console.log(`   Using incremental sync from: ${dateFrom}`);
+  } else if (!dateFrom && !dateTo && !months) {
+    // If no date range specified and no last sync, default to last 12 months (first sync)
     months = "12";
     console.log(`   Using default: last 12 months (first sync)`);
+  } else {
+    // Use environment variables if specified
+    if (dateFrom) console.log(`📅 Date from: ${dateFrom}`);
+    if (dateTo) console.log(`📅 Date to: ${dateTo}`);
+    if (months) console.log(`📅 Months: ${months}`);
   }
   
   console.log(`📡 Using API: ${apiUrl}`);
@@ -189,14 +178,14 @@ const run = async () => {
       const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
       console.log(`   📡 Trying fallback API: ${fallbackUrl}`);
       
-      let finalDateFrom = dateFrom;
-      let finalDateTo = dateTo;
-      let finalMonths = months;
-      
-      // If no date range specified and no last sync, default to last 12 months (first sync)
-      if (!finalDateFrom && !finalDateTo && !finalMonths && !lastSyncAt) {
-        finalMonths = "12";
-      }
+              let finalDateFrom = dateFrom;
+              let finalDateTo = dateTo;
+              let finalMonths = months;
+
+              // If no date range specified and no last sync, default to last 12 months (first sync)
+              if (!finalDateFrom && !finalDateTo && !finalMonths && !lastSyncAt) {
+                finalMonths = "12";
+              }
       
       const fallbackData = await postAPI(
         fallbackUrl,

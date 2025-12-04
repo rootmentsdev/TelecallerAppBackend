@@ -35,13 +35,14 @@ const buildLeadQuery = (user, filters = {}) => {
 // GET - Fetch list of leads (for listing pages)
 export const getLeads = async (req, res) => {
   try {
-    const { leadType, callStatus, leadStatus, store, page = 1, limit = 50 } = req.query;
+    const { leadType, callStatus, leadStatus, store, source, page = 1, limit = 50 } = req.query;
     
     const filters = {};
     if (leadType) filters.leadType = leadType;
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
     if (store) filters.store = store;
+    if (source) filters.source = source;
 
     const query = buildLeadQuery(req.user, filters);
     

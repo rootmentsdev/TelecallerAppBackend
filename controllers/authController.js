@@ -33,8 +33,31 @@ export const register = async (req, res) => {
     }
 };
 
+// List of employeeIds that should be admin (can be changed in code)
+// Add or remove employeeIds here to grant/revoke admin access
+const ADMIN_EMPLOYEE_IDS = [
+  "Emp188",  // SHAFNA ISMAIL - Admin
+  "emp188",  // Case-insensitive variant
+  // Add more employeeIds here as needed:
+  // "Emp001",
+  // "Emp002",
+];
+
+// Helper function to check if employeeId should be admin
+const isAdminEmployee = (employeeId) => {
+  if (!employeeId) return false;
+  return ADMIN_EMPLOYEE_IDS.some(
+    adminId => adminId.toLowerCase() === employeeId.toLowerCase()
+  );
+};
+
 // Helper function to map API role to our role system
-const mapRoleFromAPI = (apiRole) => {
+const mapRoleFromAPI = (apiRole, employeeId) => {
+  // First check if this employeeId is designated as admin in code
+  if (isAdminEmployee(employeeId)) {
+    return "admin";
+  }
+  
   if (!apiRole) return "telecaller";
   
   const roleLower = apiRole.toLowerCase().trim();
@@ -126,9 +149,10 @@ export const login = async (req, res) => {
         const apiUserData = apiResponse.data;
 
         // Step 4: Map API response to our User model
-        const mappedRole = mapRoleFromAPI(apiUserData.role);
-        const store = apiUserData.Store || apiUserData.store || "No Store";
+        // Pass employeeId to mapRoleFromAPI so it can check if user should be admin
         const employeeIdFromAPI = apiUserData.employeeId || apiUserData.employeeld || employeeId;
+        const mappedRole = mapRoleFromAPI(apiUserData.role, employeeIdFromAPI);
+        const store = apiUserData.Store || apiUserData.store || "No Store";
         const name = apiUserData.name || "";
 
         // Validate that we have essential data from API

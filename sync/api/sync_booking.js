@@ -66,34 +66,23 @@ const run = async () => {
   let dateTo = process.env.BOOKING_DATE_TO || "";
   let months = process.env.BOOKING_MONTHS || "";
 
-  // If last sync exists, use it as dateFrom for incremental sync
-  if (lastSyncAt && !dateFrom) {
-    const now = new Date();
-    const daysSinceLastSync = Math.floor((now - lastSyncAt) / (1000 * 60 * 60 * 24));
-    
-    // If last sync was today or very recent (less than 1 day), use last 7 days to catch any updates
-    if (daysSinceLastSync < 1) {
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const day = String(sevenDaysAgo.getDate()).padStart(2, '0');
-      const month = String(sevenDaysAgo.getMonth() + 1).padStart(2, '0');
-      const year = sevenDaysAgo.getFullYear();
-      dateFrom = `${day}-${month}-${year}`;
-      console.log(`   Last sync was today - using last 7 days to catch updates: ${dateFrom}`);
-    } else {
-      // Format date as DD-MM-YYYY for API
-      const day = String(lastSyncAt.getDate()).padStart(2, '0');
-      const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
-      const year = lastSyncAt.getFullYear();
-      dateFrom = `${day}-${month}-${year}`;
-      console.log(`   Using incremental sync from: ${dateFrom}`);
-    }
-  }
-
-  // If no date range specified and no last sync, default to last 12 months (first sync)
-  if (!dateFrom && !dateTo && !months && !lastSyncAt) {
+  // If last sync exists and no date range specified, use last sync date for incremental sync
+  if (lastSyncAt && !dateFrom && !dateTo && !months) {
+    // Format date as DD-MM-YYYY for API
+    const day = String(lastSyncAt.getDate()).padStart(2, '0');
+    const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
+    const year = lastSyncAt.getFullYear();
+    dateFrom = `${day}-${month}-${year}`;
+    console.log(`   Using incremental sync from: ${dateFrom}`);
+  } else if (!dateFrom && !dateTo && !months) {
+    // If no date range specified and no last sync, default to last 12 months (first sync)
     months = "12";
     console.log(`   Using default: last 12 months (first sync)`);
+  } else {
+    // Use environment variables if specified
+    if (dateFrom) console.log(`📅 Date from: ${dateFrom}`);
+    if (dateTo) console.log(`📅 Date to: ${dateTo}`);
+    if (months) console.log(`📅 Months: ${months}`);
   }
   
   // Location ID to Store Name mapping (same as rent-out)
@@ -127,6 +116,7 @@ const run = async () => {
   const locationIds = Object.keys(LOCATION_ID_TO_STORE_NAME);
   
   let allDataArray = [];
+  let locationsWithNoData = 0;
   
   // Try GetBookingList API first (GET request without params returns empty, so skip to fallback)
   console.log(`📡 Trying GetBookingList API first...`);
@@ -167,18 +157,52 @@ const run = async () => {
       );
       
       if (!data) {
-      console.log(`   ℹ️  No data for location ID ${locationId}`);
+      console.log(`   ℹ️  No data for location ID ${locationId} (API returned null/undefined)`);
       continue;
     }
     
-    // Parse response
+    // Debug: Log response structure for first location
+    if (locationId === '1') {
+      console.log(`   🔍 Debug - Response structure:`, JSON.stringify(data, null, 2).substring(0, 500));
+      console.log(`   🔍 Response keys:`, Object.keys(data || {}));
+      if (data.dataSet) {
+        console.log(`   🔍 dataSet type:`, typeof data.dataSet);
+        console.log(`   🔍 dataSet is array:`, Array.isArray(data.dataSet));
+        if (data.dataSet && !Array.isArray(data.dataSet)) {
+          console.log(`   🔍 dataSet keys:`, Object.keys(data.dataSet));
+        }
+      }
+    }
+    
+    // Parse response - handle different response structures
     let locationData = [];
-    if (data.dataSet && Array.isArray(data.dataSet.data)) {
-      locationData = data.dataSet.data;
-    } else if (Array.isArray(data.dataSet)) {
-      locationData = data.dataSet;
+    
+    // Check for dataSet.data structure (most common)
+        if (data.dataSet) {
+          if (data.dataSet === null) {
+        console.log(`   ℹ️  dataSet is null for location ID ${locationId}`);
+        continue;
+          } else if (data.dataSet.data && Array.isArray(data.dataSet.data)) {
+        locationData = data.dataSet.data;
+          } else if (Array.isArray(data.dataSet)) {
+        locationData = data.dataSet;
+      } else if (data.dataSet.data && !Array.isArray(data.dataSet.data)) {
+        // dataSet.data might be an object, try to extract array from it
+        console.log(`   ⚠️  dataSet.data is not an array for location ID ${locationId}`);
+          }
+        } else if (data.data && Array.isArray(data.data)) {
+      locationData = data.data;
+        } else if (data.result && Array.isArray(data.result)) {
+      locationData = data.result;
     } else if (Array.isArray(data)) {
       locationData = data;
+        } else {
+      // Log what we actually got
+      console.log(`   ⚠️  Unexpected response format for location ID ${locationId}`);
+      console.log(`   Response status: ${data.status}, errorDescription: ${data.errorDescription || 'none'}`);
+      if (data.errorDescription) {
+        console.log(`   Error: ${data.errorDescription}`);
+      }
     }
     
     if (locationData.length > 0) {
@@ -188,16 +212,104 @@ const run = async () => {
       });
       allDataArray.push(...locationData);
       console.log(`   ✅ Found ${locationData.length} records for location ID ${locationId}`);
-    } else {
-      console.log(`   ℹ️  No data for location ID ${locationId}`);
+      } else {
+      locationsWithNoData++;
+      console.log(`   ℹ️  No data for location ID ${locationId} (empty array or null dataSet)`);
+      // Log response status for debugging
+      if (data.status !== undefined) {
+        console.log(`   Response status: ${data.status}`);
+      }
+      if (data.errorDescription) {
+        console.log(`   Error: ${data.errorDescription}`);
+      }
     }
     
     // Small delay between API calls
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   
+  // If all locations returned no data, try fetching all data with empty locationID
+  if (allDataArray.length === 0 && locationsWithNoData === locationIds.length) {
+    console.log(`\n⚠️  No data received from individual location IDs`);
+    console.log(`📡 Trying to fetch all booking data with empty locationID...`);
+    
+    const requestBody = {
+      bookingNo: "",
+      dateFrom: dateFrom || "",
+      dateTo: dateTo || "",
+      userName: "",
+      months: months || "",
+      fromLocation: "",
+      userID: "",
+      locationID: "", // Empty locationID to get all data
+    };
+    
+    console.log(`📡 Calling API: ${fallbackUrl}`);
+    console.log(`   📤 Location ID: "" (all locations)`);
+    
+    const allData = await postAPI(
+      fallbackUrl,
+      requestBody,
+      {
+        headers: {
+          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
+          "Content-Type": "application/json-patch+json",
+          "accept": "text/plain",
+        },
+      }
+    );
+    
+    if (allData) {
+      // Parse response
+      let allLocationData = [];
+      if (allData.dataSet && Array.isArray(allData.dataSet.data)) {
+        allLocationData = allData.dataSet.data;
+      } else if (Array.isArray(allData.dataSet)) {
+        allLocationData = allData.dataSet;
+      } else if (Array.isArray(allData.data)) {
+        allLocationData = allData.data;
+      } else if (Array.isArray(allData)) {
+        allLocationData = allData;
+      }
+      
+      if (allLocationData.length > 0) {
+        console.log(`   ✅ Found ${allLocationData.length} total records from all locations`);
+        console.log(`   📊 Filtering by store name and mapping location IDs...`);
+        
+        // Map location ID from API data to store name
+        // The API data should have a location field that we can map
+        allLocationData.forEach(row => {
+          // Try to find store name from location ID in the row data
+          const rowLocationId = String(row.locationID || row.locationId || row.LocationID || "").trim();
+          if (rowLocationId && LOCATION_ID_TO_STORE_NAME[rowLocationId]) {
+            row.store = LOCATION_ID_TO_STORE_NAME[rowLocationId];
+          } else {
+            // If no location ID match, try to match by store name in the data
+            const rowStoreName = row.store || row.Store || row.storeName || row.StoreName || "";
+            if (rowStoreName) {
+              row.store = rowStoreName;
+            } else {
+              // Default to first store if no match
+              row.store = "Default Store";
+            }
+          }
+        });
+        
+        allDataArray = allLocationData;
+        console.log(`   ✅ Mapped ${allDataArray.length} records to stores`);
+        } else {
+        console.log(`   ℹ️  No booking data received even with empty locationID`);
+        console.log(`   Response status: ${allData.status}, errorDescription: ${allData.errorDescription || 'none'}`);
+      }
+    }
+  }
+  
   if (allDataArray.length === 0) {
-    console.log(`ℹ️  No booking data received from any location`);
+    console.log(`\nℹ️  No booking data received from API`);
+    console.log(`   This could mean:`);
+    console.log(`   • No new bookings in the date range (${dateFrom || 'last 7 days'})`);
+    console.log(`   • API is not returning data for the specified parameters`);
+    console.log(`   • Check API response in debug logs above`);
     return;
   }
   
