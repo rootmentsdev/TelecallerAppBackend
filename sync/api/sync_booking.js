@@ -65,17 +65,31 @@ const run = async () => {
   let dateFrom = process.env.BOOKING_DATE_FROM || "";
   let dateTo = process.env.BOOKING_DATE_TO || "";
   let months = process.env.BOOKING_MONTHS || "";
-  
+
   // If last sync exists, use it as dateFrom for incremental sync
   if (lastSyncAt && !dateFrom) {
-    // Format date as DD-MM-YYYY for API
-    const day = String(lastSyncAt.getDate()).padStart(2, '0');
-    const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
-    const year = lastSyncAt.getFullYear();
-    dateFrom = `${day}-${month}-${year}`;
-    console.log(`   Using incremental sync from: ${dateFrom}`);
+    const now = new Date();
+    const daysSinceLastSync = Math.floor((now - lastSyncAt) / (1000 * 60 * 60 * 24));
+    
+    // If last sync was today or very recent (less than 1 day), use last 7 days to catch any updates
+    if (daysSinceLastSync < 1) {
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const day = String(sevenDaysAgo.getDate()).padStart(2, '0');
+      const month = String(sevenDaysAgo.getMonth() + 1).padStart(2, '0');
+      const year = sevenDaysAgo.getFullYear();
+      dateFrom = `${day}-${month}-${year}`;
+      console.log(`   Last sync was today - using last 7 days to catch updates: ${dateFrom}`);
+    } else {
+      // Format date as DD-MM-YYYY for API
+      const day = String(lastSyncAt.getDate()).padStart(2, '0');
+      const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
+      const year = lastSyncAt.getFullYear();
+      dateFrom = `${day}-${month}-${year}`;
+      console.log(`   Using incremental sync from: ${dateFrom}`);
+    }
   }
-  
+
   // If no date range specified and no last sync, default to last 12 months (first sync)
   if (!dateFrom && !dateTo && !months && !lastSyncAt) {
     months = "12";
