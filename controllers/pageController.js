@@ -35,7 +35,26 @@ const buildLeadQuery = (user, filters = {}) => {
 // GET - Fetch list of leads (for listing pages)
 export const getLeads = async (req, res) => {
   try {
-    const { leadType, callStatus, leadStatus, store, source, page = 1, limit = 50 } = req.query;
+    const { 
+      leadType, 
+      callStatus, 
+      leadStatus, 
+      store, 
+      source, 
+      page = 1, 
+      limit = 50,
+      // Date filtering parameters
+      enquiryDateFrom,
+      enquiryDateTo,
+      functionDateFrom,
+      functionDateTo,
+      visitDateFrom,
+      visitDateTo,
+      // Generic date range (applies to enquiryDate by default)
+      dateFrom,
+      dateTo,
+      dateField = 'enquiryDate' // Which date field to filter: enquiryDate, functionDate, visitDate, createdAt
+    } = req.query;
     
     const filters = {};
     if (leadType) filters.leadType = leadType;
@@ -43,6 +62,63 @@ export const getLeads = async (req, res) => {
     if (leadStatus) filters.leadStatus = leadStatus;
     if (store) filters.store = store;
     if (source) filters.source = source;
+
+    // Date filtering logic
+    // Priority: specific date fields > generic date range
+    if (enquiryDateFrom || enquiryDateTo) {
+      filters.enquiryDate = {};
+      if (enquiryDateFrom) {
+        filters.enquiryDate.$gte = new Date(enquiryDateFrom);
+      }
+      if (enquiryDateTo) {
+        // Set to end of day for inclusive range
+        const endDate = new Date(enquiryDateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.enquiryDate.$lte = endDate;
+      }
+    }
+
+    if (functionDateFrom || functionDateTo) {
+      filters.functionDate = {};
+      if (functionDateFrom) {
+        filters.functionDate.$gte = new Date(functionDateFrom);
+      }
+      if (functionDateTo) {
+        const endDate = new Date(functionDateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.functionDate.$lte = endDate;
+      }
+    }
+
+    if (visitDateFrom || visitDateTo) {
+      filters.visitDate = {};
+      if (visitDateFrom) {
+        filters.visitDate.$gte = new Date(visitDateFrom);
+      }
+      if (visitDateTo) {
+        const endDate = new Date(visitDateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.visitDate.$lte = endDate;
+      }
+    }
+
+    // Generic date range (if specific fields not provided)
+    if ((dateFrom || dateTo) && !enquiryDateFrom && !enquiryDateTo && !functionDateFrom && !functionDateTo && !visitDateFrom && !visitDateTo) {
+      const dateFieldName = dateField === 'functionDate' ? 'functionDate' : 
+                           dateField === 'visitDate' ? 'visitDate' : 
+                           dateField === 'createdAt' ? 'createdAt' : 
+                           'enquiryDate';
+      
+      filters[dateFieldName] = {};
+      if (dateFrom) {
+        filters[dateFieldName].$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters[dateFieldName].$lte = endDate;
+      }
+    }
 
     const query = buildLeadQuery(req.user, filters);
     
