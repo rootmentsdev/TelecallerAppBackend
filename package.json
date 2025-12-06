@@ -19,7 +19,6 @@
     "sync:rentout": "node sync/api/sync_rentout.js",
     "sync:stores": "node sync/api/sync_storelist.js",
     "test:api": "node scripts/test-api-validation.js",
-    "cleanup:duplicates": "node scripts/remove-duplicate-bookings.js",
     "cleanup:duplicates": "node scripts/remove-duplicate-bookings.js"
   },
   "keywords": [],
@@ -36,6 +35,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",
     "multer": "^2.0.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

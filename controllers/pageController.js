@@ -42,7 +42,7 @@ export const getLeads = async (req, res) => {
       store, 
       source, 
       page = 1, 
-      limit = 50,
+      limit = 100, // Increased default limit from 50 to 100
       // Date filtering parameters
       enquiryDateFrom,
       enquiryDateTo,

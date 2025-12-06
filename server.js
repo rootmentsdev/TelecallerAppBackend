@@ -9,10 +9,17 @@ import assignmentRoutes from './routes/assignmentRoutes.js';
 import csvImportRoutes from './routes/csvImportRoutes.js';
 import pageRoutes from './routes/pageRoutes.js';
 
-const app = express();
+// 👉 IMPORTANT: use import instead of require (ESM)
+import { swaggerUi, swaggerSpec } from './config/swaggerConfig.js';
+
+const app = express();  // ❗ Define app BEFORE using it
+
+// Swagger UI route
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.use(express.json());
 
-// CORS configuration - allow frontend from Render or localhost
+// CORS configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
@@ -21,20 +28,22 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+  origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// DB
 connectDB();
 
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/assign', assignmentRoutes);
 app.use('/api/import', csvImportRoutes);
 app.use('/api/pages', pageRoutes);
 
-// Health check endpoint for Render
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });

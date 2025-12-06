@@ -194,6 +194,15 @@ export const login = async (req, res) => {
         }
 
         // Step 6: Generate JWT token (only after external API verification succeeded)
+        if (!process.env.JWT_SECRET) {
+            console.error("❌ JWT_SECRET is not defined in environment variables");
+            return res.status(500).json({ 
+                message: "Server configuration error. Please contact administrator.",
+                success: false,
+                error: "JWT_SECRET missing"
+            });
+        }
+
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
             expiresIn: "7d",
         });
