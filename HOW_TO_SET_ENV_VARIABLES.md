@@ -108,7 +108,7 @@ Render Dashboard
         → Save
 ```
 
----
+-------
 
 ### Option 2: Railway
 
