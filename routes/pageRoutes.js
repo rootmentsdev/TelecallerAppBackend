@@ -5,6 +5,8 @@
  *     summary: Fetch leads based on leadType and filters
  *     tags:
  *       - Leads
+ *     security:
+ *       - bearerAuth: []
  *     description: |
  *       Returns leads for Loss of Sale, Walk-in, Booking Confirmation, or Rent-Out Feedback.
  *       Supports multiple filters including store, enquiryDate range, functionDate range, and visitDate range.
@@ -72,6 +74,22 @@
  *           format: date
  *         description: Ending date for visit date filter.
  *
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination.
+ *
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 100
+ *         description: Number of records per page.
+ *
  *     responses:
  *       200:
  *         description: Returns a list of leads and pagination info.
@@ -85,42 +103,64 @@
  *                   items:
  *                     type: object
  *                     properties:
- *                       _id:
+ *                       id:
  *                         type: string
- *                       customerName:
+ *                       lead_name:
  *                         type: string
- *                       phone:
- *                         type: string
- *                       leadType:
+ *                       phone_number:
  *                         type: string
  *                       store:
  *                         type: string
- *                       enquiryDate:
+ *                       lead_type:
  *                         type: string
- *                         format: date
- *                       functionDate:
+ *                       call_status:
  *                         type: string
- *                         format: date
- *                       visitDate:
+ *                       lead_status:
  *                         type: string
- *                         format: date
- *                       status:
+ *                       enquiry_date:
  *                         type: string
+ *                         format: date-time
+ *                       function_date:
+ *                         type: string
+ *                         format: date-time
+ *                       visit_date:
+ *                         type: string
+ *                         format: date-time
+ *                       booking_number:
+ *                         type: string
+ *                       return_date:
+ *                         type: string
+ *                         format: date-time
+ *                       reason_collected_from_store:
+ *                         type: string
+ *                       attended_by:
+ *                         type: string
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       assigned_to:
+ *                         type: object
+ *                         nullable: true
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           employee_id:
+ *                             type: string
  *                 pagination:
  *                   type: object
  *                   properties:
  *                     page:
- *                       type: number
+ *                       type: integer
  *                     limit:
- *                       type: number
+ *                       type: integer
  *                     total:
- *                       type: number
+ *                       type: integer
  *                     pages:
- *                       type: number
- *
+ *                       type: integer
  *       401:
  *         description: Unauthorized. Token missing or invalid.
- *
  *       500:
  *         description: Internal server error.
  */
@@ -143,7 +183,17 @@
  *         description: ID of the lead
  *     responses:
  *       200:
- *         description: Loss of Sale lead details fetched successfully
+ *         description: Loss of Sale lead details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 lead_name: { type: string }
+ *                 phone_number: { type: string }
+ *                 visit_date: { type: string, format: date-time }
+ *                 function_date: { type: string, format: date-time }
+ *                 attended_by: { type: string }
  *       400:
  *         description: Validation error
  *       401:
@@ -175,10 +225,15 @@
  *         application/json:
  *           schema:
  *             type: object
- *             description: Payload depends on validator
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               follow_up_date: { type: string, format: date-time }
+ *               reason_collected_from_store: { type: string }
+ *               remarks: { type: string }
  *     responses:
  *       200:
- *         description: Loss of Sale updated successfully
+ *         description: Loss of Sale lead updated successfully
  *       400:
  *         description: Validation error
  *       401:
@@ -186,6 +241,7 @@
  *       500:
  *         description: Internal server error
  */
+
 /**
  * @swagger
  * /api/pages/rent-out/{id}:
@@ -203,7 +259,18 @@
  *           type: string
  *     responses:
  *       200:
- *         description: Rent-Out lead fetched successfully
+ *         description: Rent-Out lead details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 lead_name: { type: string }
+ *                 phone_number: { type: string }
+ *                 booking_number: { type: string }
+ *                 return_date: { type: string, format: date-time }
+ *                 attended_by: { type: string }
+ *                 security_amount: { type: string }
  *       400:
  *         description: Validation error
  *       401:
@@ -234,6 +301,13 @@
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               follow_up_flag: { type: boolean }
+ *               call_date: { type: string, format: date-time }
+ *               rating: { type: integer, minimum: 1, maximum: 5 }
+ *               remarks: { type: string }
  *     responses:
  *       200:
  *         description: Rent-Out lead updated successfully
@@ -244,6 +318,7 @@
  *       500:
  *         description: Internal server error
  */
+
 /**
  * @swagger
  * /api/pages/booking-confirmation/{id}:
@@ -261,7 +336,18 @@
  *           type: string
  *     responses:
  *       200:
- *         description: Booking confirmation lead fetched
+ *         description: Booking confirmation lead details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 lead_name: { type: string }
+ *                 phone_number: { type: string }
+ *                 enquiry_date: { type: string, format: date-time }
+ *                 function_date: { type: string, format: date-time }
+ *                 booking_number: { type: string }
+ *                 security_amount: { type: string }
  *       400:
  *         description: Validation error
  *       401:
@@ -292,6 +378,12 @@
  *         application/json:
  *           schema:
  *             type: object
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               follow_up_flag: { type: boolean }
+ *               call_date: { type: string, format: date-time }
+ *               remarks: { type: string }
  *     responses:
  *       200:
  *         description: Booking Confirmation lead updated
@@ -302,6 +394,83 @@
  *       500:
  *         description: Internal server error
  */
+
+/**
+ * @swagger
+ * /api/pages/just-dial/{id}:
+ *   get:
+ *     summary: Get Just Dial lead details
+ *     tags:
+ *       - Just Dial
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Just Dial lead details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 lead_name: { type: string }
+ *                 phone_number: { type: string }
+ *                 enquiry_date: { type: string, format: date-time }
+ *                 function_date: { type: string, format: date-time }
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Lead not found
+ *       500:
+ *         description: Internal server error
+ */
+/**
+ * @swagger
+ * /api/pages/just-dial/{id}:
+ *   post:
+ *     summary: Update Just Dial lead
+ *     tags:
+ *       - Just Dial
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               closing_status: { type: string }
+ *               reason: { type: string }
+ *               follow_up_flag: { type: boolean }
+ *               call_date: { type: string, format: date-time }
+ *               remarks: { type: string }
+ *     responses:
+ *       200:
+ *         description: Just Dial lead updated
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+
 /**
  * @swagger
  * /api/pages/add-lead:
@@ -317,7 +486,14 @@
  *         application/json:
  *           schema:
  *             type: object
- *             description: Lead creation payload
+ *             properties:
+ *               customer_name: { type: string }
+ *               phone_number: { type: string }
+ *               brand: { type: string }
+ *               store_location: { type: string }
+ *               lead_status: { type: string }
+ *               call_status: { type: string }
+ *               follow_up_date: { type: string, format: date-time }
  *     responses:
  *       201:
  *         description: Lead created successfully
@@ -330,8 +506,8 @@
  *       500:
  *         description: Internal server error
  */
+
 /**
- * /**
  * @swagger
  * /api/auth/login:
  *   post:
@@ -351,7 +527,7 @@
  *             properties:
  *               employeeId:
  *                 type: string
- *                 example: "EMP12345"
+ *                 example: "Emp188"
  *               password:
  *                 type: string
  *                 example: "mypassword123"
@@ -363,20 +539,24 @@
  *             schema:
  *               type: object
  *               properties:
+ *                 message:
+ *                   type: string
+ *                 success:
+ *                   type: boolean
  *                 token:
  *                   type: string
  *                 user:
  *                   type: object
  *                   properties:
- *                     _id:
- *                       type: string
  *                     employeeId:
  *                       type: string
  *                     name:
  *                       type: string
- *                     role:
- *                       type: string
  *                     store:
+ *                       type: string
+ *                     phone:
+ *                       type: string
+ *                     role:
  *                       type: string
  *       400:
  *         description: Validation error — missing fields.
@@ -419,7 +599,6 @@
  *       500:
  *         description: Internal server error
  */
-
 
 import express from "express";
 import { protect } from "../middlewares/auth.js";
@@ -542,9 +721,9 @@ router.post(
   createAddLead
 );
 
-router.get('/test', (req, res) => {
+// Simple test route (for Swagger sanity check)
+router.get("/test", (req, res) => {
   res.json({ message: "Swagger is working!" });
 });
 
 export default router;
-
