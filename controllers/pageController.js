@@ -21,8 +21,24 @@ const buildLeadQuery = (user, filters = {}) => {
   if (user.role === "admin") {
     // Admin can see all leads
   } else if (user.role === "teamLead") {
-    // Team Lead can see leads in their store
-    query.store = user.store;
+    // Team Lead can see leads in their store.
+    // Use case-insensitive regex for both the teamLead's store and the provided store filter
+    const escapeRegex = (s) => (s || '').replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+
+    if (query.store) {
+      // Provided store filter may already be a regex object; keep it if so, otherwise build a regex
+      const providedStoreFilter = typeof query.store === 'string'
+        ? { $regex: escapeRegex(query.store), $options: 'i' }
+        : query.store;
+
+      const userStoreRegex = { $regex: escapeRegex(user.store), $options: 'i' };
+
+      // Combine both as $and so results must match teamLead's store and the provided filter
+      query.$and = [{ store: userStoreRegex }, { store: providedStoreFilter }];
+      delete query.store;
+    } else {
+      query.store = { $regex: escapeRegex(user.store), $options: 'i' };
+    }
   } else if (user.role === "telecaller") {
     // Telecaller can see only assigned leads
     query.assignedTo = user._id;
@@ -88,7 +104,11 @@ export const getLeads = async (req, res) => {
     if (leadType) filters.leadType = leadType;
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
-    if (store) filters.store = store;
+    if (store) {
+      // Use case-insensitive partial match for store so callers can pass "Manjeri" or "Brand - Manjeri"
+      const escaped = store.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filters.store = { $regex: escaped, $options: 'i' };
+    }
     if (source) filters.source = source;
 
     // Date filtering logic

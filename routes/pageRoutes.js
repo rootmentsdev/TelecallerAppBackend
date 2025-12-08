@@ -19,7 +19,14 @@
  *           enum: [lossOfSale, general, bookingConfirmation, rentOutFeedback]
  *         description: Type of lead to fetch.
  *       - in: query
+ *         name: store
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Case-insensitive partial match for store (e.g. "Manjeri" or "Suitor Guy - Manjeri").
+ *       - in: query
  *         name: page
+ *         required: false
  *         required: false
  *         schema:
  *           type: integer
