@@ -60,7 +60,7 @@ export const getLeads = async (req, res) => {
     if (leadType) filters.leadType = leadType;
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
-    if (store) filters.store = store;  // Store filter is used as brand-location
+    if (store) filters.store = store;
     if (source) filters.source = source;
 
     // Date filtering logic
@@ -186,9 +186,277 @@ export const getLeads = async (req, res) => {
   }
 };
 
-// ==================== Add Lead ====================
+// ==================== Loss of Sale Page ====================
 
-// POST - Create new lead (combine brand and location into store)
+// GET - Fetch Loss of Sale lead data (GET fields only)
+export const getLossOfSaleLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await Lead.findById(id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Return only GET fields
+    res.json({
+      lead_name: lead.name,
+      phone_number: lead.phone,
+      visit_date: lead.visitDate || lead.enquiryDate,
+      function_date: lead.functionDate,
+      attended_by: lead.attendedBy,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST - Update Loss of Sale lead data (POST fields only)
+export const updateLossOfSaleLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { call_status, lead_status, follow_up_date, reason_collected_from_store, remarks } = req.body;
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    if (!lead.leadType || lead.leadType === "general") {
+      updateData.leadType = "lossOfSale";
+    }
+
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+    res.json({ message: "Loss of Sale lead updated successfully", lead: updatedLead });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ==================== Rent-Out Page ====================
+
+// GET - Fetch Rent-Out lead data (GET fields only)
+export const getRentOutLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await Lead.findById(id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Return only GET fields
+    // For return_date, use returnDate if available, otherwise it will be null (item not returned yet)
+    res.json({
+      lead_name: lead.name,
+      phone_number: lead.phone,
+      booking_number: lead.bookingNo,
+      return_date: lead.returnDate || null, // null is valid for items not yet returned
+      attended_by: lead.attendedBy || null, // Optional field, may be empty
+      security_amount: lead.securityAmount,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST - Update Rent-Out lead data (POST fields only)
+export const updateRentOutLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { call_status, lead_status, follow_up_flag, call_date, rating, remarks } = req.body;
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (follow_up_flag !== undefined) {
+      updateData.followUpFlag = follow_up_flag;
+      if (follow_up_flag && !lead.followUpDate) {
+        updateData.followUpDate = new Date();
+      }
+    }
+    if (call_date !== undefined) updateData.callDate = call_date;
+    if (rating !== undefined) updateData.rating = rating;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    if (!lead.leadType || lead.leadType === "general") {
+      updateData.leadType = "rentOutFeedback";
+    }
+
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+    res.json({ message: "Rent-Out lead updated successfully", lead: updatedLead });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ==================== Booking Confirmation Page ====================
+
+// GET - Fetch Booking Confirmation lead data (GET fields only)
+export const getBookingConfirmationLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await Lead.findById(id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Return only GET fields
+    res.json({
+      lead_name: lead.name,
+      phone_number: lead.phone,
+      enquiry_date: lead.enquiryDate,
+      function_date: lead.functionDate,
+      booking_number: lead.bookingNo,
+      security_amount: lead.securityAmount,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST - Update Booking Confirmation lead data (POST fields only)
+export const updateBookingConfirmationLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { call_status, lead_status, follow_up_flag, call_date, remarks } = req.body;
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (follow_up_flag !== undefined) {
+      updateData.followUpFlag = follow_up_flag;
+      if (follow_up_flag && !lead.followUpDate) {
+        updateData.followUpDate = new Date();
+      }
+    }
+    if (call_date !== undefined) updateData.callDate = call_date;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    if (!lead.leadType || lead.leadType === "general") {
+      updateData.leadType = "bookingConfirmation";
+    }
+
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+    res.json({ message: "Booking Confirmation lead updated successfully", lead: updatedLead });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ==================== Just Dial Page ====================
+
+// GET - Fetch Just Dial lead data (GET fields only)
+export const getJustDialLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await Lead.findById(id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Return only GET fields
+    res.json({
+      lead_name: lead.name,
+      phone_number: lead.phone,
+      enquiry_date: lead.enquiryDate,
+      function_date: lead.functionDate,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST - Update Just Dial lead data (POST fields only)
+export const updateJustDialLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { call_status, lead_status, closing_status, reason, follow_up_flag, call_date, remarks } = req.body;
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (closing_status !== undefined) updateData.closingStatus = closing_status;
+    if (reason !== undefined) updateData.reason = reason;
+    if (follow_up_flag !== undefined) {
+      updateData.followUpFlag = follow_up_flag;
+      if (follow_up_flag && !lead.followUpDate) {
+        updateData.followUpDate = new Date();
+      }
+    }
+    if (call_date !== undefined) updateData.callDate = call_date;
+    if (remarks !== undefined) updateData.remarks = remarks;
+
+    if (!lead.leadType || lead.leadType === "general") {
+      updateData.leadType = "justDial";
+    }
+
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+    res.json({ message: "Just Dial lead updated successfully", lead: updatedLead });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ==================== Add Lead Page ====================
+
+// POST - Create new lead (All fields are POST)
 export const createAddLead = async (req, res) => {
   try {
     const { customer_name, phone_number, brand, store_location, lead_status, call_status, follow_up_date } = req.body;
@@ -206,7 +474,7 @@ export const createAddLead = async (req, res) => {
       name: customer_name,
       phone: phone_number,
       brand: brand,
-      store: `${brand} - ${store_location}`,  // Combine brand and store_location into store field
+      store:  `${brand} - ${store_location}`,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
       followUpDate: follow_up_date,
