@@ -597,11 +597,28 @@ export const createAddLead = async (req, res) => {
       });
     }
 
+    // Clean and deduplicate brand/store values to avoid "Brand - Brand - Location" issues
+    const brandClean = (brand || '').trim();
+    let storeLocationClean = (store_location || '').trim();
+
+    if (brandClean) {
+      // If store_location already starts with the brand (e.g. "Brand - Location"), remove the duplicate prefix
+      const escapedBrand = brandClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const brandPrefixRegex = new RegExp(`^${escapedBrand}\\s*-\\s*`, 'i');
+      if (brandPrefixRegex.test(storeLocationClean)) {
+        storeLocationClean = storeLocationClean.replace(brandPrefixRegex, '').trim();
+      }
+    }
+
+    const storeValue = brandClean
+      ? (storeLocationClean ? `${brandClean} - ${storeLocationClean}` : brandClean)
+      : storeLocationClean;
+
     const lead = await Lead.create({
       name: customer_name,
       phone: phone_number,
-      brand: brand,
-      store:  `${brand} - ${store_location}`,
+      brand: brandClean,
+      store: storeValue,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
       followUpDate: follow_up_date,

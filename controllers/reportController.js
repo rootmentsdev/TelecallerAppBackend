@@ -37,41 +37,19 @@ export const getReports = async (req, res) => {
       Report.countDocuments(query),
     ]);
 
-    // Helper to convert changedFields (before/after) into a simple edited_fields map using listSnapshot keys
-    const fieldMap = {
-      callStatus: "call_status",
-      leadStatus: "lead_status",
-      followUpDate: "follow_up_date",
-      callDate: "call_date",
-      reasonCollectedFromStore: "reason_collected_from_store",
-      remarks: "remarks",
-      closingStatus: "closing_status",
-      rating: "rating",
-      bookingNo: "booking_number",
-      visitDate: "visit_date",
-      returnDate: "return_date",
-      securityAmount: "security_amount",
-      attendedBy: "attended_by",
-    };
-
+    // For each report return only the original lead details (beforeSnapshot) and the edited fields (after values)
     const mapped = reports.map((r) => {
-      const list = r.listSnapshot || {};
+      const originalLead = r.beforeSnapshot || {};
 
-      // Build edited_fields: map each changedFields key to the corresponding listSnapshot key and value
       const edited_fields = {};
-      if (r.changedFields && typeof r.changedFields === "object") {
+      if (r.changedFields && typeof r.changedFields === 'object') {
         Object.keys(r.changedFields).forEach((k) => {
-          const listKey = fieldMap[k] || k;
-          // Prefer value from listSnapshot (already formatted) otherwise use .after
-          const valFromList = list[listKey];
-          const afterVal = r.changedFields[k]?.after;
-          edited_fields[listKey] = valFromList !== undefined ? valFromList : afterVal;
+          edited_fields[k] = r.changedFields[k]?.after;
         });
       }
 
-      // Return flattened object matching lead list + edited_fields
       return {
-        ...list,
+        original_lead: originalLead,
         edited_fields,
         report_id: r._id,
         edited_by: r.editedBy ? { id: r.editedBy._id, name: r.editedBy.name, employee_id: r.editedBy.employeeId } : null,
@@ -99,7 +77,22 @@ export const getReportById = async (req, res) => {
     const { id } = req.params;
     const report = await Report.findById(id).populate("editedBy", "name employeeId");
     if (!report) return res.status(404).json({ message: "Report not found" });
-    res.json(report);
+
+    const originalLead = report.beforeSnapshot || {};
+    const edited_fields = {};
+    if (report.changedFields && typeof report.changedFields === 'object') {
+      Object.keys(report.changedFields).forEach((k) => {
+        edited_fields[k] = report.changedFields[k]?.after;
+      });
+    }
+
+    res.json({
+      original_lead: originalLead,
+      edited_fields,
+      report_id: report._id,
+      edited_by: report.editedBy ? { id: report.editedBy._id, name: report.editedBy.name, employee_id: report.editedBy.employeeId } : null,
+      edited_at: report.editedAt,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

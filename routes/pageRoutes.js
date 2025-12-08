@@ -1,6 +1,6 @@
 /**
  * @swagger
-  * /api/pages/leads:
+ * /api/pages/leads:
  *   get:
  *     summary: Fetch leads based on leadType and filters
  *     tags:
@@ -18,9 +18,15 @@
  *           type: string
  *           enum: [lossOfSale, general, bookingConfirmation, rentOutFeedback]
  *         description: Type of lead to fetch.
- *
  *       - in: query
-// Note: PATCH /api/pages/leads/{id} was removed - use POST /api/pages/leads/{id} for generic updates (documented below)
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number (1-indexed).
+ *       - in: query
+ *         name: limit
  *         required: false
  *         schema:
  *           type: integer
