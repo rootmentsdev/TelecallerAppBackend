@@ -5,7 +5,7 @@ const leadSchema = new mongoose.Schema(
     // Basic Information (Required)
     name: { type: String, required: true },
     phone: { type: String, required: true },
-    store: { type: String, required: true },
+    store: { type: String, required: true },  // Store field combining brand and location
     
     // Source and Type
     source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.

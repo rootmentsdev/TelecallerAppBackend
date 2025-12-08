@@ -1,6 +1,6 @@
 /**
  * @swagger
- * /api/pages/leads:
+  * /api/pages/leads:
  *   get:
  *     summary: Fetch leads based on leadType and filters
  *     tags:
@@ -9,7 +9,7 @@
  *       - bearerAuth: []
  *     description: |
  *       Returns leads for Loss of Sale, Walk-in, Booking Confirmation, or Rent-Out Feedback.
- *       Supports multiple filters including store, enquiryDate range, functionDate range, and visitDate range.
+ *       Supports multiple filters including store (brand - location), enquiryDate range, functionDate range, and visitDate range.
  *     parameters:
  *       - in: query
  *         name: leadType
@@ -24,7 +24,7 @@
  *         required: false
  *         schema:
  *           type: string
- *         description: Store name (e.g., "Zurocci - Edappal").
+ *         description: Combined store name (e.g., "Zurocci - Edappal" or "Suitor Guy - Perinthalmanna").
  *
  *       - in: query
  *         name: enquiryDateFrom
