@@ -20,70 +20,7 @@
  *         description: Type of lead to fetch.
  *
  *       - in: query
- *         name: store
- *         required: false
- *         schema:
- *           type: string
- *         description: Combined store name (e.g., "Zurocci - Edappal" or "Suitor Guy - Perinthalmanna").
- *
- *       - in: query
- *         name: enquiryDateFrom
- *         required: false
- *         schema:
- *           type: string
- *           format: date
- *         description: Starting date for enquiry date filter.
- *
- *       - in: query
- *         name: enquiryDateTo
- *         required: false
- *         schema:
- *           type: string
- *           format: date
- *         description: Ending date for enquiry date filter.
- *
- *       - in: query
- *         name: functionDateFrom
- *         required: false
- *         schema:
- *           type: string
- *           format: date
- *         description: Starting date for function date filter.
- *
- *       - in: query
- *         name: functionDateTo
- *         required: false
- *         schema:
- *           type: string
- *           format: date
- *         description: Ending date for function date filter.
- *
- *       - in: query
- *         name: visitDateFrom
- *         required: false
- *         schema:
- *           type: string
- *           format: date
- *         description: Starting date for visit date filter.
- *
- *       - in: query
- *         name: visitDateTo
- *         required: false
- *         schema:
- *           type: string
- *           format: date
- *         description: Ending date for visit date filter.
- *
- *       - in: query
- *         name: page
- *         required: false
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number for pagination.
- *
- *       - in: query
- *         name: limit
+// Note: PATCH /api/pages/leads/{id} was removed - use POST /api/pages/leads/{id} for generic updates (documented below)
  *         required: false
  *         schema:
  *           type: integer
@@ -616,6 +553,7 @@ import {
   updateJustDialLead,
   createAddLead,
   updateGenericLead,
+  getLeadById,
 } from "../controllers/pageController.js";
 import {
   lossOfSaleGetValidator,
@@ -627,6 +565,8 @@ import {
   justDialGetValidator,
   justDialPostValidator,
   addLeadPostValidator,
+  leadUpdateValidator,
+  leadGetValidator,
 } from "../validators/pageValidators.js";
 
 const router = express.Router();
@@ -691,13 +631,88 @@ router.get("/leads", protect, getLeads);
  *                 report:
  *                   type: object
  */
-import { leadUpdateValidator } from "../validators/pageValidators.js";
 router.patch(
   "/leads/:id",
   protect,
   leadUpdateValidator,
   handleValidation,
   updateGenericLead
+);
+
+/**
+ * @swagger
+ * /api/pages/leads/{id}:
+ *   post:
+ *     summary: Generic update (POST) for any lead — same behavior as PATCH; moves lead to reports
+ *     tags:
+ *       - Leads
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Lead id to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               follow_up_flag: { type: boolean }
+ *               follow_up_date: { type: string, format: date-time }
+ *               call_date: { type: string, format: date-time }
+ *               reason_collected_from_store: { type: string }
+ *               remarks: { type: string }
+ *               closing_status: { type: string }
+ *               rating: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Lead updated and moved to reports
+ */
+router.post(
+  "/leads/:id",
+  protect,
+  leadUpdateValidator,
+  handleValidation,
+  updateGenericLead
+);
+
+/**
+ * @swagger
+ * /api/pages/leads/{id}:
+ *   get:
+ *     summary: Fetch any lead by id (no leadType required)
+ *     tags:
+ *       - Leads
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Lead id to fetch
+ *     responses:
+ *       200:
+ *         description: Lead object in listing format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ */
+router.get(
+  "/leads/:id",
+  protect,
+  leadGetValidator,
+  handleValidation,
+  getLeadById
 );
 
 // ==================== Loss of Sale Page Routes ====================

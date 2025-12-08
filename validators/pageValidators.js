@@ -24,6 +24,10 @@ const leadIdValidator = param('id')
     return true;
   });
 
+  export const leadGetValidator = [
+    leadIdValidator
+  ];
+
 // Loss of Sale Page Validators
 export const lossOfSaleGetValidator = [
   param('id')

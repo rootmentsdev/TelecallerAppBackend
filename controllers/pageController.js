@@ -698,3 +698,22 @@ export const updateGenericLead = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// GET - Generic fetch lead by id (returns flattened list format)
+export const getLeadById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await Lead.findById(id).populate('assignedTo', 'name employeeId');
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const list = buildListSnapshot(lead);
+
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
