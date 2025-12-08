@@ -615,6 +615,7 @@ import {
   getJustDialLead,
   updateJustDialLead,
   createAddLead,
+  updateGenericLead,
 } from "../controllers/pageController.js";
 import {
   lossOfSaleGetValidator,
