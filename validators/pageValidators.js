@@ -24,9 +24,27 @@ const leadIdValidator = param('id')
     return true;
   });
 
-  export const leadGetValidator = [
-    leadIdValidator
-  ];
+export const leadGetValidator = [
+  leadIdValidator
+];
+
+// Validator for GET /api/pages/leads query parameters
+export const leadsListValidator = [
+  query('leadType')
+    .optional()
+    .isIn(['lossOfSale', 'rentOutFeedback', 'bookingConfirmation', 'justDial', 'general'])
+    .withMessage('leadType must be one of: lossOfSale, rentOutFeedback, bookingConfirmation, justDial, general'),
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('page must be a positive integer')
+    .toInt(),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('limit must be between 1 and 1000')
+    .toInt(),
+];
 
 // Loss of Sale Page Validators
 export const lossOfSaleGetValidator = [

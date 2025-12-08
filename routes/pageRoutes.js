@@ -2,31 +2,121 @@
  * @swagger
  * /api/pages/leads:
  *   get:
- *     summary: Fetch leads based on leadType and filters
+ *     summary: Fetch leads with optional filters (leadType, store, etc.)
  *     tags:
  *       - Leads
  *     security:
  *       - bearerAuth: []
  *     description: |
- *       Returns leads for Loss of Sale, Walk-in, Booking Confirmation, or Rent-Out Feedback.
+ *       Returns leads filtered by optional parameters. If leadType is not provided, returns leads of all types.
  *       Supports multiple filters including store (brand - location), enquiryDate range, functionDate range, and visitDate range.
+ *       Store filter supports both full format (e.g., "Suitor Guy - Kottayam", "Zorucci - Kottayam") and location-only (e.g., "Kottayam", "Edappally").
+ *       Examples:
+ *       - Get all leads for a store: /api/pages/leads?store=Suitor Guy - Edappally
+ *       - Get specific lead type: /api/pages/leads?leadType=bookingConfirmation&store=Zorucci - Kottayam
  *     parameters:
  *       - in: query
  *         name: leadType
- *         required: true
+ *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, bookingConfirmation, rentOutFeedback]
- *         description: Type of lead to fetch.
+ *           enum: [lossOfSale, general, bookingConfirmation, rentOutFeedback, justDial]
+ *         description: Type of lead to fetch. If omitted, returns leads of all types.
  *       - in: query
  *         name: store
  *         required: false
  *         schema:
  *           type: string
- *         description: Case-insensitive partial match for store (e.g. "Manjeri" or "Suitor Guy - Manjeri").
+ *         description: |
+ *           Case-insensitive partial match for store. Supports multiple formats:
+ *           - Full format: "Suitor Guy - Edappally", "Zorucci - Kottayam"
+ *           - Location-only: "Edappally", "Kottayam"
+ *           - Brand-only: "Suitor Guy", "Zorucci"
+ *           The filter will match both the full format and location part automatically.
+ *       - in: query
+ *         name: callStatus
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by call status.
+ *       - in: query
+ *         name: leadStatus
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by lead status.
+ *       - in: query
+ *         name: source
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by source (e.g., "Walk-in", "Booking", "Rent-out", "Loss of Sale").
+ *       - in: query
+ *         name: enquiryDateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter leads with enquiry date on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: enquiryDateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter leads with enquiry date on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: functionDateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter leads with function date on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: functionDateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter leads with function date on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: visitDateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter leads with visit date on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: visitDateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter leads with visit date on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: dateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Generic date range start (applies to dateField, default: enquiryDate). Use with dateField parameter.
+ *       - in: query
+ *         name: dateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Generic date range end (applies to dateField, default: enquiryDate). Use with dateField parameter.
+ *       - in: query
+ *         name: dateField
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [enquiryDate, functionDate, visitDate, createdAt]
+ *           default: enquiryDate
+ *         description: Which date field to use with dateFrom/dateTo (only used if specific date filters not provided).
  *       - in: query
  *         name: page
- *         required: false
  *         required: false
  *         schema:
  *           type: integer
@@ -70,21 +160,28 @@
  *                       enquiry_date:
  *                         type: string
  *                         format: date-time
+ *                         nullable: true
  *                       function_date:
  *                         type: string
  *                         format: date-time
+ *                         nullable: true
  *                       visit_date:
  *                         type: string
  *                         format: date-time
+ *                         nullable: true
  *                       booking_number:
  *                         type: string
+ *                         nullable: true
  *                       return_date:
  *                         type: string
  *                         format: date-time
+ *                         nullable: true
  *                       reason_collected_from_store:
  *                         type: string
+ *                         nullable: true
  *                       attended_by:
  *                         type: string
+ *                         nullable: true
  *                       created_at:
  *                         type: string
  *                         format: date-time
@@ -457,99 +554,6 @@
  *         description: Internal server error
  */
 
-/**
- * @swagger
- * /api/auth/login:
- *   post:
- *     summary: Login employee and return JWT token
- *     tags:
- *       - Authentication
- *     description: Authenticates an employee using employeeId and password, and returns a JWT token used for accessing protected APIs.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - employeeId
- *               - password
- *             properties:
- *               employeeId:
- *                 type: string
- *                 example: "Emp188"
- *               password:
- *                 type: string
- *                 example: "mypassword123"
- *     responses:
- *       200:
- *         description: Login successful — JWT token and employee details returned.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 success:
- *                   type: boolean
- *                 token:
- *                   type: string
- *                 user:
- *                   type: object
- *                   properties:
- *                     employeeId:
- *                       type: string
- *                     name:
- *                       type: string
- *                     store:
- *                       type: string
- *                     phone:
- *                       type: string
- *                     role:
- *                       type: string
- *       400:
- *         description: Validation error — missing fields.
- *       401:
- *         description: Invalid employeeId or password.
- *       500:
- *         description: Internal server error.
- */
-
-/**
- * @swagger
- * /api/auth/profile:
- *   get:
- *     summary: Get logged-in user profile
- *     tags:
- *       - Authentication
- *     security:
- *       - bearerAuth: []
- *     description: Returns user details extracted from JWT token.
- *     responses:
- *       200:
- *         description: User profile fetched successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 _id:
- *                   type: string
- *                 name:
- *                   type: string
- *                 phone:
- *                   type: string
- *                 role:
- *                   type: string
- *                 store:
- *                   type: string
- *       401:
- *         description: Unauthorized — missing or invalid token
- *       500:
- *         description: Internal server error
- */
-
 import express from "express";
 import { protect } from "../middlewares/auth.js";
 import { allowRoles } from "../middlewares/roles.js";
@@ -580,13 +584,14 @@ import {
   addLeadPostValidator,
   leadUpdateValidator,
   leadGetValidator,
+  leadsListValidator,
 } from "../validators/pageValidators.js";
 
 const router = express.Router();
 
 // ==================== Leads Listing ====================
 // GET /api/pages/leads - Fetch list of leads (with filters)
-router.get("/leads", protect, getLeads);
+router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
 
 /**
  * @swagger

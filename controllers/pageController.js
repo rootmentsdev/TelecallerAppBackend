@@ -25,7 +25,24 @@ const buildLeadQuery = (user, filters = {}) => {
     // Use case-insensitive regex for both the teamLead's store and the provided store filter
     const escapeRegex = (s) => (s || '').replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
 
-    if (query.store) {
+    if (query.$or) {
+      // If $or exists (from store filter with " - " pattern), we need to combine it with teamLead's store filter
+      const userStoreRegex = { $regex: escapeRegex(user.store), $options: 'i' };
+      
+      // Each $or condition needs to also match the teamLead's store
+      const updatedOrConditions = query.$or.map(condition => {
+        // Each condition in $or should be combined with teamLead's store using $and
+        return {
+          $and: [
+            { store: userStoreRegex },
+            condition
+          ]
+        };
+      });
+      
+      query.$or = updatedOrConditions;
+      // Remove $or from filters if it was the only store-related filter
+    } else if (query.store) {
       // Provided store filter may already be a regex object; keep it if so, otherwise build a regex
       const providedStoreFilter = typeof query.store === 'string'
         ? { $regex: escapeRegex(query.store), $options: 'i' }
@@ -105,9 +122,35 @@ export const getLeads = async (req, res) => {
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
     if (store) {
-      // Use case-insensitive partial match for store so callers can pass "Manjeri" or "Brand - Manjeri"
+      // Use case-insensitive partial match for store so callers can pass:
+      // - Full format: "Suitor Guy - Kottayam", "Zorucci - Edappally"
+      // - Location-only: "Kottayam", "Edappally"
+      // - Brand-only: "Suitor Guy", "Zorucci"
       const escaped = store.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      filters.store = { $regex: escaped, $options: 'i' };
+      
+      // Check if store contains " - " pattern (e.g., "Suitor Guy - Kottayam")
+      if (store.includes(' - ')) {
+        // Extract both brand part (before " - ") and location part (after " - ")
+        const parts = store.split(' - ').map(p => p.trim());
+        const brandPart = parts[0];
+        const locationPart = parts[parts.length - 1]; // Get last part in case of multiple dashes
+        
+        const escapedBrand = brandPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const escapedLocation = locationPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        
+        // Match either:
+        // 1. The full term (e.g., "Suitor Guy - Kottayam")
+        // 2. Just the location part (e.g., "Kottayam")
+        // 3. Just the brand part (e.g., "Suitor Guy")
+        filters.$or = [
+          { store: { $regex: escaped, $options: 'i' } },
+          { store: { $regex: escapedLocation, $options: 'i' } },
+          { store: { $regex: escapedBrand, $options: 'i' } }
+        ];
+      } else {
+        // Simple regex match for single term (could be brand or location)
+        filters.store = { $regex: escaped, $options: 'i' };
+      }
     }
     if (source) filters.source = source;
 
@@ -169,6 +212,18 @@ export const getLeads = async (req, res) => {
     }
 
     const query = buildLeadQuery(req.user, filters);
+
+    // Temporary debug log: show who called the endpoint and the resolved Mongo query
+    try {
+      console.log("[DEBUG getLeads] user:", {
+        id: req.user?._id?.toString(),
+        role: req.user?.role,
+        userStore: req.user?.store,
+      }, "queryParams:", req.query, "resolvedQuery:", query);
+    } catch (e) {
+      // swallow any logging errors
+      console.log("[DEBUG getLeads] failed to log user/query", e.message);
+    }
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     

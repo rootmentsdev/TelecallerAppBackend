@@ -47,6 +47,8 @@ const router = express.Router();
  *     summary: List report documents (edited leads)
  *     tags:
  *       - Reports
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: leadType
@@ -114,6 +116,8 @@ router.get("/", protect, getReports);
  *     summary: Get a single report by id
  *     tags:
  *       - Reports
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
