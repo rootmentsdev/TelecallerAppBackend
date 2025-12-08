@@ -31,17 +31,35 @@ const buildLeadQuery = (user, filters = {}) => {
       
       // Each $or condition needs to also match the teamLead's store
       const updatedOrConditions = query.$or.map(condition => {
-        // Each condition in $or should be combined with teamLead's store using $and
-        return {
-          $and: [
-            { store: userStoreRegex },
-            condition
-          ]
-        };
+        // Handle both simple store conditions and $and conditions
+        if (condition.store) {
+          // Simple store condition: combine with teamLead's store
+          return {
+            $and: [
+              { store: userStoreRegex },
+              condition
+            ]
+          };
+        } else if (condition.$and) {
+          // $and condition: add teamLead's store to the $and array
+          return {
+            $and: [
+              { store: userStoreRegex },
+              ...condition.$and
+            ]
+          };
+        } else {
+          // Other condition types: just add teamLead's store requirement
+          return {
+            $and: [
+              { store: userStoreRegex },
+              condition
+            ]
+          };
+        }
       });
       
       query.$or = updatedOrConditions;
-      // Remove $or from filters if it was the only store-related filter
     } else if (query.store) {
       // Provided store filter may already be a regex object; keep it if so, otherwise build a regex
       const providedStoreFilter = typeof query.store === 'string'
@@ -122,33 +140,86 @@ export const getLeads = async (req, res) => {
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
     if (store) {
-      // Use case-insensitive partial match for store so callers can pass:
-      // - Full format: "Suitor Guy - Kottayam", "Zorucci - Edappally"
-      // - Location-only: "Kottayam", "Edappally"
-      // - Brand-only: "Suitor Guy", "Zorucci"
+      // Store filtering logic for "Brand - Location" format
+      // Handles formats like "Suitor Guy - Edappally", "Zorucci - Kottayam"
+      // Matches stores that contain both brand and location (with variations)
+      
       const escaped = store.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       
-      // Check if store contains " - " pattern (e.g., "Suitor Guy - Kottayam")
+      // Check if store contains " - " pattern (e.g., "Suitor Guy - Edappally")
       if (store.includes(' - ')) {
-        // Extract both brand part (before " - ") and location part (after " - ")
-        const parts = store.split(' - ').map(p => p.trim());
+        // Split by " - " to get brand and location parts
+        const parts = store.split(' - ').map(p => p.trim()).filter(p => p.length > 0);
         const brandPart = parts[0];
         const locationPart = parts[parts.length - 1]; // Get last part in case of multiple dashes
         
+        // Escape regex special characters
         const escapedBrand = brandPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const escapedLocation = locationPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         
-        // Match either:
-        // 1. The full term (e.g., "Suitor Guy - Kottayam")
-        // 2. Just the location part (e.g., "Kottayam")
-        // 3. Just the brand part (e.g., "Suitor Guy")
-        filters.$or = [
-          { store: { $regex: escaped, $options: 'i' } },
-          { store: { $regex: escapedLocation, $options: 'i' } },
-          { store: { $regex: escapedBrand, $options: 'i' } }
-        ];
+        // Create brand variations (e.g., "Suitor Guy" -> ["Suitor Guy", "SG"])
+        // Note: SG = Suitor Guy, Z = Zorucci
+        const brandVariations = [escapedBrand];
+        if (brandPart.toLowerCase().includes('suitor guy')) {
+          brandVariations.push('SG');
+        }
+        if (brandPart.toLowerCase().includes('zorucci') || brandPart.toLowerCase().includes('zurocci')) {
+          brandVariations.push('Z');
+        }
+        
+        // Create location variations (handle case variations only, NOT different locations)
+        // IMPORTANT: Edappal and Edappally are DIFFERENT locations, not variations
+        const locationVariations = [escapedLocation];
+        // Only add case variations, not different location names
+        if (locationPart.toLowerCase().includes('kottakal')) {
+          locationVariations.push('Kottakal', 'KOTTAKAL', 'Kottakkal'); // Same location, different cases/spellings
+        }
+        if (locationPart.toLowerCase().includes('manjeri')) {
+          locationVariations.push('Manjeri', 'MANJERY', 'Manjery'); // Same location, different cases/spellings
+        }
+        // Note: Edappal and Edappally are kept separate as they are different locations
+        
+        // Build $or conditions to match stores containing:
+        // 1. Exact full format: "Suitor Guy - Edappally"
+        // 2. Brand + Location (both present): stores containing both brand and location
+        // 3. Location variations (case-insensitive, but exact location name match)
+        const orConditions = [];
+        
+        // Exact match
+        orConditions.push({ store: { $regex: escaped, $options: 'i' } });
+        
+        // Match stores containing both brand AND location (in any order)
+        // Use word boundaries for location to prevent substring matches (e.g., Edappal matching Edappally)
+        for (const brandVar of brandVariations) {
+          for (const locVar of locationVariations) {
+            const brandEscaped = brandVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            // For location, use word boundary regex to match exact location name
+            // This prevents "Edappal" from matching "Edappally" and vice versa
+            const locEscaped = locVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            // Use word boundary (\b) or look for location followed by dash/end/space
+            const locPattern = `(^|[\\s-])${locEscaped}([\\s-]|$)`;
+            
+            // Store must contain both brand and location
+            orConditions.push({
+              $and: [
+                { store: { $regex: brandEscaped, $options: 'i' } },
+                { store: { $regex: locPattern, $options: 'i' } }
+              ]
+            });
+          }
+        }
+        
+        // Also match location-only (for backward compatibility)
+        // Use word boundary for location to prevent substring matches
+        for (const locVar of locationVariations) {
+          const locEscaped = locVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const locPattern = `(^|[\\s-])${locEscaped}([\\s-]|$)`;
+          orConditions.push({ store: { $regex: locPattern, $options: 'i' } });
+        }
+        
+        filters.$or = orConditions;
       } else {
-        // Simple regex match for single term (could be brand or location)
+        // Simple regex match for single term (location-only or brand-only)
         filters.store = { $regex: escaped, $options: 'i' };
       }
     }

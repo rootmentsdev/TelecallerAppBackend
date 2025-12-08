@@ -28,11 +28,28 @@
  *         schema:
  *           type: string
  *         description: |
- *           Case-insensitive partial match for store. Supports multiple formats:
- *           - Full format: "Suitor Guy - Edappally", "Zorucci - Kottayam"
- *           - Location-only: "Edappally", "Kottayam"
- *           - Brand-only: "Suitor Guy", "Zorucci"
- *           The filter will match both the full format and location part automatically.
+ *           Filter by store name using "Brand - Location" format (e.g., "Suitor Guy - Edappally").
+ *           
+ *           **Brand Abbreviations:**
+ *           - "SG" = "Suitor Guy"
+ *           - "Z" = "Zorucci"
+ *           
+ *           **How it works:**
+ *           - Matches exact format: "Suitor Guy - Edappally"
+ *           - Matches brand abbreviations: "SG-Edappally" (same as "Suitor Guy - Edappally")
+ *           - Matches stores containing both brand and location: Any store with both "Suitor Guy" (or "SG") AND "Edappally"
+ *           - Also supports location-only searches: "Edappally", "Kottayam"
+ *           
+ *           **Important Notes:**
+ *           - Edappal and Edappally are DIFFERENT locations (not variations)
+ *           - Searching "Suitor Guy - Edappally" will NOT match stores with "Edappal"
+ *           - Searching "Suitor Guy - Edappal" will NOT match stores with "Edappally"
+ *           
+ *           **Works for all lead types:**
+ *           - Loss of Sale: `?leadType=lossOfSale&store=Suitor Guy - Edappally`
+ *           - Rent Out: `?leadType=rentOutFeedback&store=Suitor Guy - Edappally`
+ *           - Booking Confirmation: `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *           - All types: `?store=Suitor Guy - Edappally`
  *       - in: query
  *         name: callStatus
  *         required: false
