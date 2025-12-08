@@ -37,8 +37,50 @@ export const getReports = async (req, res) => {
       Report.countDocuments(query),
     ]);
 
+    // Helper to convert changedFields (before/after) into a simple edited_fields map using listSnapshot keys
+    const fieldMap = {
+      callStatus: "call_status",
+      leadStatus: "lead_status",
+      followUpDate: "follow_up_date",
+      callDate: "call_date",
+      reasonCollectedFromStore: "reason_collected_from_store",
+      remarks: "remarks",
+      closingStatus: "closing_status",
+      rating: "rating",
+      bookingNo: "booking_number",
+      visitDate: "visit_date",
+      returnDate: "return_date",
+      securityAmount: "security_amount",
+      attendedBy: "attended_by",
+    };
+
+    const mapped = reports.map((r) => {
+      const list = r.listSnapshot || {};
+
+      // Build edited_fields: map each changedFields key to the corresponding listSnapshot key and value
+      const edited_fields = {};
+      if (r.changedFields && typeof r.changedFields === "object") {
+        Object.keys(r.changedFields).forEach((k) => {
+          const listKey = fieldMap[k] || k;
+          // Prefer value from listSnapshot (already formatted) otherwise use .after
+          const valFromList = list[listKey];
+          const afterVal = r.changedFields[k]?.after;
+          edited_fields[listKey] = valFromList !== undefined ? valFromList : afterVal;
+        });
+      }
+
+      // Return flattened object matching lead list + edited_fields
+      return {
+        ...list,
+        edited_fields,
+        report_id: r._id,
+        edited_by: r.editedBy ? { id: r.editedBy._id, name: r.editedBy.name, employee_id: r.editedBy.employeeId } : null,
+        edited_at: r.editedAt,
+      };
+    });
+
     res.json({
-      reports,
+      reports: mapped,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
