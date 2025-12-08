@@ -1,4 +1,5 @@
 import Lead from "../models/Lead.js";
+import Report from "../models/Report.js";
 
 // Helper function to check access permissions
 const checkAccess = (lead, user) => {
@@ -28,6 +29,33 @@ const buildLeadQuery = (user, filters = {}) => {
   }
 
   return query;
+};
+
+// Helper to build flattened lead object matching the leads list API format
+const buildListSnapshot = (lead) => {
+  return {
+    id: lead._id,
+    lead_name: lead.name,
+    phone_number: lead.phone,
+    store: lead.store,
+    lead_type: lead.leadType,
+    call_status: lead.callStatus,
+    lead_status: lead.leadStatus,
+    function_date: lead.functionDate,
+    enquiry_date: lead.enquiryDate,
+    created_at: lead.createdAt,
+    assigned_to: lead.assignedTo && typeof lead.assignedTo === 'object' ? {
+      id: lead.assignedTo._id,
+      name: lead.assignedTo.name,
+      employee_id: lead.assignedTo.employeeId
+    } : null,
+    reason_collected_from_store: lead.reasonCollectedFromStore || null,
+    attended_by: lead.attendedBy || null,
+    booking_number: lead.bookingNo || null,
+    visit_date: lead.visitDate || null,
+    return_date: lead.returnDate || null,
+    security_amount: lead.securityAmount || null
+  };
 };
 
 // ==================== Leads Listing ====================
@@ -241,8 +269,35 @@ export const updateLossOfSaleLead = async (req, res) => {
       updateData.leadType = "lossOfSale";
     }
 
+    // Capture full snapshot before update
+    const beforeLead = lead.toObject();
+
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
-    res.json({ message: "Loss of Sale lead updated successfully", lead: updatedLead });
+
+    // Build detailed changedFields (before/after) for only the updated keys
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = {
+        before: beforeLead[key],
+        after: updatedLead[key],
+      };
+    });
+
+    const report = await Report.create({
+      originalLeadId: beforeLead._id,
+      beforeSnapshot: beforeLead,
+      leadSnapshot: updatedLead.toObject(), // full details after edit
+      listSnapshot: buildListSnapshot(updatedLead),
+      leadType: updatedLead.leadType,
+      editedBy: req.user._id,
+      changedFields,
+      note: "moved after edit",
+    });
+
+    // Remove the lead from active collection
+    await Lead.findByIdAndDelete(id);
+
+    res.json({ message: "Loss of Sale lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -311,8 +366,32 @@ export const updateRentOutLead = async (req, res) => {
       updateData.leadType = "rentOutFeedback";
     }
 
+    const beforeLead = lead.toObject();
+
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
-    res.json({ message: "Rent-Out lead updated successfully", lead: updatedLead });
+
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = {
+        before: beforeLead[key],
+        after: updatedLead[key],
+      };
+    });
+
+    const report = await Report.create({
+      originalLeadId: beforeLead._id,
+      beforeSnapshot: beforeLead,
+      leadSnapshot: updatedLead.toObject(),
+      listSnapshot: buildListSnapshot(updatedLead),
+      leadType: updatedLead.leadType,
+      editedBy: req.user._id,
+      changedFields,
+      note: "moved after edit",
+    });
+
+    await Lead.findByIdAndDelete(id);
+
+    res.json({ message: "Rent-Out lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -379,8 +458,32 @@ export const updateBookingConfirmationLead = async (req, res) => {
       updateData.leadType = "bookingConfirmation";
     }
 
+    const beforeLead = lead.toObject();
+
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
-    res.json({ message: "Booking Confirmation lead updated successfully", lead: updatedLead });
+
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = {
+        before: beforeLead[key],
+        after: updatedLead[key],
+      };
+    });
+
+    const report = await Report.create({
+      originalLeadId: beforeLead._id,
+      beforeSnapshot: beforeLead,
+      leadSnapshot: updatedLead.toObject(),
+      listSnapshot: buildListSnapshot(updatedLead),
+      leadType: updatedLead.leadType,
+      editedBy: req.user._id,
+      changedFields,
+      note: "moved after edit",
+    });
+
+    await Lead.findByIdAndDelete(id);
+
+    res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -447,8 +550,32 @@ export const updateJustDialLead = async (req, res) => {
       updateData.leadType = "justDial";
     }
 
+    const beforeLead = lead.toObject();
+
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
-    res.json({ message: "Just Dial lead updated successfully", lead: updatedLead });
+
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = {
+        before: beforeLead[key],
+        after: updatedLead[key],
+      };
+    });
+
+    const report = await Report.create({
+      originalLeadId: beforeLead._id,
+      beforeSnapshot: beforeLead,
+      leadSnapshot: updatedLead.toObject(),
+      listSnapshot: buildListSnapshot(updatedLead),
+      leadType: updatedLead.leadType,
+      editedBy: req.user._id,
+      changedFields,
+      note: "moved after edit",
+    });
+
+    await Lead.findByIdAndDelete(id);
+
+    res.json({ message: "Just Dial lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
