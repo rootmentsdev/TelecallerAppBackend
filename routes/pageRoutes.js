@@ -9,11 +9,26 @@
  *       - bearerAuth: []
  *     description: |
  *       Returns leads filtered by optional parameters. If leadType is not provided, returns leads of all types.
- *       Supports multiple filters including store (brand - location), enquiryDate range, functionDate range, and visitDate range.
- *       Store filter supports both full format (e.g., "Suitor Guy - Kottayam", "Zorucci - Kottayam") and location-only (e.g., "Kottayam", "Edappally").
- *       Examples:
- *       - Get all leads for a store: /api/pages/leads?store=Suitor Guy - Edappally
- *       - Get specific lead type: /api/pages/leads?leadType=bookingConfirmation&store=Zorucci - Kottayam
+ *       
+ *       **Filtering Options:**
+ *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
+ *       - **Date Filtering**: Multiple date fields available (enquiryDate, functionDate, visitDate, createdAt)
+ *       - **Status Filtering**: Filter by callStatus, leadStatus, source
+ *       - **Pagination**: Control page size and navigation
+ *       
+ *       **Store Filter Examples:**
+ *       - Get all leads for a store: `/api/pages/leads?store=Suitor Guy - Edappally`
+ *       - Get specific lead type: `/api/pages/leads?leadType=bookingConfirmation&store=Zorucci - Kottayam`
+ *       
+ *       **Date Filter Examples:**
+ *       - Filter by enquiry date: `/api/pages/leads?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
+ *       - Filter by function date: `/api/pages/leads?functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *       - Filter by visit date: `/api/pages/leads?leadType=lossOfSale&visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
+ *       - Generic date range: `/api/pages/leads?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate`
+ *       
+ *       **Combined Filter Examples:**
+ *       - Store + Date: `/api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
+ *       - Lead Type + Store + Date: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
  *     parameters:
  *       - in: query
  *         name: leadType
@@ -27,29 +42,48 @@
  *         required: false
  *         schema:
  *           type: string
+ *           example: "Suitor Guy - Edappally"
  *         description: |
- *           Filter by store name using "Brand - Location" format (e.g., "Suitor Guy - Edappally").
+ *           Filter leads by store name using "Brand - Location" format.
+ *           
+ *           **Supported Formats:**
+ *           - **Full Format**: `"Suitor Guy - Edappally"`, `"Zorucci - Kottayam"`
+ *           - **Location Only**: `"Edappally"`, `"Kottayam"`, `"Manjeri"`
  *           
  *           **Brand Abbreviations:**
- *           - "SG" = "Suitor Guy"
- *           - "Z" = "Zorucci"
+ *           - `"SG"` = `"Suitor Guy"` (e.g., `"SG-Edappally"` matches `"Suitor Guy - Edappally"`)
+ *           - `"Z"` = `"Zorucci"` (e.g., `"Z-Kottayam"` matches `"Zorucci - Kottayam"`)
  *           
- *           **How it works:**
- *           - Matches exact format: "Suitor Guy - Edappally"
- *           - Matches brand abbreviations: "SG-Edappally" (same as "Suitor Guy - Edappally")
- *           - Matches stores containing both brand and location: Any store with both "Suitor Guy" (or "SG") AND "Edappally"
- *           - Also supports location-only searches: "Edappally", "Kottayam"
+ *           **How Filtering Works:**
+ *           1. **Exact Match**: Searches for the exact store name
+ *           2. **Brand + Location Match**: Finds stores containing both brand and location
+ *              - `"Suitor Guy - Edappally"` matches stores with both "Suitor Guy" (or "SG") AND "Edappally"
+ *           3. **Location Match**: Also matches stores with just the location name
+ *              - `"Suitor Guy - Kottayam"` will also match stores named just `"Kottayam"`
  *           
  *           **Important Notes:**
- *           - Edappal and Edappally are DIFFERENT locations (not variations)
- *           - Searching "Suitor Guy - Edappally" will NOT match stores with "Edappal"
- *           - Searching "Suitor Guy - Edappal" will NOT match stores with "Edappally"
+ *           - **Edappal vs Edappally**: These are DIFFERENT locations (not variations)
+ *             - Searching `"Suitor Guy - Edappally"` will NOT match stores with `"Edappal"`
+ *             - Searching `"Suitor Guy - Edappal"` will NOT match stores with `"Edappally"`
+ *           - Case-insensitive matching (e.g., `"kottayam"` matches `"Kottayam"`)
+ *           - Works with all lead types (lossOfSale, rentOutFeedback, bookingConfirmation, general, justDial)
  *           
- *           **Works for all lead types:**
- *           - Loss of Sale: `?leadType=lossOfSale&store=Suitor Guy - Edappally`
- *           - Rent Out: `?leadType=rentOutFeedback&store=Suitor Guy - Edappally`
- *           - Booking Confirmation: `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
- *           - All types: `?store=Suitor Guy - Edappally`
+ *           **Examples:**
+ *           - Get all leads for a store: `?store=Suitor Guy - Edappally`
+ *           - Get specific lead type: `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *           - Get all leads for location: `?store=Kottayam`
+ *           - Get rent-out leads: `?leadType=rentOutFeedback&store=Suitor Guy - Kottayam`
+ *           - Get loss of sale leads: `?leadType=lossOfSale&store=Suitor Guy - Manjeri`
+ *           
+ *           **Use Cases:**
+ *           - **Loss of Sale Area**: Filter by store for loss of sale leads
+ *             - `?leadType=lossOfSale&store=Suitor Guy - Edappally`
+ *           - **Rent Out Area**: Filter by store for rent-out leads
+ *             - `?leadType=rentOutFeedback&store=Suitor Guy - Kottayam`
+ *           - **Booking Confirmation Area**: Filter by store for booking confirmation leads
+ *             - `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *           - **All Leads**: Get all lead types for a store
+ *             - `?store=Suitor Guy - Edappally`
  *       - in: query
  *         name: callStatus
  *         required: false
@@ -74,56 +108,96 @@
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter leads with enquiry date on or after this date (YYYY-MM-DD).
+ *           example: "2024-01-01"
+ *         description: |
+ *           Filter leads with enquiry date on or after this date (YYYY-MM-DD).
+ *           Example: `?enquiryDateFrom=2024-01-01` returns leads with enquiry date from January 1, 2024 onwards.
+ *           Can be combined with `enquiryDateTo` for a date range.
  *       - in: query
  *         name: enquiryDateTo
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter leads with enquiry date on or before this date (YYYY-MM-DD).
+ *           example: "2024-12-31"
+ *         description: |
+ *           Filter leads with enquiry date on or before this date (YYYY-MM-DD).
+ *           Example: `?enquiryDateTo=2024-12-31` returns leads with enquiry date up to December 31, 2024.
+ *           The date is inclusive (includes the entire day up to 23:59:59).
+ *           Use with `enquiryDateFrom` for a date range: `?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
  *       - in: query
  *         name: functionDateFrom
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter leads with function date on or after this date (YYYY-MM-DD).
+ *           example: "2024-03-01"
+ *         description: |
+ *           Filter leads with function/event date on or after this date (YYYY-MM-DD).
+ *           Example: `?functionDateFrom=2024-03-01` returns leads with function date from March 1, 2024 onwards.
+ *           Useful for filtering booking confirmation and rent-out leads by event date.
+ *           Can be combined with `functionDateTo` for a date range.
  *       - in: query
  *         name: functionDateTo
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter leads with function date on or before this date (YYYY-MM-DD).
+ *           example: "2024-03-31"
+ *         description: |
+ *           Filter leads with function/event date on or before this date (YYYY-MM-DD).
+ *           Example: `?functionDateTo=2024-03-31` returns leads with function date up to March 31, 2024.
+ *           The date is inclusive (includes the entire day up to 23:59:59).
+ *           Use with `functionDateFrom` for a date range: `?functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
  *       - in: query
  *         name: visitDateFrom
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter leads with visit date on or after this date (YYYY-MM-DD).
+ *           example: "2024-02-01"
+ *         description: |
+ *           Filter leads with visit date on or after this date (YYYY-MM-DD).
+ *           Example: `?visitDateFrom=2024-02-01` returns leads with visit date from February 1, 2024 onwards.
+ *           Mainly used for Loss of Sale leads.
+ *           Can be combined with `visitDateTo` for a date range.
  *       - in: query
  *         name: visitDateTo
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Filter leads with visit date on or before this date (YYYY-MM-DD).
+ *           example: "2024-02-28"
+ *         description: |
+ *           Filter leads with visit date on or before this date (YYYY-MM-DD).
+ *           Example: `?visitDateTo=2024-02-28` returns leads with visit date up to February 28, 2024.
+ *           The date is inclusive (includes the entire day up to 23:59:59).
+ *           Use with `visitDateFrom` for a date range: `?visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
  *       - in: query
  *         name: dateFrom
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Generic date range start (applies to dateField, default: enquiryDate). Use with dateField parameter.
+ *           example: "2024-01-01"
+ *         description: |
+ *           Generic date range start (applies to the field specified by `dateField`, default: `enquiryDate`).
+ *           Only used if specific date filters (`enquiryDateFrom`, `functionDateFrom`, `visitDateFrom`) are not provided.
+ *           Example: `?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate`
+ *           Priority: Specific date fields take precedence over generic date range.
  *       - in: query
  *         name: dateTo
  *         required: false
  *         schema:
  *           type: string
  *           format: date
- *         description: Generic date range end (applies to dateField, default: enquiryDate). Use with dateField parameter.
+ *           example: "2024-12-31"
+ *         description: |
+ *           Generic date range end (applies to the field specified by `dateField`, default: `enquiryDate`).
+ *           Only used if specific date filters (`enquiryDateTo`, `functionDateTo`, `visitDateTo`) are not provided.
+ *           The date is inclusive (includes the entire day up to 23:59:59).
+ *           Example: `?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=functionDate`
+ *           Priority: Specific date fields take precedence over generic date range.
  *       - in: query
  *         name: dateField
  *         required: false
@@ -131,7 +205,15 @@
  *           type: string
  *           enum: [enquiryDate, functionDate, visitDate, createdAt]
  *           default: enquiryDate
- *         description: Which date field to use with dateFrom/dateTo (only used if specific date filters not provided).
+ *         description: |
+ *           Which date field to use with `dateFrom`/`dateTo` parameters.
+ *           Only used if specific date filters are not provided.
+ *           Options:
+ *           - `enquiryDate` (default) - Filter by enquiry date
+ *           - `functionDate` - Filter by function/event date
+ *           - `visitDate` - Filter by visit date
+ *           - `createdAt` - Filter by lead creation date
+ *           Example: `?dateFrom=2024-03-01&dateTo=2024-03-31&dateField=functionDate`
  *       - in: query
  *         name: page
  *         required: false
