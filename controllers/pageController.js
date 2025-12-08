@@ -626,3 +626,75 @@ export const createAddLead = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// PATCH - Generic update for any lead (useful for 'general' leadType)
+export const updateGenericLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      call_status,
+      lead_status,
+      follow_up_flag,
+      follow_up_date,
+      call_date,
+      reason_collected_from_store,
+      remarks,
+      closing_status,
+      rating
+    } = req.body;
+
+    const lead = await Lead.findById(id);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (follow_up_flag !== undefined) {
+      updateData.followUpFlag = follow_up_flag;
+      if (follow_up_flag && !lead.followUpDate) {
+        updateData.followUpDate = new Date();
+      }
+    }
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    if (call_date !== undefined) updateData.callDate = call_date;
+    if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
+    if (remarks !== undefined) updateData.remarks = remarks;
+    if (closing_status !== undefined) updateData.closingStatus = closing_status;
+    if (rating !== undefined) updateData.rating = rating;
+
+    // If lead was general and client intends to keep it general, don't overwrite leadType.
+    // If you want to change leadType, frontend can call a specific endpoint or include lead_type in body.
+
+    // Capture before snapshot
+    const beforeLead = lead.toObject();
+
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+
+    // Build changedFields
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
+    });
+
+    const report = await Report.create({
+      originalLeadId: beforeLead._id,
+      beforeSnapshot: beforeLead,
+      leadSnapshot: updatedLead.toObject(),
+      listSnapshot: buildListSnapshot(updatedLead),
+      leadType: updatedLead.leadType,
+      editedBy: req.user._id,
+      changedFields,
+      note: 'moved after edit',
+    });
+
+    await Lead.findByIdAndDelete(id);
+
+    res.json({ message: 'Lead updated and moved to reports', report });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

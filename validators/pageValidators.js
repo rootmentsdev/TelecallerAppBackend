@@ -257,3 +257,51 @@ export const addLeadPostValidator = [
   dateValidator('follow_up_date')
 ];
 
+// Generic lead update validator (for 'general' or unknown lead types)
+export const leadUpdateValidator = [
+  param('id')
+    .notEmpty()
+    .withMessage('Lead ID is required')
+    .custom((value) => {
+      if (!mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Invalid lead ID format');
+      }
+      return true;
+    }),
+  body('call_status')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Call status must be a string'),
+  body('lead_status')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Lead status must be a string'),
+  body('follow_up_flag')
+    .optional()
+    .isBoolean()
+    .withMessage('Follow up flag must be a boolean'),
+  dateValidator('follow_up_date'),
+  dateValidator('call_date'),
+  body('reason_collected_from_store')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Reason collected from store must be a string'),
+  body('remarks')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Remarks must be a string'),
+  body('closing_status')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Closing status must be a string'),
+  body('rating')
+    .optional()
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be between 1 and 5'),
+];
+

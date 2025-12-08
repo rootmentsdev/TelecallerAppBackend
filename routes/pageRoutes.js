@@ -634,6 +634,71 @@ const router = express.Router();
 // GET /api/pages/leads - Fetch list of leads (with filters)
 router.get("/leads", protect, getLeads);
 
+/**
+ * @swagger
+ * /api/pages/leads/{id}:
+ *   patch:
+ *     summary: Generic update for any lead (including 'general') and move it to reports
+ *     tags:
+ *       - Leads
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Lead id to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               call_status:
+ *                 type: string
+ *               lead_status:
+ *                 type: string
+ *               follow_up_flag:
+ *                 type: boolean
+ *               follow_up_date:
+ *                 type: string
+ *                 format: date-time
+ *               call_date:
+ *                 type: string
+ *                 format: date-time
+ *               reason_collected_from_store:
+ *                 type: string
+ *               remarks:
+ *                 type: string
+ *               closing_status:
+ *                 type: string
+ *               rating:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Lead updated and moved to reports. Returns created report object.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 report:
+ *                   type: object
+ */
+import { leadUpdateValidator } from "../validators/pageValidators.js";
+router.patch(
+  "/leads/:id",
+  protect,
+  leadUpdateValidator,
+  handleValidation,
+  updateGenericLead
+);
+
 // ==================== Loss of Sale Page Routes ====================
 // GET /api/pages/loss-of-sale/:id - Fetch Loss of Sale lead data
 router.get(
