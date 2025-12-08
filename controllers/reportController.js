@@ -37,21 +37,24 @@ export const getReports = async (req, res) => {
       Report.countDocuments(query),
     ]);
 
-    // For each report return only the original lead details (beforeSnapshot) and the edited fields (after values)
+    // For each report, merge original lead fields with edited values so the response contains a single combined object
     const mapped = reports.map((r) => {
-      const originalLead = r.beforeSnapshot || {};
+      const originalLead = (r.beforeSnapshot && typeof r.beforeSnapshot === 'object') ? { ...r.beforeSnapshot } : {};
 
-      const edited_fields = {};
+      const editedFields = {};
       if (r.changedFields && typeof r.changedFields === 'object') {
         Object.keys(r.changedFields).forEach((k) => {
-          edited_fields[k] = r.changedFields[k]?.after;
+          const after = r.changedFields[k]?.after;
+          if (after !== undefined) editedFields[k] = after;
         });
       }
 
+      // Merge: edited values override originalLead fields
+      const merged = { ...originalLead, ...editedFields };
+
       return {
-        original_lead: originalLead,
-        edited_fields,
         report_id: r._id,
+        ...merged,
         edited_by: r.editedBy ? { id: r.editedBy._id, name: r.editedBy.name, employee_id: r.editedBy.employeeId } : null,
         edited_at: r.editedAt,
       };
@@ -78,18 +81,20 @@ export const getReportById = async (req, res) => {
     const report = await Report.findById(id).populate("editedBy", "name employeeId");
     if (!report) return res.status(404).json({ message: "Report not found" });
 
-    const originalLead = report.beforeSnapshot || {};
-    const edited_fields = {};
+    const originalLead = (report.beforeSnapshot && typeof report.beforeSnapshot === 'object') ? { ...report.beforeSnapshot } : {};
+    const editedFields = {};
     if (report.changedFields && typeof report.changedFields === 'object') {
       Object.keys(report.changedFields).forEach((k) => {
-        edited_fields[k] = report.changedFields[k]?.after;
+        const after = report.changedFields[k]?.after;
+        if (after !== undefined) editedFields[k] = after;
       });
     }
 
+    const merged = { ...originalLead, ...editedFields };
+
     res.json({
-      original_lead: originalLead,
-      edited_fields,
       report_id: report._id,
+      ...merged,
       edited_by: report.editedBy ? { id: report.editedBy._id, name: report.editedBy.name, employee_id: report.editedBy.employeeId } : null,
       edited_at: report.editedAt,
     });
