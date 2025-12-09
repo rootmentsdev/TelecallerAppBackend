@@ -270,10 +270,16 @@ export const getLeads = async (req, res) => {
     // Single date filter for createdAt (takes priority over range)
     if (createdAt) {
       // Filter for leads created on this specific date (entire day)
-      const startOfDay = new Date(createdAt);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(createdAt);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Parse date string and create UTC date range to avoid timezone issues
+      const dateParts = createdAt.split('-');
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10) - 1; // Month is 0-indexed
+      const day = parseInt(dateParts[2], 10);
+      
+      // Create start of day in UTC (00:00:00.000)
+      const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+      // Create end of day in UTC (23:59:59.999)
+      const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
       
       filters.createdAt = {
         $gte: startOfDay,
