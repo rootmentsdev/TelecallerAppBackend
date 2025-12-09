@@ -129,6 +129,9 @@ export const getLeads = async (req, res) => {
       functionDateTo,
       visitDateFrom,
       visitDateTo,
+      createdAtFrom,
+      createdAtTo,
+      createdAt, // Single date for filtering leads created on a specific day
       // Generic date range (applies to enquiryDate by default)
       dateFrom,
       dateTo,
@@ -264,8 +267,33 @@ export const getLeads = async (req, res) => {
       }
     }
 
+    // Single date filter for createdAt (takes priority over range)
+    if (createdAt) {
+      // Filter for leads created on this specific date (entire day)
+      const startOfDay = new Date(createdAt);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(createdAt);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      filters.createdAt = {
+        $gte: startOfDay,
+        $lte: endOfDay
+      };
+    } else if (createdAtFrom || createdAtTo) {
+      // Date range filter for createdAt
+      filters.createdAt = {};
+      if (createdAtFrom) {
+        filters.createdAt.$gte = new Date(createdAtFrom);
+      }
+      if (createdAtTo) {
+        const endDate = new Date(createdAtTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.createdAt.$lte = endDate;
+      }
+    }
+
     // Generic date range (if specific fields not provided)
-    if ((dateFrom || dateTo) && !enquiryDateFrom && !enquiryDateTo && !functionDateFrom && !functionDateTo && !visitDateFrom && !visitDateTo) {
+    if ((dateFrom || dateTo) && !enquiryDateFrom && !enquiryDateTo && !functionDateFrom && !functionDateTo && !visitDateFrom && !visitDateTo && !createdAtFrom && !createdAtTo && !createdAt) {
       const dateFieldName = dateField === 'functionDate' ? 'functionDate' : 
                            dateField === 'visitDate' ? 'visitDate' : 
                            dateField === 'createdAt' ? 'createdAt' : 

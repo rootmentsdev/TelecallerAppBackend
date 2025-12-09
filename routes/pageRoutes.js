@@ -12,7 +12,7 @@
  *       
  *       **Filtering Options:**
  *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
- *       - **Date Filtering**: Multiple date fields available (enquiryDate, functionDate, visitDate, createdAt)
+ *       - **Date Filtering**: Multiple date fields available with both range and single-day options
  *       - **Status Filtering**: Filter by callStatus, leadStatus, source
  *       - **Pagination**: Control page size and navigation
  *       
@@ -24,11 +24,22 @@
  *       - Filter by enquiry date: `/api/pages/leads?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
  *       - Filter by function date: `/api/pages/leads?functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
  *       - Filter by visit date: `/api/pages/leads?leadType=lossOfSale&visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
+ *       - Filter by creation date range: `/api/pages/leads?createdAtFrom=2024-01-01&createdAtTo=2024-12-31`
+ *       - Filter by creation date (single day): `/api/pages/leads?createdAt=2024-12-08` (perfect for date pickers)
  *       - Generic date range: `/api/pages/leads?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate`
+ *       
+ *       **Date Filtering Options:**
+ *       - **Enquiry Date**: `enquiryDateFrom`, `enquiryDateTo` - Filter by when the enquiry was made
+ *       - **Function Date**: `functionDateFrom`, `functionDateTo` - Filter by event/function date
+ *       - **Visit Date**: `visitDateFrom`, `visitDateTo` - Filter by visit date (mainly for Loss of Sale)
+ *       - **Creation Date Range**: `createdAtFrom`, `createdAtTo` - Filter by when leads were added to system (date range)
+ *       - **Creation Date (Single Day)**: `createdAt` - Filter by specific creation date (single day, perfect for frontend date pickers)
+ *       - **Generic Date Range**: `dateFrom`, `dateTo`, `dateField` - Flexible date filtering with field selection
  *       
  *       **Combined Filter Examples:**
  *       - Store + Date: `/api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
- *       - Lead Type + Store + Date: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *       - Lead Type + Store + Creation Date: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally&createdAt=2024-12-08`
+ *       - Lead Type + Store + Date Range: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
  *     parameters:
  *       - in: query
  *         name: leadType
@@ -174,6 +185,44 @@
  *           The date is inclusive (includes the entire day up to 23:59:59).
  *           Use with `visitDateFrom` for a date range: `?visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
  *       - in: query
+ *         name: createdAtFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-01-01"
+ *         description: |
+ *           Filter leads created on or after this date (YYYY-MM-DD).
+ *           Example: `?createdAtFrom=2024-01-01` returns leads created from January 1, 2024 onwards.
+ *           Useful for filtering leads by when they were added to the system.
+ *           Can be combined with `createdAtTo` for a date range.
+ *       - in: query
+ *         name: createdAtTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-12-31"
+ *         description: |
+ *           Filter leads created on or before this date (YYYY-MM-DD).
+ *           Example: `?createdAtTo=2024-12-31` returns leads created up to December 31, 2024.
+ *           The date is inclusive (includes the entire day up to 23:59:59).
+ *           Use with `createdAtFrom` for a date range: `?createdAtFrom=2024-01-01&createdAtTo=2024-12-31`
+ *       - in: query
+ *         name: createdAt
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-12-08"
+ *         description: |
+ *           Filter leads created on a specific date (YYYY-MM-DD).
+ *           Example: `?createdAt=2024-12-08` returns leads created on December 8, 2024.
+ *           This is a single date filter (not a range) - perfect for frontend date pickers showing "creations for this day".
+ *           The date is inclusive (includes the entire day from 00:00:00 to 23:59:59).
+ *           Takes priority over `createdAtFrom`/`createdAtTo` if provided.
+ *           Example: `?createdAt=2024-12-08&store=Suitor Guy - Edappally`
+ *       - in: query
  *         name: dateFrom
  *         required: false
  *         schema:
@@ -182,7 +231,7 @@
  *           example: "2024-01-01"
  *         description: |
  *           Generic date range start (applies to the field specified by `dateField`, default: `enquiryDate`).
- *           Only used if specific date filters (`enquiryDateFrom`, `functionDateFrom`, `visitDateFrom`) are not provided.
+ *           Only used if specific date filters (`enquiryDateFrom`, `functionDateFrom`, `visitDateFrom`, `createdAtFrom`) are not provided.
  *           Example: `?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate`
  *           Priority: Specific date fields take precedence over generic date range.
  *       - in: query
@@ -194,7 +243,7 @@
  *           example: "2024-12-31"
  *         description: |
  *           Generic date range end (applies to the field specified by `dateField`, default: `enquiryDate`).
- *           Only used if specific date filters (`enquiryDateTo`, `functionDateTo`, `visitDateTo`) are not provided.
+ *           Only used if specific date filters (`enquiryDateTo`, `functionDateTo`, `visitDateTo`, `createdAtTo`) are not provided.
  *           The date is inclusive (includes the entire day up to 23:59:59).
  *           Example: `?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=functionDate`
  *           Priority: Specific date fields take precedence over generic date range.
@@ -305,6 +354,94 @@
  *                       type: integer
  *                     pages:
  *                       type: integer
+ *             examples:
+ *               storeFiltering:
+ *                 summary: Store filtering examples
+ *                 value:
+ *                   leads: []
+ *                   pagination:
+ *                     page: 1
+ *                     limit: 100
+ *                     total: 0
+ *                     pages: 0
+ *                 description: |
+ *                   **Store Filtering API Endpoints:**
+ *                   
+ *                   1. Get all leads for a store (all lead types):
+ *                      `GET /api/pages/leads?store=Suitor Guy - Edappally`
+ *                   
+ *                   2. Get Loss of Sale leads for a store:
+ *                      `GET /api/pages/leads?leadType=lossOfSale&store=Suitor Guy - Edappally`
+ *                   
+ *                   3. Get Rent Out leads for a store:
+ *                      `GET /api/pages/leads?leadType=rentOutFeedback&store=Suitor Guy - Kottayam`
+ *                   
+ *                   4. Get Booking Confirmation leads for a store:
+ *                      `GET /api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *                   
+ *                   5. Get leads for location only:
+ *                      `GET /api/pages/leads?store=Kottayam`
+ *                   
+ *                   6. Get leads for brand only:
+ *                      `GET /api/pages/leads?store=Suitor Guy`
+ *               dateFiltering:
+ *                 summary: Date filtering examples
+ *                 value:
+ *                   leads: []
+ *                   pagination:
+ *                     page: 1
+ *                     limit: 100
+ *                     total: 0
+ *                     pages: 0
+ *                 description: |
+ *                   **Date Filtering API Endpoints:**
+ *                   
+ *                   1. Filter by enquiry date range:
+ *                      `GET /api/pages/leads?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
+ *                   
+ *                   2. Filter by function date range:
+ *                      `GET /api/pages/leads?functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *                   
+ *                   3. Filter by visit date (Loss of Sale):
+ *                      `GET /api/pages/leads?leadType=lossOfSale&visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
+ *                   
+ *                   4. Filter by creation date (single day):
+ *                      `GET /api/pages/leads?createdAt=2024-12-08`
+ *                   
+ *                   5. Filter by creation date range:
+ *                      `GET /api/pages/leads?createdAtFrom=2024-01-01&createdAtTo=2024-12-31`
+ *                   
+ *                   6. Generic date range (enquiry date):
+ *                      `GET /api/pages/leads?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate`
+ *                   
+ *                   7. Generic date range (function date):
+ *                      `GET /api/pages/leads?dateFrom=2024-03-01&dateTo=2024-03-31&dateField=functionDate`
+ *               combinedFilters:
+ *                 summary: Combined store and date filtering examples
+ *                 value:
+ *                   leads: []
+ *                   pagination:
+ *                     page: 1
+ *                     limit: 100
+ *                     total: 0
+ *                     pages: 0
+ *                 description: |
+ *                   **Combined Store + Date Filtering API Endpoints:**
+ *                   
+ *                   1. Store + Enquiry Date:
+ *                      `GET /api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
+ *                   
+ *                   2. Lead Type + Store + Creation Date (single day):
+ *                      `GET /api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally&createdAt=2024-12-08`
+ *                   
+ *                   3. Lead Type + Store + Function Date:
+ *                      `GET /api/pages/leads?leadType=rentOutFeedback&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *                   
+ *                   4. Loss of Sale + Store + Visit Date:
+ *                      `GET /api/pages/leads?leadType=lossOfSale&store=Suitor Guy - Manjeri&visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
+ *                   
+ *                   5. Store + Creation Date Range:
+ *                      `GET /api/pages/leads?store=Suitor Guy - Edappally&createdAtFrom=2024-01-01&createdAtTo=2024-12-31`
  *       401:
  *         description: Unauthorized. Token missing or invalid.
  *       500:
