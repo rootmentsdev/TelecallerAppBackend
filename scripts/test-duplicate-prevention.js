@@ -200,20 +200,17 @@ const testDuplicatePrevention = async () => {
     };
 
     // Create a report entry (simulating a lead moved to reports)
+    // Create a report entry (simulating a lead moved to reports)
     const report = await Report.create({
-      leadType: "bookingConfirmation",
-      beforeSnapshot: {
-        name: reportLead.name,
-        phone: reportLead.phone,
-        bookingNo: reportLead.bookingNo,
+      leadData: {
+        id: mongoose.Types.ObjectId(),
+        lead_name: reportLead.name,
+        phone_number: reportLead.phone,
         store: reportLead.store,
+        lead_type: reportLead.leadType,
+        booking_number: reportLead.bookingNo,
       },
-      leadSnapshot: {
-        name: reportLead.name,
-        phone: reportLead.phone,
-        bookingNo: reportLead.bookingNo,
-        store: reportLead.store,
-      },
+      editedBy: mongoose.Types.ObjectId(),
     });
 
     console.log("Created report entry for lead...");

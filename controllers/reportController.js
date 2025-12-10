@@ -13,9 +13,10 @@ export const getReports = async (req, res) => {
       limit = 50,
     } = req.query;
 
-    const query = {};
-    if (leadType) query.leadType = leadType;
-    if (editedBy) query.editedBy = editedBy;
+  const query = {};
+  // Note: Report schema now stores flattened lead data in `leadData`.
+  // Keep support for filtering by editedBy and date range.
+  if (editedBy) query.editedBy = editedBy;
     if (dateFrom || dateTo) {
       query.editedAt = {};
       if (dateFrom) query.editedAt.$gte = new Date(dateFrom);
@@ -37,24 +38,13 @@ export const getReports = async (req, res) => {
       Report.countDocuments(query),
     ]);
 
-    // For each report, merge original lead fields with edited values so the response contains a single combined object
+    // Reports now contain `leadData` which is the flattened lead object.
     const mapped = reports.map((r) => {
-      const originalLead = (r.beforeSnapshot && typeof r.beforeSnapshot === 'object') ? { ...r.beforeSnapshot } : {};
-
-      const editedFields = {};
-      if (r.changedFields && typeof r.changedFields === 'object') {
-        Object.keys(r.changedFields).forEach((k) => {
-          const after = r.changedFields[k]?.after;
-          if (after !== undefined) editedFields[k] = after;
-        });
-      }
-
-      // Merge: edited values override originalLead fields
-      const merged = { ...originalLead, ...editedFields };
+      const lead = (r.leadData && typeof r.leadData === 'object') ? { ...r.leadData } : {};
 
       return {
         report_id: r._id,
-        ...merged,
+        ...lead,
         edited_by: r.editedBy ? { id: r.editedBy._id, name: r.editedBy.name, employee_id: r.editedBy.employeeId } : null,
         edited_at: r.editedAt,
       };
@@ -81,20 +71,11 @@ export const getReportById = async (req, res) => {
     const report = await Report.findById(id).populate("editedBy", "name employeeId");
     if (!report) return res.status(404).json({ message: "Report not found" });
 
-    const originalLead = (report.beforeSnapshot && typeof report.beforeSnapshot === 'object') ? { ...report.beforeSnapshot } : {};
-    const editedFields = {};
-    if (report.changedFields && typeof report.changedFields === 'object') {
-      Object.keys(report.changedFields).forEach((k) => {
-        const after = report.changedFields[k]?.after;
-        if (after !== undefined) editedFields[k] = after;
-      });
-    }
-
-    const merged = { ...originalLead, ...editedFields };
+    const lead = (report.leadData && typeof report.leadData === 'object') ? { ...report.leadData } : {};
 
     res.json({
       report_id: report._id,
-      ...merged,
+      ...lead,
       edited_by: report.editedBy ? { id: report.editedBy._id, name: report.editedBy.name, employee_id: report.editedBy.employeeId } : null,
       edited_at: report.editedAt,
     });

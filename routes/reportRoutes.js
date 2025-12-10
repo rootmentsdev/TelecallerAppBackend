@@ -5,34 +5,25 @@ import { getReports, getReportById } from "../controllers/reportController.js";
 const router = express.Router();
 
 /**
- * @swagger
- * components:
- *   schemas:
  *     Report:
  *       type: object
  *       properties:
  *         _id:
  *           type: string
- *         originalLeadId:
- *           type: string
- *         beforeSnapshot:
+ *         leadData:
  *           type: object
- *         leadSnapshot:
- *           type: object
- *         listSnapshot:
- *           type: object
- *         leadType:
- *           type: string
+ *           description: Flattened lead data as returned by the leads list API (lead_name, phone_number, store, lead_type, etc.)
  *         editedBy:
  *           type: object
  *         editedAt:
  *           type: string
  *           format: date-time
- *         changedFields:
- *           type: object
  *         note:
  *           type: string
  *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
  *           type: string
  *           format: date-time
  *         updatedAt:

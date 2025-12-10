@@ -35,34 +35,29 @@ export const saveToMongo = async (leadData) => {
     }
 
     // IMPORTANT: Check if lead already exists in Report collection (moved after edit)
-    // If it exists in reports, skip importing to prevent re-adding leads that were moved to reports
-    // Check both beforeSnapshot and leadSnapshot fields for matching
-    let reportCheckQuery = {
-      leadType: leadData.leadType,
-      $or: []
-    };
-    
+    // New Report schema stores flattened lead in `leadData`. Support both old snapshot fields and new leadData fields.
+    const reportOrClauses = [];
+
     // For booking/rent-out, match by phone + bookingNo for accuracy
     if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-      reportCheckQuery.$or.push(
-        { 
-          "beforeSnapshot.phone": leadData.phone,
-          "beforeSnapshot.bookingNo": leadData.bookingNo.trim()
-        },
-        { 
-          "leadSnapshot.phone": leadData.phone,
-          "leadSnapshot.bookingNo": leadData.bookingNo.trim()
-        }
+      const bookingNo = leadData.bookingNo.trim();
+      reportOrClauses.push(
+        { "beforeSnapshot.phone": leadData.phone, "beforeSnapshot.bookingNo": bookingNo },
+        { "leadSnapshot.phone": leadData.phone, "leadSnapshot.bookingNo": bookingNo },
+        { "leadData.phone": leadData.phone, "leadData.booking_number": bookingNo },
+        { "leadData.phone": leadData.phone, "leadData.bookingNo": bookingNo }
       );
     }
-    
+
     // For all lead types, also check by phone (fallback if bookingNo not available)
-    reportCheckQuery.$or.push(
+    reportOrClauses.push(
       { "beforeSnapshot.phone": leadData.phone },
-      { "leadSnapshot.phone": leadData.phone }
+      { "leadSnapshot.phone": leadData.phone },
+      { "leadData.phone": leadData.phone },
+      { "leadData.phone_number": leadData.phone }
     );
-    
-    const existingReport = await Report.findOne(reportCheckQuery);
+
+    const existingReport = await Report.findOne({ $or: reportOrClauses });
     if (existingReport) {
       // Lead was moved to reports - skip importing to prevent it from reappearing in leads list
       return { skipped: true, reason: "Lead exists in reports (moved after edit)" };
@@ -140,12 +135,13 @@ export const saveToMongo = async (leadData) => {
       }
       
       // Check if lead exists in reports first (before checking Lead collection)
-      // Use phone + leadType as primary match (simpler and more reliable)
+      // Use phone as primary match and support both old and new report shapes
       const reportCheckQuery = {
-        leadType: leadData.leadType,
         $or: [
           { "beforeSnapshot.phone": leadData.phone },
-          { "leadSnapshot.phone": leadData.phone }
+          { "leadSnapshot.phone": leadData.phone },
+          { "leadData.phone": leadData.phone },
+          { "leadData.phone_number": leadData.phone }
         ]
       };
       

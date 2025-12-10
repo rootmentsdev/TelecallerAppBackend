@@ -109,6 +109,21 @@ const buildListSnapshot = (lead) => {
   };
 };
 
+// Helper to create a Report entry from a Lead document using the flattened list format
+const createReportFromLead = async (leadDoc, userId, note = 'moved after edit', editedFields = null) => {
+  const leadData = buildListSnapshot(leadDoc);
+  const payload = {
+    leadData,
+    editedBy: userId,
+    editedAt: new Date(),
+    note,
+  };
+  if (editedFields && typeof editedFields === 'object' && Object.keys(editedFields).length > 0) {
+    payload.editedFields = editedFields;
+  }
+  return await Report.create(payload);
+};
+
 // ==================== Leads Listing ====================
 
 // GET - Fetch list of leads (for listing pages)
@@ -459,30 +474,16 @@ export const updateLossOfSaleLead = async (req, res) => {
       updateData.leadType = "lossOfSale";
     }
 
-    // Capture full snapshot before update
     const beforeLead = lead.toObject();
 
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
 
-    // Build detailed changedFields (before/after) for only the updated keys
     const changedFields = {};
     Object.keys(updateData).forEach((key) => {
-      changedFields[key] = {
-        before: beforeLead[key],
-        after: updatedLead[key],
-      };
+      changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await Report.create({
-      originalLeadId: beforeLead._id,
-      beforeSnapshot: beforeLead,
-      leadSnapshot: updatedLead.toObject(), // full details after edit
-      listSnapshot: buildListSnapshot(updatedLead),
-      leadType: updatedLead.leadType,
-      editedBy: req.user._id,
-      changedFields,
-      note: "moved after edit",
-    });
+    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
 
     // Remove the lead from active collection
     await Lead.findByIdAndDelete(id);
@@ -562,22 +563,10 @@ export const updateRentOutLead = async (req, res) => {
 
     const changedFields = {};
     Object.keys(updateData).forEach((key) => {
-      changedFields[key] = {
-        before: beforeLead[key],
-        after: updatedLead[key],
-      };
+      changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await Report.create({
-      originalLeadId: beforeLead._id,
-      beforeSnapshot: beforeLead,
-      leadSnapshot: updatedLead.toObject(),
-      listSnapshot: buildListSnapshot(updatedLead),
-      leadType: updatedLead.leadType,
-      editedBy: req.user._id,
-      changedFields,
-      note: "moved after edit",
-    });
+    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -660,16 +649,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
       };
     });
 
-    const report = await Report.create({
-      originalLeadId: beforeLead._id,
-      beforeSnapshot: beforeLead,
-      leadSnapshot: updatedLead.toObject(),
-      listSnapshot: buildListSnapshot(updatedLead),
-      leadType: updatedLead.leadType,
-      editedBy: req.user._id,
-      changedFields,
-      note: "moved after edit",
-    });
+    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -752,16 +732,7 @@ export const updateJustDialLead = async (req, res) => {
       };
     });
 
-    const report = await Report.create({
-      originalLeadId: beforeLead._id,
-      beforeSnapshot: beforeLead,
-      leadSnapshot: updatedLead.toObject(),
-      listSnapshot: buildListSnapshot(updatedLead),
-      leadType: updatedLead.leadType,
-      editedBy: req.user._id,
-      changedFields,
-      note: "moved after edit",
-    });
+    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -887,16 +858,7 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await Report.create({
-      originalLeadId: beforeLead._id,
-      beforeSnapshot: beforeLead,
-      leadSnapshot: updatedLead.toObject(),
-      listSnapshot: buildListSnapshot(updatedLead),
-      leadType: updatedLead.leadType,
-      editedBy: req.user._id,
-      changedFields,
-      note: 'moved after edit',
-    });
+  const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
 
     await Lead.findByIdAndDelete(id);
 
