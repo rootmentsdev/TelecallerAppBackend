@@ -339,6 +339,14 @@ export const mapWalkin = (row) => {
   
   const remarks = remarksValue || "";
 
+  // Parse dates
+  const parsedEnquiryDate = parseDate(date);
+  const parsedFunctionDate = parseDate(functionDate);
+  
+  // Set createdAt from enquiryDate (actual lead creation date from CSV, not import date)
+  // IMPORTANT: Use the Date field from CSV as the creation date
+  const createdAt = parsedEnquiryDate || undefined;
+
   // Build complete lead object with all fields
   const leadData = {
     // Required fields
@@ -354,8 +362,8 @@ export const mapWalkin = (row) => {
     enquiryType: enquiryType || undefined,
     
     // Dates
-    enquiryDate: parseDate(date),
-    functionDate: parseDate(functionDate),
+    enquiryDate: parsedEnquiryDate,
+    functionDate: parsedFunctionDate,
     
     // Status and tracking
     closingStatus: status || undefined,
@@ -364,6 +372,12 @@ export const mapWalkin = (row) => {
     // Additional information
     remarks: remarks || undefined,
   };
+
+  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
+  // This ensures createdAt reflects the actual lead creation date from CSV, not import date
+  if (createdAt) {
+    leadData.createdAt = createdAt;
+  }
 
   // Remove undefined values to keep data clean
   Object.keys(leadData).forEach(key => {
@@ -479,14 +493,26 @@ export const mapLossOfSale = (row) => {
 
   // Date fields (if present in CSV)
   // Excel stores dates as numbers (days since 1900-01-01), convert to date
-  let enquiryDateValue = row.enquiryDate || row["enquiry date"] || row["Enquiry Date"] ||
-    row.date || row.Date || row.DATE;
+  // For loss of sale CSV, the "Date" field is typically the visit date (when customer visited store)
+  let visitDateValue = row.visitDate || row.VisitDate || row["Visit Date"] || row["visit date"] ||
+    row.Date || row.date || row.DATE; // Date field from CSV is the visit date
   
   // If it's an Excel date number, convert it
-  if (enquiryDateValue && typeof enquiryDateValue === 'number') {
+  if (visitDateValue && typeof visitDateValue === 'number') {
     // Excel date: days since 1900-01-01 (Excel incorrectly treats 1900 as leap year, so we use Dec 30, 1899 as epoch)
     // Subtract 2 days to account for Excel's leap year bug
     const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
+    const date = new Date(excelEpoch.getTime() + (visitDateValue - 2) * 24 * 60 * 60 * 1000);
+    visitDateValue = date; // Pass Date object directly
+  }
+  
+  const visitDate = visitDateValue instanceof Date ? visitDateValue : parseDate(visitDateValue);
+
+  let enquiryDateValue = row.enquiryDate || row["enquiry date"] || row["Enquiry Date"];
+  
+  // If it's an Excel date number, convert it
+  if (enquiryDateValue && typeof enquiryDateValue === 'number') {
+    const excelEpoch = new Date(1899, 11, 30);
     const date = new Date(excelEpoch.getTime() + (enquiryDateValue - 2) * 24 * 60 * 60 * 1000);
     enquiryDateValue = date; // Pass Date object directly
   }
@@ -504,6 +530,11 @@ export const mapLossOfSale = (row) => {
   }
   
   const functionDate = functionDateValue instanceof Date ? functionDateValue : parseDate(functionDateValue);
+
+  // Set createdAt from visitDate (Date field from CSV) or enquiryDate (actual lead creation date from CSV, not import date)
+  // IMPORTANT: Use the Date field from CSV as the creation date
+  // Priority: visitDate (Date field from CSV) -> enquiryDate
+  const createdAt = visitDate || enquiryDate || undefined;
 
   // Build complete lead object with all fields
   const leadData = {
@@ -530,10 +561,17 @@ export const mapLossOfSale = (row) => {
     // Dates (if available)
     enquiryDate: enquiryDate,
     functionDate: functionDate,
+    visitDate: visitDate,
     
     // Additional information
     remarks: remarks || undefined,
   };
+
+  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
+  // This ensures createdAt reflects the actual lead creation date from CSV, not import date
+  if (createdAt) {
+    leadData.createdAt = createdAt;
+  }
 
   // Remove undefined values to keep data clean
   Object.keys(leadData).forEach(key => {
@@ -554,7 +592,16 @@ export const mapBooking = (row) => {
   );
   if (!phone) return null;
 
-  return {
+  // Parse dates
+  const bookingDate = parseApiDate(row.bookingDate || row.booking_date);
+  const enquiryDate = parseApiDate(row.enquiryDate || row.enquiry_date || row.date);
+  const functionDate = parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date);
+  
+  // Set createdAt from bookingDate or enquiryDate (actual lead creation date, not import date)
+  // IMPORTANT: Use the earliest available date as the creation date
+  const createdAt = bookingDate || enquiryDate || undefined;
+
+  const leadData = {
     name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
     phone: phone,
     store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
@@ -566,11 +613,18 @@ export const mapBooking = (row) => {
     securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit 
       ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit) 
       : undefined,
-    enquiryDate: parseApiDate(row.enquiryDate || row.bookingDate || row.date),
+    enquiryDate: enquiryDate,
     // Function Date: API uses 'deliveryDate' or 'trialDate'
-    functionDate: parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
+    functionDate: functionDate,
     remarks: (row.remarks || row.notes || row.Remarks || "").trim(),
   };
+
+  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
+  if (createdAt) {
+    leadData.createdAt = createdAt;
+  }
+
+  return leadData;
 };
 
 // Map Rent-Out API data to Lead model
@@ -582,7 +636,17 @@ export const mapRentOut = (row) => {
   );
   if (!phone) return null;
 
-  return {
+  // Parse dates
+  const rentOutDate = parseApiDate(row.rentOutDate || row.rentOut_date || row.rent_date);
+  const enquiryDate = parseApiDate(row.enquiryDate || row.enquiry_date || row.rentDate);
+  const returnDate = parseApiDate(row.returnDate || row.return_date || row.expectedReturnDate);
+  const functionDate = parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date);
+  
+  // Set createdAt from rentOutDate or enquiryDate (actual lead creation date, not import date)
+  // IMPORTANT: Use the earliest available date as the creation date
+  const createdAt = rentOutDate || enquiryDate || undefined;
+
+  const leadData = {
     name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
     phone: phone,
     store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
@@ -594,13 +658,20 @@ export const mapRentOut = (row) => {
     securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit 
       ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit) 
       : undefined,
-    returnDate: parseApiDate(row.returnDate || row.return_date || row.expectedReturnDate),
-    enquiryDate: parseApiDate(row.enquiryDate || row.rentDate || row.rentOutDate || row.rent_date),
-    functionDate: parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
+    returnDate: returnDate,
+    enquiryDate: enquiryDate,
+    functionDate: functionDate,
     // Attended By: API uses 'bookingBy'
     attendedBy: (row.attendedBy || row.attended_by || row.staff || row.Staff || row.bookingBy || row.handledBy || "").trim() || undefined,
     remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
   };
+
+  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
+  if (createdAt) {
+    leadData.createdAt = createdAt;
+  }
+
+  return leadData;
 };
 
 // Map Booking Item API data to Lead model
