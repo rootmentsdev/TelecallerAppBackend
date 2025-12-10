@@ -76,8 +76,8 @@ const run = async () => {
       console.log(`   Using incremental sync: last ${months} months`);
     } else {
       // First sync - default to last 12 months
-      months = "12";
-      console.log(`   Using default: last 12 months (first sync)`);
+    months = "12";
+    console.log(`   Using default: last 12 months (first sync)`);
     }
   } else {
     // Use environment variables if specified
@@ -132,14 +132,14 @@ const run = async () => {
     
     // Use GetBookingReport API (POST) with locationID
     // Note: API prefers months parameter over dateFrom/dateTo
-    const requestBody = {
+      const requestBody = {
       bookingNo: "",
-      dateFrom: dateFrom || "",
-      dateTo: dateTo || "",
-      userName: "",
+        dateFrom: dateFrom || "",
+        dateTo: dateTo || "",
+        userName: "",
       months: months || "", // Prioritize months parameter
-      fromLocation: "",
-      userID: "",
+        fromLocation: "",
+        userID: "",
       locationID: locationId,
     };
     

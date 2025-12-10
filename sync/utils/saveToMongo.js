@@ -73,22 +73,22 @@ export const saveToMongo = async (leadData) => {
     if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") {
       let duplicateQuery = null;
       
-      // For booking/rent-out: Primary check: bookingNo + phone + leadType (most reliable)
-      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        duplicateQuery = {
-          bookingNo: leadData.bookingNo.trim(),
-          phone: leadData.phone,
-          leadType: leadData.leadType,
-        };
-      } else {
-        // Fallback: phone + name + leadType + store (if bookingNo is missing)
-        duplicateQuery = {
-          phone: leadData.phone,
-          name: leadData.name,
-          leadType: leadData.leadType,
-          store: leadData.store,
-        };
-      }
+        // For booking/rent-out: Primary check: bookingNo + phone + leadType (most reliable)
+        if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+          duplicateQuery = {
+            bookingNo: leadData.bookingNo.trim(),
+            phone: leadData.phone,
+            leadType: leadData.leadType,
+          };
+        } else {
+          // Fallback: phone + name + leadType + store (if bookingNo is missing)
+          duplicateQuery = {
+            phone: leadData.phone,
+            name: leadData.name,
+            leadType: leadData.leadType,
+            store: leadData.store,
+          };
+        }
       
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
