@@ -2,6 +2,7 @@ import Lead from "../models/Lead.js";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
 import { mapWalkin, mapLossOfSale } from "../sync/utils/dataMapper.js";
+import { saveToMongo } from "../sync/utils/saveToMongo.js";
 
 export const importLeadsFromCSV = async (req, res) => {
   try {
@@ -199,15 +200,47 @@ export const importLeadsFromCSV = async (req, res) => {
           leadData.leadType = "general"; // Default to general if invalid
         }
 
-        // Create lead (duplicates allowed for tracking customer revisits)
-        const lead = await Lead.create(leadData);
-        results.push({
-          row: rowNumber,
-          success: true,
-          leadId: lead._id,
-          name: lead.name,
-          phone: lead.phone,
-        });
+        // Use saveToMongo for duplicate prevention and proper handling
+        // This ensures CSV imports follow the same duplicate prevention logic as sync scripts
+        const result = await saveToMongo(leadData);
+        
+        if (result.saved) {
+          results.push({
+            row: rowNumber,
+            success: true,
+            action: "created",
+            leadId: result.leadId,
+            name: result.name,
+            phone: result.phone,
+          });
+        } else if (result.updated) {
+          results.push({
+            row: rowNumber,
+            success: true,
+            action: "updated",
+            leadId: result.leadId,
+            name: result.name,
+            phone: result.phone,
+          });
+        } else if (result.skipped) {
+          // Duplicate or exists in reports - log but don't count as error
+          results.push({
+            row: rowNumber,
+            success: true,
+            action: "skipped",
+            reason: result.reason,
+            leadId: result.leadId,
+            name: result.name,
+            phone: result.phone,
+          });
+        } else {
+          // Error occurred
+          errors.push({
+            row: rowNumber,
+            error: result.message || "Failed to save lead",
+            data: row,
+          });
+        }
       } catch (error) {
         errors.push({
           row: rowNumber,

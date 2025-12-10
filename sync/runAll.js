@@ -78,10 +78,20 @@ const runAll = async () => {
     console.log();
     console.log("✅ Summary:");
     console.log("   • Stores synced");
-    console.log("   • Booking Confirmation synced (incremental - only NEW records added)");
-    console.log("   • Rent-Out synced (incremental - only NEW records added)");
-    console.log("   • Walk-in data imported (ALL files - updates existing records)");
-    console.log("   • Loss of Sale data imported (ALL files - updates existing records)");
+    console.log("   • Booking Confirmation synced (incremental - only NEW records, duplicates skipped)");
+    console.log("   • Rent-Out synced (incremental - only NEW records, duplicates skipped)");
+    console.log("   • Walk-in data imported (incremental - only modified files, duplicates updated)");
+    console.log("   • Loss of Sale data imported (incremental - only modified files, duplicates updated)");
+    console.log();
+    console.log("📋 Duplicate Prevention:");
+    console.log("   ✅ API imports: Duplicates skipped (preserves user edits)");
+    console.log("   ✅ CSV imports: Duplicates updated (keeps data fresh)");
+    console.log("   ✅ Reports check: Leads in reports skipped (prevents reappearing)");
+    console.log();
+    console.log("🔄 Incremental Sync:");
+    console.log("   ✅ Next sync will only process:");
+    console.log("      • API: Records updated after last sync time");
+    console.log("      • CSV: Files modified after last sync time");
     console.log();
 
   } catch (error) {

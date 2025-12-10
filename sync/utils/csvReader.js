@@ -10,7 +10,8 @@ const __dirname = dirname(__filename);
 // Helper function to read a single Excel sheet
 const readExcelSheet = (worksheet, sheetName = '') => {
   // Read as array to detect header row
-  const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+  // Use raw: true to get raw cell values (important for dates)
+  const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null, raw: false });
   
   if (!rawData || rawData.length === 0) {
     return [];

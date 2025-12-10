@@ -28,12 +28,14 @@ const run = async () => {
   // Connect to MongoDB
   await connectDB();
   
-  // Step 1: API configuration - Use GetRentOutList API for rent-outs
+  // Step 1: API configuration - Use GetBookingReport (same endpoint as booking, but filter for rent-out data)
+  // Note: The API might return both booking and rent-out data from GetBookingReport
   const baseUrl = process.env.RENTOUT_API_BASE_URL || process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || "http://15.207.90.158:5000";
-  const endpoint = process.env.RENTOUT_API_ENDPOINT || "/api/RentOut/GetRentOutList";
+  const endpoint = process.env.RENTOUT_API_ENDPOINT || "/api/Reports/GetBookingReport"; // Use same endpoint as booking
   const apiUrl = `${baseUrl}${endpoint}`;
   const apiToken = process.env.RENTOUT_API_KEY || process.env.BOOKING_API_KEY || process.env.API_TOKEN;
-  const usePost = process.env.RENTOUT_USE_POST === "true" || false;
+  // Always use POST for GetBookingReport
+  const usePost = true;
   
   // Step 3: Location ID to Store Name mapping
   const LOCATION_ID_TO_STORE_NAME = {
@@ -75,18 +77,19 @@ const run = async () => {
   let dateTo = process.env.RENTOUT_DATE_TO || "";
   let months = process.env.RENTOUT_MONTHS || "";
 
-  // If last sync exists and no date range specified, use last sync date for incremental sync
-  if (lastSyncAt && !dateFrom && !dateTo && !months) {
-    // Format date as DD-MM-YYYY for API
-    const day = String(lastSyncAt.getDate()).padStart(2, '0');
-    const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
-    const year = lastSyncAt.getFullYear();
-    dateFrom = `${day}-${month}-${year}`;
-    console.log(`   Using incremental sync from: ${dateFrom}`);
-  } else if (!dateFrom && !dateTo && !months) {
-    // If no date range specified and no last sync, default to last 12 months (first sync)
+  // Date range configuration - prioritize months parameter for better API compatibility
+  if (!dateFrom && !dateTo && !months) {
+    if (lastSyncAt) {
+      // For incremental sync, use months parameter (more reliable than dateFrom)
+      // Calculate months since last sync (minimum 1 month, maximum 12 months)
+      const monthsSinceSync = Math.min(12, Math.max(1, Math.floor((Date.now() - lastSyncAt.getTime()) / (1000 * 60 * 60 * 24 * 30))));
+      months = String(monthsSinceSync);
+      console.log(`   Using incremental sync: last ${months} months`);
+    } else {
+      // First sync - default to last 12 months
     months = "12";
     console.log(`   Using default: last 12 months (first sync)`);
+    }
   } else {
     // Use environment variables if specified
     if (dateFrom) console.log(`📅 Date from: ${dateFrom}`);
@@ -115,10 +118,7 @@ const run = async () => {
     
     console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
     
-    // Try GetRentOutList first (GET request with location ID)
-    let data;
-    if (usePost) {
-      // Prepare request body for POST request
+    // Use POST request with GetBookingReport endpoint (same as booking uses)
       let finalDateFrom = dateFrom;
       let finalDateTo = dateTo;
       let finalMonths = months;
@@ -136,13 +136,13 @@ const run = async () => {
         months: finalMonths || "",
         fromLocation: "",
         userID: "",
-        locationID: locationId,
+      locationID: String(locationId), // Ensure it's a string
       };
       
       console.log(`📡 Calling API: ${apiUrl}`);
       console.log(`   📤 Request body:`, JSON.stringify(requestBody));
       
-      data = await postAPI(
+    const data = await postAPI(
         apiUrl,
         requestBody,
         {
@@ -153,71 +153,32 @@ const run = async () => {
           },
         }
       );
-    } else {
-      // Use GET request with location ID as query parameter
-      const urlWithParams = `${apiUrl}?locationID=${locationId}`;
-      console.log(`📡 Calling API: ${urlWithParams}`);
-      console.log(`   Method: GET`);
-      
-      data = await fetchAPI(urlWithParams, {
-        headers: {
-          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
-          "accept": "text/plain",
-        },
-        timeout: 30000,
-      });
-    }
     
-    // Check if GetRentOutList returned empty or error, fallback to GetBookingReport
-    if (!data || (data.dataSet && (!data.dataSet.data || (Array.isArray(data.dataSet.data) && data.dataSet.data.length === 0))) || data.status === false) {
-      if (data?.errorDescription) {
-        console.log(`   ⚠️  GetRentOutList error: ${data.errorDescription}`);
-      }
-      
-      // Fallback to GetBookingReport if GetRentOutList fails or returns no data
-      const fallbackUrl = `${baseUrl}/api/Reports/GetBookingReport`;
-      console.log(`   📡 Trying fallback API: ${fallbackUrl}`);
-      
-              let finalDateFrom = dateFrom;
-              let finalDateTo = dateTo;
-              let finalMonths = months;
-
-              // If no date range specified and no last sync, default to last 12 months (first sync)
-              if (!finalDateFrom && !finalDateTo && !finalMonths && !lastSyncAt) {
-                finalMonths = "12";
-              }
-      
-      const fallbackData = await postAPI(
-        fallbackUrl,
-        {
-          bookingNo: "",
-          dateFrom: finalDateFrom || "",
-          dateTo: finalDateTo || "",
-          userName: "",
-          months: finalMonths || "",
-          fromLocation: "",
-          userID: "",
-          locationID: locationId, // Use location ID for filtering
-        },
-        {
-          headers: {
-            "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
-            "Content-Type": "application/json-patch+json",
-            "accept": "text/plain",
-          },
-        }
-      );
-      
-      if (!fallbackData) {
-        console.log(`   ℹ️  No data for location ID ${locationId}`);
-        continue;
-      }
-      
-      data = fallbackData;
+    // Check if API returned error or empty data
+    if (!data) {
+      console.log(`   ⚠️  API returned null/undefined for location ID ${locationId}`);
+      continue;
     }
     
     // Log full response for debugging
-    console.log(`   📥 Response status: ${data.status}, errorDescription: ${data.errorDescription || "none"}`);
+    if (data.status !== undefined) {
+      console.log(`   📥 Response status: ${data.status}`);
+    }
+    if (data.errorDescription) {
+      console.log(`   ⚠️  Error: ${data.errorDescription}`);
+      }
+      
+    // Debug: Log response structure for first location
+    if (locationId === '1') {
+      console.log(`   🔍 Debug - Response structure:`, JSON.stringify(data, null, 2).substring(0, 500));
+      console.log(`   🔍 Response keys:`, Object.keys(data || {}));
+    }
+    
+    // Check if status is false
+    if (data.status === false) {
+      console.log(`   ℹ️  API returned status=false for location ID ${locationId}`);
+        continue;
+    }
     
     // Handle different response formats
     let dataArray = null;
@@ -246,21 +207,32 @@ const run = async () => {
     }
     
     if (!dataArray || dataArray.length === 0) {
-      console.log(`   ℹ️  No rent-out data for location ID ${locationId}`);
+      console.log(`   ℹ️  No data for location ID ${locationId}`);
       continue;
     }
     
-    console.log(`   📊 Found ${dataArray.length} records for location ID ${locationId}`);
+    // Filter: Only process records that have rentOutDate or returnDate (rent-out records)
+    // The API returns both booking and rent-out records, so we filter for rent-out only
+    const rentOutRecords = dataArray.filter(row => {
+      return row.rentOutDate || row.rentOut_date || row.rentOutDate || row.returnDate || row.return_date || row.ReturnDate;
+    });
+    
+    if (rentOutRecords.length === 0) {
+      console.log(`   ℹ️  No rent-out data for location ID ${locationId} (${dataArray.length} total records, none are rent-out)`);
+      continue;
+    }
+    
+    console.log(`   📊 Found ${dataArray.length} total records, ${rentOutRecords.length} rent-out records for location ID ${locationId}`);
     
     // Process and save rent-out data with progress indicator
     let saved = 0;
     let skipped = 0;
     let errors = 0;
-    const totalRecordsInLocation = dataArray.length;
+    const totalRecordsInLocation = rentOutRecords.length;
     const progressInterval = Math.max(1, Math.floor(totalRecordsInLocation / 20)); // Update every 5%
     
     for (let i = 0; i < totalRecordsInLocation; i++) {
-      const row = dataArray[i];
+      const row = rentOutRecords[i];
       
       // Add store name to the row data for mapping
       const rowWithStore = {

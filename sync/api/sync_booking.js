@@ -66,18 +66,19 @@ const run = async () => {
   let dateTo = process.env.BOOKING_DATE_TO || "";
   let months = process.env.BOOKING_MONTHS || "";
 
-  // If last sync exists and no date range specified, use last sync date for incremental sync
-  if (lastSyncAt && !dateFrom && !dateTo && !months) {
-    // Format date as DD-MM-YYYY for API
-    const day = String(lastSyncAt.getDate()).padStart(2, '0');
-    const month = String(lastSyncAt.getMonth() + 1).padStart(2, '0');
-    const year = lastSyncAt.getFullYear();
-    dateFrom = `${day}-${month}-${year}`;
-    console.log(`   Using incremental sync from: ${dateFrom}`);
-  } else if (!dateFrom && !dateTo && !months) {
-    // If no date range specified and no last sync, default to last 12 months (first sync)
-    months = "12";
-    console.log(`   Using default: last 12 months (first sync)`);
+  // Date range configuration - prioritize months parameter for better API compatibility
+  if (!dateFrom && !dateTo && !months) {
+    if (lastSyncAt) {
+      // For incremental sync, use months parameter (more reliable than dateFrom)
+      // Calculate months since last sync (minimum 1 month, maximum 12 months)
+      const monthsSinceSync = Math.min(12, Math.max(1, Math.floor((Date.now() - lastSyncAt.getTime()) / (1000 * 60 * 60 * 24 * 30))));
+      months = String(monthsSinceSync);
+      console.log(`   Using incremental sync: last ${months} months`);
+    } else {
+      // First sync - default to last 12 months
+      months = "12";
+      console.log(`   Using default: last 12 months (first sync)`);
+    }
   } else {
     // Use environment variables if specified
     if (dateFrom) console.log(`📅 Date from: ${dateFrom}`);
@@ -130,14 +131,15 @@ const run = async () => {
     console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
     
     // Use GetBookingReport API (POST) with locationID
-      const requestBody = {
+    // Note: API prefers months parameter over dateFrom/dateTo
+    const requestBody = {
       bookingNo: "",
-        dateFrom: dateFrom || "",
-        dateTo: dateTo || "",
-        userName: "",
-        months: months || "",
-        fromLocation: "",
-        userID: "",
+      dateFrom: dateFrom || "",
+      dateTo: dateTo || "",
+      userName: "",
+      months: months || "", // Prioritize months parameter
+      fromLocation: "",
+      userID: "",
       locationID: locationId,
     };
     
@@ -157,8 +159,16 @@ const run = async () => {
       );
       
       if (!data) {
-      console.log(`   ℹ️  No data for location ID ${locationId} (API returned null/undefined)`);
+      console.log(`   ⚠️  API returned null/undefined for location ID ${locationId}`);
       continue;
+    }
+    
+    // Log response status for debugging
+    if (data.status !== undefined) {
+      console.log(`   📥 Response status: ${data.status}`);
+    }
+    if (data.errorDescription) {
+      console.log(`   ⚠️  Error: ${data.errorDescription}`);
     }
     
     // Debug: Log response structure for first location
@@ -206,12 +216,18 @@ const run = async () => {
     }
     
     if (locationData.length > 0) {
-      // Add store name to each record
-      locationData.forEach(row => {
+      // Filter: Only process records that have bookingDate (booking records)
+      // The API returns both booking and rent-out records, so we filter for booking only
+      const bookingRecords = locationData.filter(row => {
+        return row.bookingDate || row.booking_date || row.BookingDate;
+      });
+      
+      // Add store name to each booking record
+      bookingRecords.forEach(row => {
         row.store = storeName;
       });
-      allDataArray.push(...locationData);
-      console.log(`   ✅ Found ${locationData.length} records for location ID ${locationId}`);
+      allDataArray.push(...bookingRecords);
+      console.log(`   ✅ Found ${locationData.length} total records, ${bookingRecords.length} booking records for location ID ${locationId}`);
       } else {
       locationsWithNoData++;
       console.log(`   ℹ️  No data for location ID ${locationId} (empty array or null dataSet)`);
@@ -274,18 +290,23 @@ const run = async () => {
       
       if (allLocationData.length > 0) {
         console.log(`   ✅ Found ${allLocationData.length} total records from all locations`);
-        console.log(`   📊 Filtering by store name and mapping location IDs...`);
+        console.log(`   📊 Filtering booking records and mapping location IDs...`);
+        
+        // Filter: Only process records that have bookingDate (booking records)
+        const bookingRecords = allLocationData.filter(row => {
+          return row.bookingDate || row.booking_date || row.BookingDate;
+        });
         
         // Map location ID from API data to store name
         // The API data should have a location field that we can map
-        allLocationData.forEach(row => {
+        bookingRecords.forEach(row => {
           // Try to find store name from location ID in the row data
           const rowLocationId = String(row.locationID || row.locationId || row.LocationID || "").trim();
           if (rowLocationId && LOCATION_ID_TO_STORE_NAME[rowLocationId]) {
             row.store = LOCATION_ID_TO_STORE_NAME[rowLocationId];
           } else {
             // If no location ID match, try to match by store name in the data
-            const rowStoreName = row.store || row.Store || row.storeName || row.StoreName || "";
+            const rowStoreName = row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "";
             if (rowStoreName) {
               row.store = rowStoreName;
             } else {
@@ -295,8 +316,8 @@ const run = async () => {
           }
         });
         
-        allDataArray = allLocationData;
-        console.log(`   ✅ Mapped ${allDataArray.length} records to stores`);
+        allDataArray = bookingRecords;
+        console.log(`   ✅ Filtered to ${allDataArray.length} booking records and mapped to stores`);
         } else {
         console.log(`   ℹ️  No booking data received even with empty locationID`);
         console.log(`   Response status: ${allData.status}, errorDescription: ${allData.errorDescription || 'none'}`);

@@ -21,31 +21,199 @@ const cleanPhone = (phone) => {
   return null;
 };
 
-// Helper function to parse date
+// Helper function to parse date from CSV files
+// IMPORTANT: CSV files use DD-MM-YYYY format (e.g., "6-7-2024" = July 6, 2024)
 const parseDate = (dateStr) => {
   if (!dateStr) return undefined;
   
-  // Handle DD-MM-YYYY format (common in Indian date formats)
-  if (typeof dateStr === 'string' && dateStr.includes('-')) {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      // Try DD-MM-YYYY format
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
-      const year = parseInt(parts[2], 10);
+  // If it's already a Date object, return as is
+  if (dateStr instanceof Date) {
+    return isNaN(dateStr.getTime()) ? undefined : dateStr;
+  }
+  
+  // Handle string dates - prioritize DD-MM-YYYY format (common in Indian date formats)
+  if (typeof dateStr === 'string') {
+    const trimmed = dateStr.trim();
+    
+    // Handle dates with dashes or slashes (e.g., "6-7-2024" or "6/7/2024")
+    if (trimmed.includes('-') || trimmed.includes('/')) {
+      const separator = trimmed.includes('-') ? '-' : '/';
+      const parts = trimmed.split(separator).map(p => p.trim());
       
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-        const date = new Date(year, month, day);
-        if (!isNaN(date.getTime())) {
-          return date;
+      if (parts.length === 3) {
+        const part0 = parseInt(parts[0], 10);
+        const part1 = parseInt(parts[1], 10);
+        const part2 = parseInt(parts[2], 10);
+        
+        // Validate all parts are numbers
+        if (!isNaN(part0) && !isNaN(part1) && !isNaN(part2)) {
+          // Determine format based on year position
+          // If part2 is 4 digits, it's DD-MM-YYYY or MM-DD-YYYY
+          // If part0 is 4 digits, it's YYYY-MM-DD
+          
+          if (part2.toString().length === 4) {
+            // Format is either DD-MM-YYYY or MM-DD-YYYY
+            // For CSV files, we assume DD-MM-YYYY format (Indian format)
+            // If part0 > 12, it MUST be DD-MM-YYYY (since month can't be > 12)
+            // If part0 <= 12 and part1 <= 12, we assume DD-MM-YYYY (Indian format preference)
+            
+            const day = part0; // First part is day in DD-MM-YYYY
+            const month = part1 - 1; // Second part is month (0-indexed)
+            const year = part2; // Third part is year
+            
+            // Validate date ranges
+            if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+              const date = new Date(Date.UTC(year, month, day));
+              if (!isNaN(date.getTime())) {
+                return date;
+              }
+            }
+          } else if (part0.toString().length === 4) {
+            // YYYY-MM-DD format: parts[0] = year, parts[1] = month, parts[2] = day
+            const year = part0;
+            const month = part1 - 1; // Month is 0-indexed
+            const day = part2;
+            
+            if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+              const date = new Date(Date.UTC(year, month, day));
+              if (!isNaN(date.getTime())) {
+                return date;
+              }
+            }
+          }
         }
+      }
+    }
+    
+    // Try standard date parsing as fallback (handles ISO format, etc.)
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  
+  return undefined;
+};
+
+// Helper function to parse date from API responses
+// IMPORTANT: APIs return ISO format dates (e.g., "2025-03-13T07:04:47" or "2025-04-01T00:00:00")
+// This function ensures exact date parsing without timezone issues
+const parseApiDate = (dateStr) => {
+  if (!dateStr) return undefined;
+  
+  // If it's already a Date object, return as is
+  if (dateStr instanceof Date) {
+    return isNaN(dateStr.getTime()) ? undefined : dateStr;
+  }
+  
+  // Handle string dates from API
+  if (typeof dateStr === 'string') {
+    const trimmed = dateStr.trim();
+    
+    // API returns ISO format dates: "2025-03-13T07:04:47" or "2025-04-01T00:00:00"
+    // Parse ISO format dates correctly and ensure exact dates
+    
+    // Check for ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+    if (trimmed.match(/^\d{4}-\d{2}-\d{2}/)) {
+      // Extract date parts to ensure exact parsing
+      const dateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (dateMatch) {
+        const year = parseInt(dateMatch[1], 10);
+        const month = parseInt(dateMatch[2], 10) - 1; // Month is 0-indexed
+        const day = parseInt(dateMatch[3], 10);
+        
+        // Validate date parts
+        if (year >= 2000 && year <= 2100 && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+          // Extract time if present
+          const timeMatch = trimmed.match(/T(\d{2}):(\d{2}):(\d{2})/);
+          let hour = 0, minute = 0, second = 0;
+          
+          if (timeMatch) {
+            hour = parseInt(timeMatch[1], 10);
+            minute = parseInt(timeMatch[2], 10);
+            second = parseInt(timeMatch[3], 10);
+          }
+          
+          // Create date using UTC to ensure exact date without timezone conversion
+          const date = new Date(Date.UTC(year, month, day, hour, minute, second));
+          
+          if (!isNaN(date.getTime())) {
+            // Double-check the date is correct
+            if (date.getUTCFullYear() === year && 
+                date.getUTCMonth() === month && 
+                date.getUTCDate() === day) {
+              return date;
+            }
+          }
+        }
+      }
+    }
+    
+    // Handle dates with dashes or slashes (fallback for non-ISO formats)
+    if (trimmed.includes('-') || trimmed.includes('/')) {
+      const separator = trimmed.includes('-') ? '-' : '/';
+      const parts = trimmed.split(separator).map(p => p.trim());
+      
+      if (parts.length === 3) {
+        const part0 = parseInt(parts[0], 10);
+        const part1 = parseInt(parts[1], 10);
+        const part2 = parseInt(parts[2], 10);
+        
+        // Validate all parts are numbers
+        if (!isNaN(part0) && !isNaN(part1) && !isNaN(part2)) {
+          // For API dates, prioritize YYYY-MM-DD format
+          if (part0.toString().length === 4) {
+            // YYYY-MM-DD format: parts[0] = year, parts[1] = month, parts[2] = day
+            const year = part0;
+            const month = part1 - 1; // Month is 0-indexed
+            const day = part2;
+            
+            // Validate date ranges (ensure year is reasonable - 2000-2100)
+            if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 2000 && year <= 2100) {
+              const date = new Date(Date.UTC(year, month, day));
+              if (!isNaN(date.getTime())) {
+                // Verify the date is correct
+                if (date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day) {
+                  return date;
+                }
+              }
+            }
+          } else if (part2.toString().length === 4) {
+            // DD-MM-YYYY format: parts[0] = day, parts[1] = month, parts[2] = year
+            const day = part0;
+            const month = part1 - 1;
+            const year = part2;
+            
+            // Validate date ranges (ensure year is reasonable - 2000-2100)
+            if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 2000 && year <= 2100) {
+              const date = new Date(Date.UTC(year, month, day));
+              if (!isNaN(date.getTime())) {
+                // Verify the date is correct
+                if (date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day) {
+                  return date;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Try standard date parsing as fallback (but validate year)
+    const date = new Date(trimmed);
+    if (!isNaN(date.getTime())) {
+      // Validate the parsed date is reasonable (not in 1900s)
+      const year = date.getUTCFullYear();
+      if (year >= 2000 && year <= 2100) {
+        return date;
+      } else {
+        // If year is in 1900s, it's likely a parsing error - reject it
+        console.warn(`⚠️  Suspicious date year detected: ${year} for date string: ${trimmed} - rejecting`);
       }
     }
   }
   
-  // Try standard date parsing
-  const date = new Date(dateStr);
-  return isNaN(date.getTime()) ? undefined : date;
+  return undefined;
 };
 
 // Map Walk-in CSV data to Lead model
@@ -117,12 +285,59 @@ export const mapWalkin = (row) => {
     .join(" - ")
     .trim() || category || subCategory || "";
 
-  // Remarks
-  const remarks = (
-    row.remarks || row.Remarks || row.REMARKS ||
-    row.Notes || row.notes ||
-    row["__EMPTY_9"] || row["Remarks"] // Excel column name
-  )?.trim() || "";
+  // Remarks - check multiple possible column names and Excel variations
+  // Excel columns: #, Date, Customer Name, Contact, Function Date, Staff, Status, Category, Sub Category, Repeat count, Remarks
+  let remarksValue = "";
+  
+  // Try all possible column name variations
+  const remarksFields = [
+    row.remarks, row.Remarks, row.REMARKS,
+    row["Remarks"], row["remarks"], row["REMARKS"],
+    row.Notes, row.notes, row.NOTES,
+    row["Notes"], row["notes"], row["NOTES"],
+    row["Comment"], row["comment"], row["COMMENT"],
+    row["Comments"], row["comments"], row["COMMENTS"],
+    row["Other Comments"], row["other comments"], row["OTHER COMMENTS"],
+    row["Additional Notes"], row["additional notes"],
+    // Excel empty column variations (Remarks is typically around column 10-11)
+    row["__EMPTY_9"], row["__EMPTY_10"], row["__EMPTY_11"], row["__EMPTY_12"]
+  ];
+  
+  // Find first non-empty remarks value
+  for (const field of remarksFields) {
+    if (field !== null && field !== undefined && String(field).trim()) {
+      remarksValue = String(field).trim();
+      break;
+    }
+  }
+  
+  // If still empty, check all __EMPTY columns (Excel might have different column positions)
+  if (!remarksValue) {
+    for (const [key, value] of Object.entries(row)) {
+      if (key.startsWith("__EMPTY") && value !== null && value !== undefined && String(value).trim()) {
+        remarksValue = String(value).trim();
+        break;
+      }
+    }
+  }
+  
+  // If still empty, try to find any column that might contain remarks by checking column names
+  if (!remarksValue) {
+    for (const [key, value] of Object.entries(row)) {
+      if (value && typeof value === 'string') {
+        const lowerKey = key.toLowerCase();
+        // If column name suggests it's a remarks field
+        if ((lowerKey.includes('remark') || lowerKey.includes('note') || 
+             lowerKey.includes('comment') || lowerKey.includes('other')) &&
+            String(value).trim().length > 0) {
+          remarksValue = String(value).trim();
+          break;
+        }
+      }
+    }
+  }
+  
+  const remarks = remarksValue || "";
 
   // Build complete lead object with all fields
   const leadData = {
@@ -213,15 +428,47 @@ export const mapLossOfSale = (row) => {
     row.status || row.Status || row.STATUS
   )?.trim();
 
-  // Remarks - combine multiple comment fields
-  const remarks = (
-    row.remarks || row.Remarks || row.REMARKS || row.notes || row.Notes ||
-    row.COMMENTS || row["COMMENTS"] || row["OTHER COMMENTS"] || // Excel column names
-    row["Comments"] || row["Other Comments"] ||
-    (row.COMMENTS && row["OTHER COMMENTS"] 
-      ? `${row.COMMENTS || ''} ${row["OTHER COMMENTS"] || ''}`.trim()
-      : (row.COMMENTS || row["OTHER COMMENTS"] || ''))
-  )?.trim() || "";
+  // Remarks - combine multiple comment fields and check all possible variations
+  let remarksValue = "";
+  
+  // Try all possible column name variations
+  const remarksFields = [
+    row.remarks, row.Remarks, row.REMARKS,
+    row.notes, row.Notes, row.NOTES,
+    row["Remarks"], row["remarks"], row["REMARKS"],
+    row["Notes"], row["notes"], row["NOTES"],
+    row["Comment"], row["comment"], row["COMMENT"],
+    row["Comments"], row["comments"], row["COMMENTS"],
+    row["Other Comments"], row["other comments"], row["OTHER COMMENTS"],
+    row["Additional Notes"], row["additional notes"],
+    row.COMMENTS, row["COMMENTS"],
+    row["OTHER COMMENTS"], row["other comments"],
+    // Excel empty column variations (check multiple positions)
+    row["__EMPTY_8"], row["__EMPTY_9"], row["__EMPTY_10"], row["__EMPTY_11"], row["__EMPTY_12"]
+  ];
+  
+  // Find first non-empty remarks value
+  for (const field of remarksFields) {
+    if (field && String(field).trim()) {
+      remarksValue = String(field).trim();
+      break;
+    }
+  }
+  
+  // If we have multiple comment fields, combine them
+  if (row.COMMENTS && row["OTHER COMMENTS"]) {
+    const comments = String(row.COMMENTS || '').trim();
+    const otherComments = String(row["OTHER COMMENTS"] || '').trim();
+    if (comments && otherComments) {
+      remarksValue = `${comments} ${otherComments}`.trim();
+    } else if (comments) {
+      remarksValue = comments;
+    } else if (otherComments) {
+      remarksValue = otherComments;
+    }
+  }
+  
+  const remarks = remarksValue || "";
 
   // Attended By (Staff Name)
   const attendedBy = (
@@ -319,9 +566,9 @@ export const mapBooking = (row) => {
     securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit 
       ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit) 
       : undefined,
-    enquiryDate: parseDate(row.enquiryDate || row.bookingDate || row.date),
+    enquiryDate: parseApiDate(row.enquiryDate || row.bookingDate || row.date),
     // Function Date: API uses 'deliveryDate' or 'trialDate'
-    functionDate: parseDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
+    functionDate: parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
     remarks: (row.remarks || row.notes || row.Remarks || "").trim(),
   };
 };
@@ -347,9 +594,9 @@ export const mapRentOut = (row) => {
     securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit 
       ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit) 
       : undefined,
-    returnDate: parseDate(row.returnDate || row.return_date || row.expectedReturnDate),
-    enquiryDate: parseDate(row.enquiryDate || row.rentDate || row.rentOutDate || row.rent_date),
-    functionDate: parseDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
+    returnDate: parseApiDate(row.returnDate || row.return_date || row.expectedReturnDate),
+    enquiryDate: parseApiDate(row.enquiryDate || row.rentDate || row.rentOutDate || row.rent_date),
+    functionDate: parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date),
     // Attended By: API uses 'bookingBy'
     attendedBy: (row.attendedBy || row.attended_by || row.staff || row.Staff || row.bookingBy || row.handledBy || "").trim() || undefined,
     remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
@@ -370,7 +617,7 @@ export const mapBookingItem = (row) => {
     enquiryType: (row.enquiryType || row.itemType || row.type || "").trim(),
     bookingNo: (row.bookingNo || row.bookingNumber || row.itemNo || row.BookingNo || "").trim(),
     remarks: (row.remarks || row.status || row.notes || row.Remarks || "").trim(),
-    enquiryDate: parseDate(row.enquiryDate || row.date || row.bookingDate),
+    enquiryDate: parseApiDate(row.enquiryDate || row.date || row.bookingDate),
   };
 };
 

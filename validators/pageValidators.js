@@ -24,9 +24,9 @@ const leadIdValidator = param('id')
     return true;
   });
 
-export const leadGetValidator = [
-  leadIdValidator
-];
+  export const leadGetValidator = [
+    leadIdValidator
+  ];
 
 // Validator for GET /api/pages/leads query parameters
 export const leadsListValidator = [

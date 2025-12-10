@@ -6,6 +6,7 @@ import { saveToMongo } from "../utils/saveToMongo.js";
 import SyncLog from "../../models/SyncLog.js";
 import fs from "fs";
 import { join } from "path";
+import { statSync } from "fs";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 
@@ -261,16 +262,74 @@ const run = async () => {
   console.log("=".repeat(60));
   await connectDB();
   
-  // Find all Loss of Sale files
-  const files = findLossOfSaleFiles();
+  // Get last sync time for incremental sync
+  let lastSyncAt = null;
+  let syncLog = await SyncLog.findOne({ syncType: "lossofsale" });
   
-  if (files.length === 0) {
+  if (syncLog && syncLog.lastSyncAt) {
+    lastSyncAt = syncLog.lastSyncAt;
+    console.log(`📅 Last sync: ${lastSyncAt.toISOString()}`);
+    console.log(`   Will only process files modified after this time (incremental sync)`);
+  } else {
+    console.log(`📅 First sync - will process all files`);
+  }
+  
+  // Find all Loss of Sale files
+  const allFiles = findLossOfSaleFiles();
+  
+  if (allFiles.length === 0) {
     console.log("⚠️  No Loss of Sale files found in data/ folder");
     console.log("   Looking for files matching: *lossofsale*.csv, *lossofsale*.xlsx");
     return;
   }
   
-  console.log(`\n📁 Found ${files.length} Loss of Sale file(s) in data/ folder\n`);
+  // Filter files: only process if modified after last sync (incremental sync)
+  let filesToProcess = [];
+  let filesSkipped = 0;
+  
+  if (lastSyncAt) {
+    for (const fileInfo of allFiles) {
+      try {
+        const stats = statSync(fileInfo.path);
+        const fileModifiedTime = stats.mtime;
+        
+        if (fileModifiedTime > lastSyncAt) {
+          filesToProcess.push(fileInfo);
+        } else {
+          filesSkipped++;
+        }
+      } catch (error) {
+        // If we can't read file stats, include it to be safe
+        filesToProcess.push(fileInfo);
+      }
+    }
+    
+    console.log(`\n📁 Found ${allFiles.length} Loss of Sale file(s) total`);
+    console.log(`   📝 Files to process: ${filesToProcess.length} (modified since last sync)`);
+    console.log(`   ⏭️  Files skipped: ${filesSkipped} (not modified since last sync)\n`);
+  } else {
+    filesToProcess = allFiles;
+    console.log(`\n📁 Found ${allFiles.length} Loss of Sale file(s) in data/ folder\n`);
+  }
+  
+  if (filesToProcess.length === 0) {
+    console.log("✅ No files to process - all files are up to date!");
+    console.log(`   Next sync will only process files modified after: ${new Date().toISOString()}`);
+    
+    // Update sync log even if no files processed
+    const syncEndTime = new Date();
+    await SyncLog.findOneAndUpdate(
+      { syncType: "lossofsale" },
+      {
+        lastSyncAt: syncEndTime,
+        lastSyncCount: 0,
+        status: "success",
+        errorMessage: null,
+      },
+      { upsert: true, new: true }
+    );
+    return;
+  }
   
   let totalSaved = 0;
   let totalUpdated = 0;
@@ -278,9 +337,9 @@ const run = async () => {
   let totalErrors = 0;
   
   // Process each file
-  for (let i = 0; i < files.length; i++) {
-    const fileInfo = files[i];
-    console.log(`\n[${i + 1}/${files.length}]`);
+  for (let i = 0; i < filesToProcess.length; i++) {
+    const fileInfo = filesToProcess[i];
+    console.log(`\n[${i + 1}/${filesToProcess.length}]`);
     
     try {
       const result = await importFile(fileInfo);
@@ -310,12 +369,13 @@ const run = async () => {
   console.log("\n" + "=".repeat(60));
   console.log("✅ All Loss of Sale Imports Completed!");
   console.log("=".repeat(60));
-  console.log(`   📁 Files processed: ${files.length}`);
+  console.log(`   📁 Files processed: ${filesToProcess.length}`);
+  console.log(`   ⏭️  Files skipped (not modified): ${filesSkipped}`);
   console.log(`   💾 Total new records saved: ${totalSaved}`);
   console.log(`   🔄 Total records updated: ${totalUpdated}`);
-  console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
+  console.log(`   ⏭️  Total skipped (duplicates): ${totalSkipped}`);
   console.log(`   ❌ Total errors: ${totalErrors}`);
-  console.log(`   📅 Next sync will skip existing records (duplicate prevention enabled)`);
+  console.log(`   📅 Next sync will only process files modified after: ${syncEndTime.toISOString()}`);
 };
 
 // Auto-run if called directly

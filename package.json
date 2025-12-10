@@ -19,7 +19,10 @@
     "sync:rentout": "node sync/api/sync_rentout.js",
     "sync:stores": "node sync/api/sync_storelist.js",
     "test:api": "node scripts/test-api-validation.js",
-    "cleanup:duplicates": "node scripts/remove-duplicate-bookings.js"
+    "test:duplicates": "node scripts/test-duplicate-prevention.js",
+    "cleanup:duplicates": "node scripts/remove-duplicate-bookings.js",
+    "delete:lossofsale-walkin": "node scripts/delete-lossofsale-walkin.js",
+    "delete:api-leads": "node scripts/delete-api-leads.js"
   },
   "keywords": [],
   "author": "",
