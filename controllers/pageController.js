@@ -135,7 +135,10 @@ export const getLeads = async (req, res) => {
       // Generic date range (applies to enquiryDate by default)
       dateFrom,
       dateTo,
-      dateField = 'enquiryDate' // Which date field to filter: enquiryDate, functionDate, visitDate, createdAt
+      dateField = 'enquiryDate', // Which date field to filter: enquiryDate, functionDate, visitDate, createdAt
+      // Sorting parameters
+      sortBy = 'createdAt', // Field to sort by (default: createdAt)
+      sortOrder = 'desc' // Sort order: 'asc' or 'desc' (default: desc)
     } = req.query;
     
     const filters = {};
@@ -335,9 +338,16 @@ export const getLeads = async (req, res) => {
     // Select fields based on lead type for better data retrieval
     const selectFields = "name phone store leadType callStatus leadStatus bookingNo functionDate enquiryDate visitDate returnDate createdAt assignedTo reasonCollectedFromStore attendedBy";
     
+    // Build sort object based on sortBy and sortOrder parameters
+    // Allowed sort fields: createdAt, enquiryDate, functionDate, visitDate, name, store
+    const allowedSortFields = ['createdAt', 'enquiryDate', 'functionDate', 'visitDate', 'name', 'store'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+    const sortObject = { [sortField]: sortDirection };
+    
     const leads = await Lead.find(query)
       .populate("assignedTo", "name employeeId")
-      .sort({ createdAt: -1 })
+      .sort(sortObject)
       .skip(skip)
       .limit(parseInt(limit))
       .select(selectFields);

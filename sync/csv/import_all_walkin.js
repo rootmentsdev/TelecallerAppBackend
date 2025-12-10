@@ -3,6 +3,7 @@
 import { readCSV } from "../utils/csvReader.js";
 import { mapWalkin } from "../utils/dataMapper.js";
 import { saveToMongo } from "../utils/saveToMongo.js";
+import Lead from "../../models/Lead.js";
 import fs from "fs";
 import { join } from "path";
 import dotenv from "dotenv";
@@ -208,6 +209,7 @@ const importFile = async (fileInfo) => {
   console.log(`   📊 Found ${data.length} records`);
   
   let saved = 0;
+  let updated = 0;
   let skipped = 0;
   let errors = 0;
   
@@ -227,6 +229,8 @@ const importFile = async (fileInfo) => {
       const result = await saveToMongo(mapped);
       if (result.saved) {
         saved++;
+      } else if (result.updated) {
+        updated++;
       } else if (result.skipped) {
         skipped++;
       } else {
@@ -239,7 +243,7 @@ const importFile = async (fileInfo) => {
     // Show progress
     if (i % progressInterval === 0 || i === totalRecords - 1) {
       const progress = ((i + 1) / totalRecords * 100).toFixed(1);
-      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`);
+      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Saved: ${saved}, Updated: ${updated}, Skipped: ${skipped}, Errors: ${errors}`);
     }
   }
   
@@ -247,9 +251,9 @@ const importFile = async (fileInfo) => {
     process.stdout.write('\n');
   }
   
-  console.log(`   ✅ Saved: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
+  console.log(`   ✅ Saved: ${saved}, 🔄 Updated: ${updated}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
   
-  return { saved, skipped, errors };
+  return { saved, updated, skipped, errors };
 };
 
 const run = async () => {
@@ -269,6 +273,7 @@ const run = async () => {
   console.log(`\n📁 Found ${files.length} Walk-in file(s) in data/ folder\n`);
   
   let totalSaved = 0;
+  let totalUpdated = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
   
@@ -279,9 +284,10 @@ const run = async () => {
     
     try {
       const result = await importFile(fileInfo);
-      totalSaved += result.saved;
-      totalSkipped += result.skipped;
-      totalErrors += result.errors;
+      totalSaved += result.saved || 0;
+      totalUpdated += result.updated || 0;
+      totalSkipped += result.skipped || 0;
+      totalErrors += result.errors || 0;
     } catch (error) {
       console.error(`   ❌ Error processing ${fileInfo.filename}:`, error.message);
       totalErrors++;
@@ -293,7 +299,8 @@ const run = async () => {
   console.log("=".repeat(60));
   console.log(`   📁 Files processed: ${files.length}`);
   console.log(`   💾 Total new records saved: ${totalSaved}`);
-  console.log(`   ⏭️  Total skipped (already exists): ${totalSkipped}`);
+  console.log(`   🔄 Total records updated: ${totalUpdated}`);
+  console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
   console.log(`   ❌ Total errors: ${totalErrors}`);
 };
 

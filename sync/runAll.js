@@ -53,19 +53,19 @@ const runAll = async () => {
     await new Promise(resolve => setTimeout(resolve, 2000));
     console.log();
 
-    // Step 4: Import Walk-in (CSV/Excel)
-    console.log("📦 Step 4/5: Importing Walk-in Data...");
+    // Step 4: Import Walk-in (CSV/Excel) - Import ALL walkin files
+    console.log("📦 Step 4/5: Importing Walk-in Data (All Files)...");
     console.log("-".repeat(60));
-    const { run: importWalkin } = await import("./csv/import_walkin.js");
-    await importWalkin();
+    const { run: importAllWalkin } = await import("./csv/import_all_walkin.js");
+    await importAllWalkin();
     await new Promise(resolve => setTimeout(resolve, 2000));
     console.log();
 
-    // Step 5: Import Loss of Sale (CSV/Excel)
-    console.log("📦 Step 5/5: Importing Loss of Sale Data...");
+    // Step 5: Import Loss of Sale (CSV/Excel) - Import ALL loss of sale files
+    console.log("📦 Step 5/5: Importing Loss of Sale Data (All Files)...");
     console.log("-".repeat(60));
-    const { run: importLossOfSale } = await import("./csv/import_lossofsale.js");
-    await importLossOfSale();
+    const { run: importAllLossOfSale } = await import("./csv/import_all_lossofsale.js");
+    await importAllLossOfSale();
     console.log();
 
     const endTime = Date.now();
@@ -78,10 +78,10 @@ const runAll = async () => {
     console.log();
     console.log("✅ Summary:");
     console.log("   • Stores synced");
-    console.log("   • Booking Confirmation synced (incremental + duplicate prevention)");
-    console.log("   • Rent-Out synced (incremental + duplicate prevention)");
-    console.log("   • Walk-in data imported");
-    console.log("   • Loss of Sale data imported");
+    console.log("   • Booking Confirmation synced (incremental - only NEW records added)");
+    console.log("   • Rent-Out synced (incremental - only NEW records added)");
+    console.log("   • Walk-in data imported (ALL files - updates existing records)");
+    console.log("   • Loss of Sale data imported (ALL files - updates existing records)");
     console.log();
 
   } catch (error) {

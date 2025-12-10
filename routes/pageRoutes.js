@@ -14,6 +14,7 @@
  *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
  *       - **Date Filtering**: Multiple date fields available with both range and single-day options
  *       - **Status Filtering**: Filter by callStatus, leadStatus, source
+ *       - **Sorting**: Sort by createdAt, enquiryDate, functionDate, visitDate, name, or store (asc/desc)
  *       - **Pagination**: Control page size and navigation
  *       
  *       **Store Filter Examples:**
@@ -40,6 +41,8 @@
  *       - Store + Date: `/api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
  *       - Lead Type + Store + Creation Date: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally&createdAt=2024-12-08`
  *       - Lead Type + Store + Date Range: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *       - Today's General Leads (Newest First): `/api/pages/leads?leadType=general&createdAt=2024-12-10&sortBy=createdAt&sortOrder=desc`
+ *       - Sort by Name: `/api/pages/leads?leadType=lossOfSale&sortBy=name&sortOrder=asc`
  *     parameters:
  *       - in: query
  *         name: leadType
@@ -277,6 +280,35 @@
  *           type: integer
  *           default: 100
  *         description: Number of records per page.
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store]
+ *           default: createdAt
+ *         description: |
+ *           Field to sort results by.
+ *           Options:
+ *           - `createdAt` (default) - Sort by creation date
+ *           - `enquiryDate` - Sort by enquiry date
+ *           - `functionDate` - Sort by function/event date
+ *           - `visitDate` - Sort by visit date
+ *           - `name` - Sort by lead name
+ *           - `store` - Sort by store name
+ *           Example: `?sortBy=createdAt&sortOrder=desc`
+ *       - in: query
+ *         name: sortOrder
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: |
+ *           Sort order: ascending (`asc`) or descending (`desc`).
+ *           Default is `desc` (newest first for dates).
+ *           Example: `?sortBy=createdAt&sortOrder=desc` (newest first)
+ *           Example: `?sortBy=createdAt&sortOrder=asc` (oldest first)
  *
  *     responses:
  *       200:
