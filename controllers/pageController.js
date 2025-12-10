@@ -109,19 +109,83 @@ const buildListSnapshot = (lead) => {
   };
 };
 
-// Helper to create a Report entry from a Lead document using the flattened list format
+// Helper to create a Report entry from a Lead document using a completely flat structure
 const createReportFromLead = async (leadDoc, userId, note = 'moved after edit', editedFields = null) => {
-  const leadData = buildListSnapshot(leadDoc);
-  const payload = {
-    leadData,
-    editedBy: userId,
-    editedAt: new Date(),
-    note,
-  };
-  if (editedFields && typeof editedFields === 'object' && Object.keys(editedFields).length > 0) {
-    payload.editedFields = editedFields;
+  // Normalize lead object
+  const lead = (leadDoc && typeof leadDoc.toObject === 'function') ? leadDoc.toObject() : (leadDoc || {});
+
+  // Utility: camelCase to snake_case
+  const toSnake = (s) => s.replace(/([A-Z])/g, '_$1').replace(/^_/, '').toLowerCase();
+
+  const payload = {};
+
+  // Core mappings (common lead fields)
+  if (lead._id) payload.id = String(lead._id);
+  payload.lead_name = lead.name ?? "";
+  payload.phone_number = lead.phone ?? "";
+  payload.store = lead.store ?? "";
+  payload.lead_type = lead.leadType ?? lead.lead_type ?? "";
+  payload.call_status = lead.callStatus ?? lead.call_status ?? "";
+  payload.lead_status = lead.leadStatus ?? lead.lead_status ?? "";
+  payload.function_date = lead.functionDate ?? lead.function_date ?? null;
+  payload.enquiry_date = lead.enquiryDate ?? lead.enquiry_date ?? null;
+  payload.visit_date = lead.visitDate ?? lead.visit_date ?? null;
+  payload.return_date = lead.returnDate ?? lead.return_date ?? null;
+  payload.created_at = lead.createdAt ?? lead.created_at ?? null;
+  payload.assigned_to = (lead.assignedTo !== undefined) ? lead.assignedTo : (lead.assigned_to !== undefined ? lead.assigned_to : null);
+  payload.attended_by = lead.attendedBy ?? lead.attended_by ?? "";
+  payload.booking_number = lead.bookingNo ?? lead.booking_number ?? null;
+  payload.security_amount = lead.securityAmount ?? lead.security_amount ?? null;
+  payload.remarks = lead.remarks ?? "";
+  payload.reason_collected_from_store = lead.reasonCollectedFromStore ?? lead.reason_collected_from_store ?? "";
+
+  // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
+  Object.keys(lead).forEach((k) => {
+    if (['id','_id','name','phone','store','leadType','lead_type','callStatus','call_status','leadStatus','lead_status','functionDate','function_date','enquiryDate','enquiry_date','visitDate','visit_date','returnDate','return_date','createdAt','created_at','assignedTo','assigned_to','attendedBy','attended_by','bookingNo','booking_number','securityAmount','security_amount','remarks','reasonCollectedFromStore','reason_collected_from_store'].includes(k)) return;
+    const snake = toSnake(k);
+    // Only set if not already set by core mappings
+    if (payload[snake] === undefined) payload[snake] = lead[k];
+  });
+
+  // Attach edited before/after fields for every changed key
+  if (editedFields && typeof editedFields === 'object') {
+    Object.keys(editedFields).forEach((origKey) => {
+      const beforeVal = editedFields[origKey]?.before;
+      const afterVal = editedFields[origKey]?.after;
+
+      const snakeKey = toSnake(origKey);
+
+      // Set <field>_before and <field>_after
+      payload[`${snakeKey}_before`] = (beforeVal === undefined || beforeVal === null) ? "" : beforeVal;
+      payload[`${snakeKey}_after`] = (afterVal === undefined || afterVal === null) ? "" : afterVal;
+
+      // Also ensure the canonical field is present and reflects the "after" value (or existing payload)
+      if (afterVal !== undefined) {
+        // If field maps to a date field in payload (ends with _date), try to preserve type
+        if (snakeKey.endsWith('date')) payload[snakeKey] = afterVal;
+        else payload[snakeKey] = afterVal;
+      } else if (payload[snakeKey] === undefined) {
+        payload[snakeKey] = payload[snakeKey] ?? "";
+      }
+    });
   }
-  return await Report.create(payload);
+
+  // Metadata
+  payload.editedBy = userId;
+  payload.editedAt = new Date();
+  payload.note = note;
+
+  // Create the report document (schema allows dynamic fields via strict:false)
+  const report = await Report.create(payload);
+
+  // Ensure report_id field is set to the saved _id string
+  try {
+    await Report.findByIdAndUpdate(report._id, { $set: { report_id: String(report._id) } });
+  } catch (e) {
+    // ignore
+  }
+
+  return await Report.findById(report._id);
 };
 
 // ==================== Leads Listing ====================

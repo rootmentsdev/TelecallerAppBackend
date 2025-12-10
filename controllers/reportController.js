@@ -1,7 +1,7 @@
 import Report from "../models/Report.js";
 
 // GET /api/reports
-// Query params: leadType, editedBy, dateFrom, dateTo, page, limit
+// Query params: leadType (optional - must match flat field lead_type), editedBy, dateFrom, dateTo, page, limit
 export const getReports = async (req, res) => {
   try {
     const {
@@ -13,10 +13,9 @@ export const getReports = async (req, res) => {
       limit = 50,
     } = req.query;
 
-  const query = {};
-  // Note: Report schema now stores flattened lead data in `leadData`.
-  // Keep support for filtering by editedBy and date range.
-  if (editedBy) query.editedBy = editedBy;
+    const query = {};
+    if (editedBy) query.editedBy = editedBy;
+    if (leadType) query.lead_type = leadType; // flat field
     if (dateFrom || dateTo) {
       query.editedAt = {};
       if (dateFrom) query.editedAt.$gte = new Date(dateFrom);
@@ -38,15 +37,25 @@ export const getReports = async (req, res) => {
       Report.countDocuments(query),
     ]);
 
-    // Reports now contain `leadData` which is the flattened lead object.
+    // Reports are stored flat; return them directly with editor metadata
     const mapped = reports.map((r) => {
-      const lead = (r.leadData && typeof r.leadData === 'object') ? { ...r.leadData } : {};
+      const obj = r.toObject ? r.toObject() : { ...r };
+      // Normalize edited_by and edited_at presentation
+      const edited_by = r.editedBy ? { id: r.editedBy._id, name: r.editedBy.name, employee_id: r.editedBy.employeeId } : null;
+      const edited_at = r.editedAt;
+
+      // Ensure report_id exists
+      if (!obj.report_id) obj.report_id = String(r._id);
+
+      // Remove internal mongoose fields if present
+      delete obj._id;
+      delete obj.__v;
 
       return {
-        report_id: r._id,
-        ...lead,
-        edited_by: r.editedBy ? { id: r.editedBy._id, name: r.editedBy.name, employee_id: r.editedBy.employeeId } : null,
-        edited_at: r.editedAt,
+        report_id: obj.report_id,
+        ...obj,
+        edited_by,
+        edited_at,
       };
     });
 
@@ -71,13 +80,19 @@ export const getReportById = async (req, res) => {
     const report = await Report.findById(id).populate("editedBy", "name employeeId");
     if (!report) return res.status(404).json({ message: "Report not found" });
 
-    const lead = (report.leadData && typeof report.leadData === 'object') ? { ...report.leadData } : {};
+    const obj = report.toObject ? report.toObject() : { ...report };
+    const edited_by = report.editedBy ? { id: report.editedBy._id, name: report.editedBy.name, employee_id: report.editedBy.employeeId } : null;
+    const edited_at = report.editedAt;
+
+    if (!obj.report_id) obj.report_id = String(report._id);
+    delete obj._id;
+    delete obj.__v;
 
     res.json({
-      report_id: report._id,
-      ...lead,
-      edited_by: report.editedBy ? { id: report.editedBy._id, name: report.editedBy.name, employee_id: report.editedBy.employeeId } : null,
-      edited_at: report.editedAt,
+      report_id: obj.report_id,
+      ...obj,
+      edited_by,
+      edited_at,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
