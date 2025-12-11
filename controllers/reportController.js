@@ -138,13 +138,13 @@ export const getCallStatusSummary = async (req, res) => {
 
     summary.forEach(item => {
       const status = item._id?.toLowerCase();
-      if (status?.includes("connected") && !status?.includes("not")) {
+      if (status?.includes("Connected") && !status?.includes("not")) {
         result.connected = item.count;
-      } else if (status?.includes("not connected")) {
+      } else if (status?.includes("Not Connected")) {
         result.not_connected = item.count;
-      } else if (status?.includes("call back")) {
+      } else if (status?.includes("Call Back Later")) {
         result.call_back_later = item.count;
-      } else if (status?.includes("confirm")) {
+      } else if (status?.includes("Confirmed")) {
         result.confirmed = item.count;
       }
     });
