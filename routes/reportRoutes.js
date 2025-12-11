@@ -104,35 +104,6 @@ router.get("/", protect, getReports);
 
 /**
  * @swagger
- * /api/reports/{id}:
- *   get:
- *     summary: Get a single report by id
- *     tags:
- *       - Reports
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Report id
- *     responses:
- *       200:
- *         description: Report found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Report'
- *       404:
- *         description: Report not found
- */
-router.get("/:id", protect, getReportById);
-
-
-/**
- * @swagger
  * /api/reports/call-summary:
  *   get:
  *     summary: Get call status summary for a selected date and store
@@ -183,5 +154,36 @@ router.get("/:id", protect, getReportById);
  *         description: Internal Server Error
  */
 router.get("/call-summary", protect, getCallStatusSummary);
+
+/**
+ * @swagger
+ * /api/reports/{id}:
+ *   get:
+ *     summary: Get a single report by id
+ *     tags:
+ *       - Reports
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Report id
+ *     responses:
+ *       200:
+ *         description: Report found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Report'
+ *       404:
+ *         description: Report not found
+ */
+router.get("/:id", protect, getReportById);
+
+
+
 
 export default router;
