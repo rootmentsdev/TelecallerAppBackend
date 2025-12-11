@@ -99,60 +99,63 @@ export const getReportById = async (req, res) => {
   }
 };
 
-//Get call summary report
+// Get call summary report
 export const getCallStatusSummary = async (req, res) => {
   try {
-    const user = req.user;
     const { date, store } = req.query;
+    const user = req.user;
 
     if (!date) {
       return res.status(400).json({ message: "Date is required" });
     }
 
-    // Build filter
-    const match = {
-      call_date: {
-        $gte: new Date(date + "T00:00:00.000Z"),
-        $lte: new Date(date + "T23:59:59.999Z")
-      }
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end = new Date(`${date}T23:59:59.999Z`);
+
+    let match = {
+      created_at: { $gte: start, $lte: end }   // ✅ FIXED: use created_at for date filtering
     };
 
-    if (store) match.store = store;
-
-    // Telecaller can only see their own edits
+    // Telecaller can only see their own reports
     if (user.role === "telecaller") {
-      match.editedBy = user._id;
+      match["editedBy._id"] = user._id;
+    }
+
+    // Optional store filter
+    if (store) {
+      match["store"] = store;
     }
 
     const summary = await Report.aggregate([
       { $match: match },
-      { $group: { _id: "$call_status", count: { $sum: 1 } } }
+      {
+        $group: {
+          _id: "$call_status",
+          count: { $sum: 1 }
+        }
+      }
     ]);
 
     const result = {
       connected: 0,
       not_connected: 0,
       call_back_later: 0,
-      confirmed: 0
+      confirmed: 0,
     };
 
-    summary.forEach(item => {
-      const status = item._id?.toLowerCase();
-      if (status?.includes("Connected") && !status?.includes("not")) {
-        result.connected = item.count;
-      } else if (status?.includes("Not Connected")) {
-        result.not_connected = item.count;
-      } else if (status?.includes("Call Back Later")) {
-        result.call_back_later = item.count;
-      } else if (status?.includes("Confirmed")) {
-        result.confirmed = item.count;
+    summary.forEach((row) => {
+      const key = row._id?.toLowerCase().replace(/\s+/g, "_");
+      if (result[key] !== undefined) {
+        result[key] = row.count;
       }
     });
 
     return res.json(result);
 
-  } catch (error) {
-    console.error("Error in call summary:", error);
-    return res.status(500).json({ message: "Server error" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
   }
 };
+
+
+
