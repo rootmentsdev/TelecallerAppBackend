@@ -98,3 +98,61 @@ export const getReportById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+//Get call summary report
+export const getCallStatusSummary = async (req, res) => {
+  try {
+    const user = req.user;
+    const { date, store } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "Date is required" });
+    }
+
+    // Build filter
+    const match = {
+      call_date: {
+        $gte: new Date(date + "T00:00:00.000Z"),
+        $lte: new Date(date + "T23:59:59.999Z")
+      }
+    };
+
+    if (store) match.store = store;
+
+    // Telecaller can only see their own edits
+    if (user.role === "telecaller") {
+      match.editedBy = user._id;
+    }
+
+    const summary = await Report.aggregate([
+      { $match: match },
+      { $group: { _id: "$call_status", count: { $sum: 1 } } }
+    ]);
+
+    const result = {
+      connected: 0,
+      not_connected: 0,
+      call_back_later: 0,
+      confirmed: 0
+    };
+
+    summary.forEach(item => {
+      const status = item._id?.toLowerCase();
+      if (status?.includes("connected") && !status?.includes("not")) {
+        result.connected = item.count;
+      } else if (status?.includes("not connected")) {
+        result.not_connected = item.count;
+      } else if (status?.includes("call back")) {
+        result.call_back_later = item.count;
+      } else if (status?.includes("confirm")) {
+        result.confirmed = item.count;
+      }
+    });
+
+    return res.json(result);
+
+  } catch (error) {
+    console.error("Error in call summary:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};

@@ -1,6 +1,8 @@
 import express from "express";
 import { protect } from "../middlewares/auth.js";
 import { getReports, getReportById } from "../controllers/reportController.js";
+import { getCallStatusSummary } from "../controllers/reportController.js";
+
 
 const router = express.Router();
 
@@ -127,5 +129,59 @@ router.get("/", protect, getReports);
  *         description: Report not found
  */
 router.get("/:id", protect, getReportById);
+
+
+/**
+ * @swagger
+ * /api/reports/call-summary:
+ *   get:
+ *     summary: Get call status summary for a selected date and store
+ *     tags:
+ *       - Reports
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "2025-12-10"
+ *         description: Date to filter the summary (YYYY-MM-DD)
+ *       - in: query
+ *         name: store
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "Suitor Guy - Edappal"
+ *         description: Store name (optional). If not provided, results include all stores.
+ *     responses:
+ *       200:
+ *         description: Summary fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 connected:
+ *                   type: integer
+ *                   example: 12
+ *                 not_connected:
+ *                   type: integer
+ *                   example: 8
+ *                 call_back_later:
+ *                   type: integer
+ *                   example: 3
+ *                 confirmed:
+ *                   type: integer
+ *                   example: 5
+ *       400:
+ *         description: Missing or invalid date parameter
+ *       401:
+ *         description: Unauthorized – Token missing or invalid
+ *       500:
+ *         description: Internal Server Error
+ */
+router.get("/call-summary", protect, getCallStatusSummary);
 
 export default router;
