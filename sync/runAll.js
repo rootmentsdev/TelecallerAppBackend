@@ -34,7 +34,7 @@ const runAll = async () => {
     console.log("-".repeat(60));
     const { run: syncStores } = await import("./api/sync_storelist.js");
     await syncStores();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     console.log();
 
     // Step 2: Sync Booking Confirmation (API)
@@ -42,7 +42,7 @@ const runAll = async () => {
     console.log("-".repeat(60));
     const { run: syncBooking } = await import("./api/sync_booking.js");
     await syncBooking();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     console.log();
 
     // Step 3: Sync Rent-Out (API)

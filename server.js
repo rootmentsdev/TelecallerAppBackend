@@ -13,6 +13,9 @@ import reportRoutes from './routes/reportRoutes.js';
 // 👉 IMPORTANT: use import instead of require (ESM)
 import { swaggerUi, swaggerSpec } from './config/swaggerConfig.js';
 
+// API Sync Scheduler (does not affect CSV imports)
+import { startScheduler } from './scheduler/apiSyncScheduler.js';
+
 const app = express();  // ❗ Define app BEFORE using it
 
 // Swagger UI route
@@ -51,4 +54,9 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 8800;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+  
+  // Start API sync scheduler (CSV imports remain manual)
+  startScheduler();
+});
