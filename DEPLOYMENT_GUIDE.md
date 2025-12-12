@@ -11,7 +11,6 @@ This guide will help you deploy the backend and connect it with your frontend.
 - [ ] External API credentials ready
 - [ ] CORS configured for frontend URL
 - [ ] Health check endpoint working
-- [ ] Server tested locally
 
 ---
 
