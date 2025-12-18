@@ -135,11 +135,46 @@ export const readCSV = (filePath) => {
       }
     } else {
       // Read CSV file
-      const data = [];
+      const allRows = [];
       fs.createReadStream(fullPath)
-        .pipe(csvParser())
-        .on("data", (row) => data.push(row))
-        .on("end", () => resolve(data))
+        .pipe(csvParser({ header: false })) // Read without headers first
+        .on("data", (row) => allRows.push(Object.values(row)))
+        .on("end", () => {
+          if (allRows.length === 0) {
+            resolve([]);
+            return;
+          }
+
+          // Find header row (same keywords as readExcelSheet)
+          let headerRowIndex = 0;
+          const headerKeywords = ['#', 'number', 'date', 'customer', 'contact', 'phone', 'name', 'store', 'status', 'remarks', 'reason'];
+
+          for (let i = 0; i < Math.min(10, allRows.length); i++) {
+            const row = allRows[i];
+            let headerLikeCount = 0;
+            row.forEach(cell => {
+              const str = String(cell || '').trim().toLowerCase();
+              if (headerKeywords.some(kw => str.includes(kw))) headerLikeCount++;
+            });
+            if (headerLikeCount >= 2) {
+              headerRowIndex = i;
+              break;
+            }
+          }
+
+          const headers = allRows[headerRowIndex].map(h => String(h || '').trim());
+          const dataRows = allRows.slice(headerRowIndex + 1);
+
+          const jsonData = dataRows.map(row => {
+            const obj = {};
+            headers.forEach((h, i) => {
+              if (h) obj[h] = row[i];
+            });
+            return obj;
+          }).filter(row => Object.values(row).some(v => v !== null && v !== undefined && v !== ''));
+
+          resolve(jsonData);
+        })
         .on("error", reject);
     }
   });
