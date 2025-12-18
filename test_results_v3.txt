@@ -1,0 +1,29 @@
+﻿[dotenv@17.2.3] injecting env (14) from .env -- tip: ≡ƒöæ add access controls to secrets: https://dotenvx.com/ops
+
+≡ƒÜÇ Starting Filtering Verification Tests...
+============================================================
+Γ£à Connected to MongoDB
+
+≡ƒöì TEST 1: Edappal vs Edappally Distinction
+----------------------------------------
+Leads matching "Edappal": 221
+Leads matching "Edappally": 12708
+Γ£à PASS: "Edappal" filter does NOT match "Edappally" records.
+
+≡ƒöì TEST 2: Team Lead Role Restriction
+----------------------------------------
+Admin "Suitor Guy" count: 8474
+Team Lead (Manjeri) "Suitor Guy" count: 15
+Γ£à PASS: Team Lead is restricted to their own store.
+Γ£à PASS: No leads from other stores found in Team Lead results.
+
+≡ƒöì TEST 3: Date Range Filtering
+----------------------------------------
+Sample lead found with date: 2025-12-01
+Leads on 2025-12-01: 214
+Γ£à PASS: Date filtering returns records.
+
+≡ƒöî Disconnected from MongoDB
+============================================================
+≡ƒÅü Filtering Verification Finished
+

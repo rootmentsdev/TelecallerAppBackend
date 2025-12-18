@@ -28,7 +28,7 @@ const buildLeadQuery = (user, filters = {}) => {
     if (query.$or) {
       // If $or exists (from store filter with " - " pattern), we need to combine it with teamLead's store filter
       const userStoreRegex = { $regex: escapeRegex(user.store), $options: 'i' };
-      
+
       // Each $or condition needs to also match the teamLead's store
       const updatedOrConditions = query.$or.map(condition => {
         // Handle both simple store conditions and $and conditions
@@ -58,7 +58,7 @@ const buildLeadQuery = (user, filters = {}) => {
           };
         }
       });
-      
+
       query.$or = updatedOrConditions;
     } else if (query.store) {
       // Provided store filter may already be a regex object; keep it if so, otherwise build a regex
@@ -141,7 +141,7 @@ const createReportFromLead = async (leadDoc, userId, note = 'moved after edit', 
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id','_id','name','phone','store','leadType','lead_type','callStatus','call_status','leadStatus','lead_status','functionDate','function_date','enquiryDate','enquiry_date','visitDate','visit_date','returnDate','return_date','createdAt','created_at','assignedTo','assigned_to','attendedBy','attended_by','bookingNo','booking_number','securityAmount','security_amount','remarks','reasonCollectedFromStore','reason_collected_from_store'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -193,15 +193,44 @@ const createReportFromLead = async (leadDoc, userId, note = 'moved after edit', 
 // GET - Fetch list of leads (for listing pages)
 export const getLeads = async (req, res) => {
   try {
-    const { 
-      leadType, 
-      callStatus, 
-      leadStatus, 
-      store, 
-      source, 
-      page = 1, 
-      limit = 100, // Increased default limit from 50 to 100
-      // Date filtering parameters
+    // Normalize query parameters (handle snake_case aliases)
+    const normalizedQuery = { ...req.query };
+
+    // Mapping of snake_case query params to their camelCase equivalents
+    const paramAliases = {
+      'lead_type': 'leadType',
+      'call_status': 'callStatus',
+      'lead_status': 'leadStatus',
+      'enquiry_date_from': 'enquiryDateFrom',
+      'enquiry_date_to': 'enquiryDateTo',
+      'function_date_from': 'functionDateFrom',
+      'function_date_to': 'functionDateTo',
+      'visit_date_from': 'visitDateFrom',
+      'visit_date_to': 'visitDateTo',
+      'created_at_from': 'createdAtFrom',
+      'created_at_to': 'createdAtTo',
+      'date_from': 'dateFrom',
+      'date_to': 'dateTo',
+      'date_field': 'dateField',
+      'sort_by': 'sortBy',
+      'sort_order': 'sortOrder'
+    };
+
+    Object.keys(paramAliases).forEach(snakeKey => {
+      const camelKey = paramAliases[snakeKey];
+      if (normalizedQuery[snakeKey] !== undefined && normalizedQuery[camelKey] === undefined) {
+        normalizedQuery[camelKey] = normalizedQuery[snakeKey];
+      }
+    });
+
+    const {
+      leadType,
+      callStatus,
+      leadStatus,
+      store,
+      source,
+      page = 1,
+      limit = 100,
       enquiryDateFrom,
       enquiryDateTo,
       functionDateFrom,
@@ -210,102 +239,124 @@ export const getLeads = async (req, res) => {
       visitDateTo,
       createdAtFrom,
       createdAtTo,
-      createdAt, // Single date for filtering leads created on a specific day
-      // Generic date range (applies to enquiryDate by default)
+      createdAt,
       dateFrom,
       dateTo,
-      dateField = 'enquiryDate', // Which date field to filter: enquiryDate, functionDate, visitDate, createdAt
-      // Sorting parameters
-      sortBy = 'createdAt', // Field to sort by (default: createdAt)
-      sortOrder = 'desc' // Sort order: 'asc' or 'desc' (default: desc)
-    } = req.query;
-    
+      dateField = 'enquiryDate',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = normalizedQuery;
+
     const filters = {};
     if (leadType) filters.leadType = leadType;
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
     if (store) {
-      // Store filtering logic for "Brand - Location" format
-      // Handles formats like "Suitor Guy - Edappally", "Zorucci - Kottayam"
-      // Matches stores that contain both brand and location (with variations)
-      
-      const escaped = store.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      
-      // Check if store contains " - " pattern (e.g., "Suitor Guy - Edappally")
-      if (store.includes(' - ')) {
-        // Split by " - " to get brand and location parts
-        const parts = store.split(' - ').map(p => p.trim()).filter(p => p.length > 0);
-        const brandPart = parts[0];
-        const locationPart = parts[parts.length - 1]; // Get last part in case of multiple dashes
-        
-        // Escape regex special characters
-        const escapedBrand = brandPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const escapedLocation = locationPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        
-        // Create brand variations (e.g., "Suitor Guy" -> ["Suitor Guy", "SG"])
-        // Note: SG = Suitor Guy, Z = Zorucci
-        const brandVariations = [escapedBrand];
-        if (brandPart.toLowerCase().includes('suitor guy')) {
-          brandVariations.push('SG');
-        }
-        if (brandPart.toLowerCase().includes('zorucci') || brandPart.toLowerCase().includes('zurocci')) {
-          brandVariations.push('Z');
-        }
-        
-        // Create location variations (handle case variations only, NOT different locations)
-        // IMPORTANT: Edappal and Edappally are DIFFERENT locations, not variations
-        const locationVariations = [escapedLocation];
-        // Only add case variations, not different location names
-        if (locationPart.toLowerCase().includes('kottakal')) {
-          locationVariations.push('Kottakal', 'KOTTAKAL', 'Kottakkal'); // Same location, different cases/spellings
-        }
-        if (locationPart.toLowerCase().includes('manjeri')) {
-          locationVariations.push('Manjeri', 'MANJERY', 'Manjery'); // Same location, different cases/spellings
-        }
-        // Note: Edappal and Edappally are kept separate as they are different locations
-        
-        // Build $or conditions to match stores containing:
-        // 1. Exact full format: "Suitor Guy - Edappally"
-        // 2. Brand + Location (both present): stores containing both brand and location
-        // 3. Location variations (case-insensitive, but exact location name match)
-        const orConditions = [];
-        
-        // Exact match
-        orConditions.push({ store: { $regex: escaped, $options: 'i' } });
-        
-        // Match stores containing both brand AND location (in any order)
-        // Use word boundaries for location to prevent substring matches (e.g., Edappal matching Edappally)
-        for (const brandVar of brandVariations) {
-          for (const locVar of locationVariations) {
-            const brandEscaped = brandVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            // For location, use word boundary regex to match exact location name
-            // This prevents "Edappal" from matching "Edappally" and vice versa
-            const locEscaped = locVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            // Use word boundary (\b) or look for location followed by dash/end/space
-            const locPattern = `(^|[\\s-])${locEscaped}([\\s-]|$)`;
-            
-            // Store must contain both brand and location
-            orConditions.push({
-              $and: [
-                { store: { $regex: brandEscaped, $options: 'i' } },
-                { store: { $regex: locPattern, $options: 'i' } }
-              ]
-            });
+      // Helper to get all variants of a brand or location
+      const getVariants = (text, type) => {
+        const variants = [text];
+        const lower = text.toLowerCase();
+
+        if (type === 'brand') {
+          if (lower.includes('suitor guy') || lower === 'sg') {
+            variants.push('Suitor Guy', 'SG');
+          }
+          if (lower.includes('zorucci') || lower.includes('zurocci') || lower === 'z') {
+            variants.push('Zurocci', 'Zorucci', 'Z');
+          }
+        } else if (type === 'location') {
+          if (lower.includes('kottakkal') || lower.includes('kottakal')) {
+            variants.push('Kottakkal', 'Kottakal', 'Z.Kottakkal');
+          }
+          if (lower.includes('manjeri') || lower.includes('manjery')) {
+            variants.push('Manjeri', 'MANJERY');
+          }
+          if (lower.includes('perinthalmanna') || lower.includes('perinathalmann') || lower === 'pmna') {
+            variants.push('Perinthalmanna', 'PMNA');
+          }
+          if (lower.includes('edappally') || lower.includes('edapally') || lower.includes('edappall')) {
+            variants.push('Edappally', 'Edapally');
           }
         }
-        
-        // Also match location-only (for backward compatibility)
-        // Use word boundary for location to prevent substring matches
-        for (const locVar of locationVariations) {
-          const locEscaped = locVar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const locPattern = `(^|[\\s-])${locEscaped}([\\s-]|$)`;
-          orConditions.push({ store: { $regex: locPattern, $options: 'i' } });
+        return [...new Set(variants)];
+      };
+
+      // Helper to escape and build a "word-boundary" regex pattern
+      // Matches the text at start of string or after a separator (space/dash)
+      // and at end of string or before a separator
+      const buildStrictRegex = (text) => {
+        const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return `(^|[\\s-])${escaped}([\\s-]|$)`;
+      };
+
+      // Split by dash to handle Brand - Location format
+      const hasDash = store.includes('-') || store.includes(' - ');
+
+      if (hasDash) {
+        const parts = store.split(/[\s-]*[-][\s-]*/).map(p => p.trim()).filter(p => p.length > 0);
+
+        if (parts.length >= 2) {
+          const brandPart = parts[0];
+          const locationPart = parts[parts.length - 1];
+
+          const brandVariations = getVariants(brandPart, 'brand');
+          const locationVariations = getVariants(locationPart, 'location');
+
+          const orConditions = [];
+          for (const brandVar of brandVariations) {
+            for (const locVar of locationVariations) {
+              orConditions.push({
+                $and: [
+                  { store: { $regex: buildStrictRegex(brandVar), $options: 'i' } },
+                  { store: { $regex: buildStrictRegex(locVar), $options: 'i' } }
+                ]
+              });
+            }
+          }
+          filters.$or = orConditions;
+        } else {
+          // Fallback for weirdly formatted dash query
+          filters.store = { $regex: buildStrictRegex(store), $options: 'i' };
         }
-        
-        filters.$or = orConditions;
       } else {
-        // Simple regex match for single term (location-only or brand-only)
-        filters.store = { $regex: escaped, $options: 'i' };
+        // No dash - could be just brand OR just location OR both combined without dash
+        const brandVars = getVariants(store, 'brand');
+        const locVars = getVariants(store, 'location');
+
+        // Check if we detected BOTH a known brand and a known location
+        // We exclude the original string text from this check to see if we found specific variants
+        const hasSpecificBrand = brandVars.some(v => v.toLowerCase() !== store.toLowerCase());
+        const hasSpecificLoc = locVars.some(v => v.toLowerCase() !== store.toLowerCase());
+
+        if (hasSpecificBrand && hasSpecificLoc) {
+          // Intersection: must match both a brand variant AND a location variant
+          // Use variants that are not the original string to ensure we found specific matches
+          const bVars = brandVars.filter(v => v.toLowerCase() !== store.toLowerCase());
+          const lVars = locVars.filter(v => v.toLowerCase() !== store.toLowerCase());
+
+          const orConditions = [];
+          for (const brandVar of bVars) {
+            for (const locVar of lVars) {
+              orConditions.push({
+                $and: [
+                  { store: { $regex: buildStrictRegex(brandVar), $options: 'i' } },
+                  { store: { $regex: buildStrictRegex(locVar), $options: 'i' } }
+                ]
+              });
+            }
+          }
+          filters.$or = orConditions;
+        } else {
+          // Union: just match whatever variants we found
+          const allVars = [...new Set([...brandVars, ...locVars])];
+          if (allVars.length > 1) {
+            filters.$or = allVars.map(v => ({
+              store: { $regex: buildStrictRegex(v), $options: 'i' }
+            }));
+          } else {
+            filters.store = { $regex: buildStrictRegex(store), $options: 'i' };
+          }
+        }
       }
     }
     if (source) filters.source = source;
@@ -357,12 +408,12 @@ export const getLeads = async (req, res) => {
       const year = parseInt(dateParts[0], 10);
       const month = parseInt(dateParts[1], 10) - 1; // Month is 0-indexed
       const day = parseInt(dateParts[2], 10);
-      
+
       // Create start of day in UTC (00:00:00.000)
       const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
       // Create end of day in UTC (23:59:59.999)
       const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
-      
+
       filters.createdAt = {
         $gte: startOfDay,
         $lte: endOfDay
@@ -382,11 +433,11 @@ export const getLeads = async (req, res) => {
 
     // Generic date range (if specific fields not provided)
     if ((dateFrom || dateTo) && !enquiryDateFrom && !enquiryDateTo && !functionDateFrom && !functionDateTo && !visitDateFrom && !visitDateTo && !createdAtFrom && !createdAtTo && !createdAt) {
-      const dateFieldName = dateField === 'functionDate' ? 'functionDate' : 
-                           dateField === 'visitDate' ? 'visitDate' : 
-                           dateField === 'createdAt' ? 'createdAt' : 
-                           'enquiryDate';
-      
+      const dateFieldName = dateField === 'functionDate' ? 'functionDate' :
+        dateField === 'visitDate' ? 'visitDate' :
+          dateField === 'createdAt' ? 'createdAt' :
+            'enquiryDate';
+
       filters[dateFieldName] = {};
       if (dateFrom) {
         filters[dateFieldName].$gte = new Date(dateFrom);
@@ -411,19 +462,19 @@ export const getLeads = async (req, res) => {
       // swallow any logging errors
       console.log("[DEBUG getLeads] failed to log user/query", e.message);
     }
-    
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     // Select fields based on lead type for better data retrieval
     const selectFields = "name phone store leadType callStatus leadStatus bookingNo functionDate enquiryDate visitDate returnDate createdAt assignedTo reasonCollectedFromStore attendedBy";
-    
+
     // Build sort object based on sortBy and sortOrder parameters
     // Allowed sort fields: createdAt, enquiryDate, functionDate, visitDate, name, store
     const allowedSortFields = ['createdAt', 'enquiryDate', 'functionDate', 'visitDate', 'name', 'store'];
     const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
     const sortObject = { [sortField]: sortDirection };
-    
+
     const leads = await Lead.find(query)
       .populate("assignedTo", "name employeeId")
       .sort(sortObject)
@@ -922,7 +973,7 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-  const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
 
     await Lead.findByIdAndDelete(id);
 

@@ -28,24 +28,26 @@ const connectDB = async () => {
 
 // Known brands and locations
 const BRANDS = ["Zurocci", "Suitor Guy", "Zurocci", "SuitorGuy"];
+// IMPORTANT: Put longer location names BEFORE shorter ones to avoid substring matching issues
+// e.g., "Edappally" must come before "Edappal" so "edappally" doesn't match "Edappal"
 const LOCATIONS = [
-  "Trivandrum", "Edapally", "Perumbavoor", "Kottayam", "Trissur",
-  "Palakkad", "Chavakkad", "Edappal", "MANJERY", "PMNA",
-  "Z.Kottakkal", "CALICUT", "VATAKARA", "KALPETTA", "KANNUR",
-  "MG Road", "Kottakkal", "Kalpetta", "Kannur", "Calicut", "Vadakara"
+  "Trivandrum", "Edappally", "Edappal", "Perumbavoor", "Kottayam", "Trissur", "Thrissur",
+  "Palakkad", "Chavakkad", "MANJERY", "Manjeri", "PMNA", "Perinthalmanna",
+  "Z.Kottakkal", "Kottakkal", "CALICUT", "Calicut", "VATAKARA", "Vatakara", "Vadakara",
+  "KALPETTA", "Kalpetta", "KANNUR", "Kannur", "MG Road"
 ];
 
 // Extract brand and location from filename
 const extractBrandAndLocation = (filename) => {
   const lowerFilename = filename.toLowerCase();
-  
+
   // Detect brand - check for patterns like "lossofsale_sg_location" or "lossofsale_z_location"
   let brand = null;
-  
+
   // Pattern 1: lossofsale_sg_location or lossofsale_z_location
   const lossofsalePattern = /lossofsale[_\s-]+(sg|z)[_\s-]+(.+?)(?:\.(csv|xlsx|xls))?$/i;
   const lossofsaleMatch = filename.match(lossofsalePattern);
-  
+
   if (lossofsaleMatch) {
     const brandCode = lossofsaleMatch[1].toLowerCase();
     if (brandCode === 'sg' || brandCode === 's') {
@@ -53,25 +55,37 @@ const extractBrandAndLocation = (filename) => {
     } else if (brandCode === 'z') {
       brand = "Zurocci";
     }
-    
+
     // Location is in the third group
     if (lossofsaleMatch[2]) {
-      const locationStr = lossofsaleMatch[2].trim();
-      // Try to match with known locations
+      const locationStr = lossofsaleMatch[2].trim().toLowerCase();
+
+      // First try exact match (case-insensitive)
       for (const loc of LOCATIONS) {
-        const locLower = loc.toLowerCase();
-        if (locationStr.includes(locLower) || locLower.includes(locationStr)) {
+        if (locationStr === loc.toLowerCase()) {
           return { brand, location: loc };
         }
       }
+
+      // Then try checking if location starts with the known location
+      // This handles cases like "edappally" matching "Edappally" but not "Edappal"
+      for (const loc of LOCATIONS) {
+        const locLower = loc.toLowerCase();
+        // Only match if the extracted string equals the location (not substring)
+        if (locationStr === locLower ||
+          (locationStr.startsWith(locLower) && locationStr.length === locLower.length)) {
+          return { brand, location: loc };
+        }
+      }
+
       // If no match, use the extracted string (capitalize first letter of each word)
-      const location = locationStr.split(/[_\s-]+/).map(word => 
+      const location = lossofsaleMatch[2].trim().split(/[_\s-]+/).map(word =>
         word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
       ).join(' ');
       return { brand, location };
     }
   }
-  
+
   // Pattern 2: Check for full brand names
   if (lowerFilename.includes("zurocci") || lowerFilename.includes("z-")) {
     brand = "Zurocci";
@@ -82,20 +96,20 @@ const extractBrandAndLocation = (filename) => {
   } else if (lowerFilename.includes("_z_") || lowerFilename.includes("-z-") || lowerFilename.match(/\bz\b/)) {
     brand = "Zurocci";
   }
-  
+
   // Detect location
   let location = null;
   for (const loc of LOCATIONS) {
     const locLower = loc.toLowerCase();
     // Check various formats
-    if (lowerFilename.includes(locLower) || 
-        lowerFilename.includes(locLower.replace(/\s+/g, "")) ||
-        lowerFilename.includes(locLower.replace(/\s+/g, "_"))) {
+    if (lowerFilename.includes(locLower) ||
+      lowerFilename.includes(locLower.replace(/\s+/g, "")) ||
+      lowerFilename.includes(locLower.replace(/\s+/g, "_"))) {
       location = loc;
       break;
     }
   }
-  
+
   // Try to extract from patterns like "brand_location" or "brand - location"
   if (!brand || !location) {
     // Pattern: "zurocci_edapally" or "zurocci-edapally" or "zurocci edapally"
@@ -103,7 +117,7 @@ const extractBrandAndLocation = (filename) => {
       /(zurocci|suitor[\s_-]?guy|sg|z)[\s_-]+([a-z\s]+)/i,
       /([a-z\s]+)[\s_-]+(trivandrum|edapally|kottayam|trissur|palakkad|chavakkad|edappal|manjery|pmna|kottakkal|calicut|vadakara|kalpetta|kannur|mg[\s_-]?road)/i
     ];
-    
+
     for (const pattern of patterns) {
       const match = filename.match(pattern);
       if (match) {
@@ -125,7 +139,7 @@ const extractBrandAndLocation = (filename) => {
       }
     }
   }
-  
+
   return { brand, location };
 };
 
@@ -135,20 +149,20 @@ const findLossOfSaleFiles = () => {
   if (!fs.existsSync(dataDir)) {
     return [];
   }
-  
+
   const files = fs.readdirSync(dataDir);
   const lossOfSaleFiles = [];
-  
+
   const patterns = [
     /lossofsale/i,
     /loss[\s_-]?of[\s_-]?sale/i,
     /loss_of_sale/i
   ];
-  
+
   for (const file of files) {
     const filePath = join(dataDir, file);
     const stat = fs.statSync(filePath);
-    
+
     if (stat.isFile()) {
       const ext = file.toLowerCase().split('.').pop();
       if (ext === 'csv' || ext === 'xlsx' || ext === 'xls') {
@@ -167,29 +181,29 @@ const findLossOfSaleFiles = () => {
       }
     }
   }
-  
+
   return lossOfSaleFiles;
 };
 
 const importFile = async (fileInfo) => {
   const { filename, path, brand, location } = fileInfo;
-  
+
   // Extract brand and location from filename if not provided
   let finalBrand = brand;
   let finalLocation = location;
-  
+
   if (!finalBrand || !finalLocation) {
     const extracted = extractBrandAndLocation(filename);
     finalBrand = finalBrand || extracted.brand;
     finalLocation = finalLocation || extracted.location;
   }
-  
+
   // Build store name
   let storeName = null;
   if (finalBrand && finalLocation) {
     storeName = `${finalBrand} - ${finalLocation}`;
   }
-  
+
   console.log(`\n📄 Processing: ${filename}`);
   if (storeName) {
     console.log(`   🏪 Store: "${storeName}"`);
@@ -198,33 +212,33 @@ const importFile = async (fileInfo) => {
     console.log(`   ⚠️  Could not detect brand/location from filename`);
     console.log(`   Will use CSV column or default to "Default Store"`);
   }
-  
+
   // Read file
   const data = await readCSV(path);
-  
+
   if (!data || data.length === 0) {
     console.log(`   ⚠️  No data found in file`);
     return { saved: 0, skipped: 0, errors: 0 };
   }
-  
+
   console.log(`   📊 Found ${data.length} records`);
-  
+
   let saved = 0;
   let updated = 0;
   let skipped = 0;
   let errors = 0;
-  
+
   const totalRecords = data.length;
   const progressInterval = Math.max(1, Math.floor(totalRecords / 20));
-  
+
   for (let i = 0; i < totalRecords; i++) {
     const row = data[i];
-    
+
     // Add store name to row data if specified
-    const rowWithStore = storeName 
+    const rowWithStore = storeName
       ? { ...row, store: storeName }
       : row;
-    
+
     const mapped = mapLossOfSale(rowWithStore);
     if (mapped) {
       const result = await saveToMongo(mapped);
@@ -240,20 +254,20 @@ const importFile = async (fileInfo) => {
     } else {
       skipped++;
     }
-    
+
     // Show progress
     if (i % progressInterval === 0 || i === totalRecords - 1) {
       const progress = ((i + 1) / totalRecords * 100).toFixed(1);
       process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Saved: ${saved}, Updated: ${updated}, Skipped: ${skipped}, Errors: ${errors}`);
     }
   }
-  
+
   if (totalRecords > 0) {
     process.stdout.write('\n');
   }
-  
+
   console.log(`   ✅ Saved: ${saved}, 🔄 Updated: ${updated}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
-  
+
   return { saved, updated, skipped, errors };
 };
 
@@ -261,11 +275,11 @@ const run = async () => {
   console.log("🔄 Starting All Loss of Sale CSV Import...");
   console.log("=".repeat(60));
   await connectDB();
-  
+
   // Get last sync time for incremental sync
   let lastSyncAt = null;
   let syncLog = await SyncLog.findOne({ syncType: "lossofsale" });
-  
+
   if (syncLog && syncLog.lastSyncAt) {
     lastSyncAt = syncLog.lastSyncAt;
     console.log(`📅 Last sync: ${lastSyncAt.toISOString()}`);
@@ -273,26 +287,26 @@ const run = async () => {
   } else {
     console.log(`📅 First sync - will process all files`);
   }
-  
+
   // Find all Loss of Sale files
   const allFiles = findLossOfSaleFiles();
-  
+
   if (allFiles.length === 0) {
     console.log("⚠️  No Loss of Sale files found in data/ folder");
     console.log("   Looking for files matching: *lossofsale*.csv, *lossofsale*.xlsx");
     return;
   }
-  
+
   // Filter files: only process if modified after last sync (incremental sync)
   let filesToProcess = [];
   let filesSkipped = 0;
-  
+
   if (lastSyncAt) {
     for (const fileInfo of allFiles) {
       try {
         const stats = statSync(fileInfo.path);
         const fileModifiedTime = stats.mtime;
-        
+
         if (fileModifiedTime > lastSyncAt) {
           filesToProcess.push(fileInfo);
         } else {
@@ -303,7 +317,7 @@ const run = async () => {
         filesToProcess.push(fileInfo);
       }
     }
-    
+
     console.log(`\n📁 Found ${allFiles.length} Loss of Sale file(s) total`);
     console.log(`   📝 Files to process: ${filesToProcess.length} (modified since last sync)`);
     console.log(`   ⏭️  Files skipped: ${filesSkipped} (not modified since last sync)\n`);
@@ -311,11 +325,11 @@ const run = async () => {
     filesToProcess = allFiles;
     console.log(`\n📁 Found ${allFiles.length} Loss of Sale file(s) in data/ folder\n`);
   }
-  
+
   if (filesToProcess.length === 0) {
     console.log("✅ No files to process - all files are up to date!");
     console.log(`   Next sync will only process files modified after: ${new Date().toISOString()}`);
-    
+
     // Update sync log even if no files processed
     const syncEndTime = new Date();
     await SyncLog.findOneAndUpdate(
@@ -330,17 +344,17 @@ const run = async () => {
     );
     return;
   }
-  
+
   let totalSaved = 0;
   let totalUpdated = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
-  
+
   // Process each file
   for (let i = 0; i < filesToProcess.length; i++) {
     const fileInfo = filesToProcess[i];
     console.log(`\n[${i + 1}/${filesToProcess.length}]`);
-    
+
     try {
       const result = await importFile(fileInfo);
       totalSaved += result.saved || 0;
@@ -352,7 +366,7 @@ const run = async () => {
       totalErrors++;
     }
   }
-  
+
   // Update sync log
   const syncEndTime = new Date();
   await SyncLog.findOneAndUpdate(
@@ -365,7 +379,7 @@ const run = async () => {
     },
     { upsert: true, new: true }
   );
-  
+
   console.log("\n" + "=".repeat(60));
   console.log("✅ All Loss of Sale Imports Completed!");
   console.log("=".repeat(60));
