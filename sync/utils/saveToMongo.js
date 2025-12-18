@@ -67,36 +67,36 @@ export const saveToMongo = async (leadData) => {
     // These come from API and should only add new records (incremental sync)
     if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") {
       let duplicateQuery = null;
-      
-        // For booking/rent-out: Primary check: bookingNo + phone + leadType (most reliable)
-        if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-          duplicateQuery = {
-            bookingNo: leadData.bookingNo.trim(),
-            phone: leadData.phone,
-            leadType: leadData.leadType,
-          };
-        } else {
-          // Fallback: phone + name + leadType + store (if bookingNo is missing)
-          duplicateQuery = {
-            phone: leadData.phone,
-            name: leadData.name,
-            leadType: leadData.leadType,
-            store: leadData.store,
-          };
-        }
-      
+
+      // For booking/rent-out: Primary check: bookingNo + phone + leadType (most reliable)
+      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+        duplicateQuery = {
+          bookingNo: leadData.bookingNo.trim(),
+          phone: leadData.phone,
+          leadType: leadData.leadType,
+        };
+      } else {
+        // Fallback: phone + name + leadType + store (if bookingNo is missing)
+        duplicateQuery = {
+          phone: leadData.phone,
+          name: leadData.name,
+          leadType: leadData.leadType,
+          store: leadData.store,
+        };
+      }
+
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
         // Record already exists - skip it (don't update to preserve user edits and avoid unnecessary updates)
         return { skipped: true, leadId: existing._id, name: existing.name, phone: existing.phone, bookingNo: existing.bookingNo, reason: "Already exists" };
       }
     }
-    
+
     // For loss of sale and general (walk-in): check for duplicates and UPDATE existing records
     // These come from CSV files and should update existing records when re-imported
     if (leadData.leadType === "lossOfSale" || leadData.leadType === "general") {
       let duplicateQuery = null;
-      
+
       if (leadData.leadType === "lossOfSale") {
         // For loss of sale: Check phone + name + store + leadType + enquiryDate (if available)
         duplicateQuery = {
@@ -105,12 +105,16 @@ export const saveToMongo = async (leadData) => {
           leadType: leadData.leadType,
           store: leadData.store,
         };
-        
+
         // If enquiryDate is available, include it in the duplicate check for more accuracy
         if (leadData.enquiryDate) {
           duplicateQuery.enquiryDate = leadData.enquiryDate;
         }
-        // Alternative: if functionDate is available and enquiryDate is not, use functionDate
+        // If visitDate is available, include it (essential for Loss of Sale visits)
+        else if (leadData.visitDate) {
+          duplicateQuery.visitDate = leadData.visitDate;
+        }
+        // Alternative: if functionDate is available and enquiryDate/visitDate are not, use functionDate
         else if (leadData.functionDate) {
           duplicateQuery.functionDate = leadData.functionDate;
         }
@@ -123,7 +127,7 @@ export const saveToMongo = async (leadData) => {
           leadType: leadData.leadType,
           store: leadData.store,
         };
-        
+
         // If enquiryDate is available, include it to update same-day visits
         if (leadData.enquiryDate) {
           duplicateQuery.enquiryDate = leadData.enquiryDate;
@@ -133,7 +137,7 @@ export const saveToMongo = async (leadData) => {
           duplicateQuery.functionDate = leadData.functionDate;
         }
       }
-      
+
       // Check if lead exists in reports first (before checking Lead collection)
       // Use phone as primary match and support both old and new report shapes
       const reportCheckQuery = {
@@ -144,13 +148,13 @@ export const saveToMongo = async (leadData) => {
           { "leadData.phone_number": leadData.phone }
         ]
       };
-      
+
       const existingReport = await Report.findOne(reportCheckQuery);
       if (existingReport) {
         // Lead was moved to reports - skip importing to prevent it from reappearing in leads list
         return { skipped: true, reason: "Lead exists in reports (moved after edit)" };
       }
-      
+
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
         // Record already exists - UPDATE it with new data (preserves _id and createdAt)
@@ -158,7 +162,7 @@ export const saveToMongo = async (leadData) => {
         const updateData = { ...leadData };
         delete updateData._id;
         delete updateData.createdAt;
-        
+
         const updated = await Lead.findByIdAndUpdate(
           existing._id,
           { $set: updateData },
@@ -189,7 +193,7 @@ export const saveStoreToMongo = async (storeData) => {
     }
 
     // Check for duplicate by code or name
-    const query = storeData.code 
+    const query = storeData.code
       ? { $or: [{ code: storeData.code }, { name: storeData.name }] }
       : { name: storeData.name };
 
