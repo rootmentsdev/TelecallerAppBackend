@@ -1,7 +1,7 @@
 import Lead from "../models/Lead.js";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
-import { mapWalkin, mapLossOfSale } from "../sync/utils/dataMapper.js";
+import { mapWalkin, mapLossOfSale, mapRentOut, mapBooking } from "../sync/utils/dataMapper.js";
 import { saveToMongo } from "../sync/utils/saveToMongo.js";
 
 export const importLeadsFromCSV = async (req, res) => {
@@ -33,37 +33,58 @@ export const importLeadsFromCSV = async (req, res) => {
       // Skip rows that are likely headers or title rows
       const rowKeys = Object.keys(row);
       const rowValues = Object.values(row);
-      
+
       // Skip if row has no data or only empty values
       const hasData = rowValues.some(val => val && val.toString().trim() !== "");
-      
+
       // Skip if row looks like a header (all values are column-like names)
       const looksLikeHeader = rowValues.every(val => {
         const str = String(val || "").trim();
-        return str === "" || 
-               str.includes("Customer Name") || 
-               str.includes("Contact") || 
-               str.includes("Walk-In Report") ||
-               str === "#" ||
-               str === "Date" ||
-               str === "Function Date";
+        return str === "" ||
+          str.includes("Customer Name") ||
+          str.includes("Contact") ||
+          str.includes("Walk-In Report") ||
+          str === "#" ||
+          str === "Date" ||
+          str === "Function Date";
       });
-      
+
       return hasData && !looksLikeHeader;
     });
 
     const results = [];
     const errors = [];
 
-    // Detect CSV type from first valid row (check for loss of sale indicators)
+    // Detect CSV type from first valid row
     const firstRow = validRows[0] || {};
-    const isLossOfSale = 
-      firstRow.reason !== undefined || 
+
+    // Check for Loss of Sale indicators
+    const isLossOfSale =
+      firstRow.reason !== undefined ||
       firstRow.Reason !== undefined ||
       firstRow.leadType === "lossOfSale" ||
       firstRow.LeadType === "lossOfSale" ||
       (firstRow.source && firstRow.source.toLowerCase().includes("loss")) ||
       (firstRow.Source && firstRow.Source.toLowerCase().includes("loss"));
+
+    // Check for Rent-Out indicators
+    const isRentOut =
+      firstRow.returnDate !== undefined ||
+      firstRow.ReturnDate !== undefined ||
+      firstRow["Return Date"] !== undefined ||
+      firstRow.leadType === "rentOutFeedback" ||
+      firstRow.LeadType === "rentOutFeedback" ||
+      (firstRow.source && firstRow.source.toLowerCase().includes("rent")) ||
+      (firstRow.Source && firstRow.Source.toLowerCase().includes("rent"));
+
+    // Check for Booking Confirmation indicators
+    const isBooking =
+      (firstRow.bookingNo !== undefined || firstRow.BookingNo !== undefined || firstRow["Booking No"] !== undefined) &&
+      !isRentOut && // Rent-Out also has bookingNo
+      (firstRow.leadType === "bookingConfirmation" ||
+        firstRow.LeadType === "bookingConfirmation" ||
+        (firstRow.source && firstRow.source.toLowerCase().includes("booking")) ||
+        (firstRow.Source && firstRow.Source.toLowerCase().includes("booking")));
 
     // Process each valid row
     for (let i = 0; i < validRows.length; i++) {
@@ -73,93 +94,105 @@ export const importLeadsFromCSV = async (req, res) => {
       try {
         // Use appropriate mapper based on CSV type
         let leadData = null;
-        
+
         if (isLossOfSale) {
           // Use loss of sale mapper
           leadData = mapLossOfSale(row);
+        } else if (isRentOut) {
+          // Use rent-out mapper
+          leadData = mapRentOut(row);
+        } else if (isBooking) {
+          // Use booking mapper
+          leadData = mapBooking(row);
         } else {
           // Use walk-in mapper
           leadData = mapWalkin(row);
         }
-        
+
         // If mapping failed, try fallback to basic mapping
         if (!leadData) {
           // Fallback: basic mapping for other CSV formats
           // Handle column names with spaces - csv-parser converts them to keys with spaces
           leadData = {
             name: (
-              row.name?.trim() || 
-              row.Name?.trim() || 
-              row.NAME?.trim() || 
+              row.name?.trim() ||
+              row.Name?.trim() ||
+              row.NAME?.trim() ||
               row["Customer Name"]?.trim() ||
               row["customer name"]?.trim() ||
               row["CUSTOMER NAME"]?.trim()
             ),
             phone: (
-              row.phone?.trim() || 
-              row.Phone?.trim() || 
-              row.PHONE?.trim() || 
+              row.phone?.trim() ||
+              row.Phone?.trim() ||
+              row.PHONE?.trim() ||
               row.Contact?.trim() ||
               row.contact?.trim() ||
               row.CONTACT?.trim()
             ),
             store: (
-              row.store?.trim() || 
-              row.Store?.trim() || 
-              row.STORE?.trim() || 
+              row.store?.trim() ||
+              row.Store?.trim() ||
+              row.STORE?.trim() ||
               req.user.store
             ),
             source: (
-              row.source?.trim() || 
-              row.Source?.trim() || 
-              row.SOURCE?.trim() || 
-              (isLossOfSale ? "Loss of Sale" : "Walk-in")
+              row.source?.trim() ||
+              row.Source?.trim() ||
+              row.SOURCE?.trim() ||
+              (isLossOfSale ? "Loss of Sale" :
+                isRentOut ? "Rent-out" :
+                  isBooking ? "Booking" : "Walk-in")
             ),
             enquiryType: (
-              row.enquiryType?.trim() || 
-              row["enquiry type"]?.trim() || 
-              row["Enquiry Type"]?.trim() || 
+              row.enquiryType?.trim() ||
+              row["enquiry type"]?.trim() ||
+              row["Enquiry Type"]?.trim() ||
               row.Category?.trim() ||
               row.category?.trim()
             ),
             leadType: (
-              row.leadType?.trim() || 
-              row["lead type"]?.trim() || 
-              row["Lead Type"]?.trim() || 
-              (isLossOfSale ? "lossOfSale" : "general")
+              row.leadType?.trim() ||
+              row["lead type"]?.trim() ||
+              row["Lead Type"]?.trim() ||
+              (isLossOfSale ? "lossOfSale" :
+                isRentOut ? "rentOutFeedback" :
+                  isBooking ? "bookingConfirmation" : "general")
             ),
             enquiryDate: row.enquiryDate ? new Date(row.enquiryDate) : (row.Date ? new Date(row.Date) : undefined),
             functionDate: (
-              row.functionDate ? new Date(row.functionDate) : 
-              (row["Function Date"] ? new Date(row["Function Date"]) : undefined)
+              row.functionDate ? new Date(row.functionDate) :
+                (row["Function Date"] ? new Date(row["Function Date"]) : undefined)
             ),
             bookingNo: row.bookingNo?.trim() || row["booking no"]?.trim() || row["Booking No"]?.trim(),
             securityAmount: row.securityAmount ? parseFloat(row.securityAmount) : undefined,
             returnDate: row.returnDate ? new Date(row.returnDate) : undefined,
             remarks: (
-              row.remarks?.trim() || 
+              row.remarks?.trim() ||
               row.Remarks?.trim() ||
               row.remarks?.trim()
             ),
             attendedBy: (
-              row.Staff?.trim() || 
+              row.Staff?.trim() ||
               row.staff?.trim() ||
               row["Staff"]?.trim()
             ),
             closingStatus: (
-              row.closingStatus?.trim() || 
-              row["closing status"]?.trim() || 
-              row.Status?.trim() || 
+              row.closingStatus?.trim() ||
+              row["closing status"]?.trim() ||
+              row.Status?.trim() ||
               row.status?.trim() ||
               row["Status"]?.trim()
             ),
             reason: row.reason?.trim() || row.Reason?.trim(), // For loss of sale
+            reasonCollectedFromStore: (isLossOfSale ? (row.reason?.trim() || row.Reason?.trim()) : undefined), // Fix: ensure this is set
+            visitDate: (isLossOfSale && (row.Date || row.date)) ? new Date(row.Date || row.date) : undefined, // Fix: Use Date column as visitDate for LoS
           };
         }
-        
+
         // Add createdBy (required for API uploads)
         leadData.createdBy = req.user._id;
-        
+
         // Ensure store is set (use user's store as fallback)
         if (!leadData.store) {
           leadData.store = req.user.store || "Default Store";
@@ -172,9 +205,9 @@ export const importLeadsFromCSV = async (req, res) => {
           errors.push({
             row: rowNumber,
             error: "Missing required fields: name, phone, or store",
-            data: { 
-              name: leadData.name || "missing", 
-              phone: leadData.phone || "missing", 
+            data: {
+              name: leadData.name || "missing",
+              phone: leadData.phone || "missing",
               store: leadData.store || "missing",
               availableColumns: availableColumns,
               sampleRowData: row
@@ -203,7 +236,7 @@ export const importLeadsFromCSV = async (req, res) => {
         // Use saveToMongo for duplicate prevention and proper handling
         // This ensures CSV imports follow the same duplicate prevention logic as sync scripts
         const result = await saveToMongo(leadData);
-        
+
         if (result.saved) {
           results.push({
             row: rowNumber,
