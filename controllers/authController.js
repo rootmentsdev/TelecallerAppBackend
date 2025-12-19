@@ -36,39 +36,39 @@ export const register = async (req, res) => {
 // List of employeeIds that should be admin (can be changed in code)
 // Add or remove employeeIds here to grant/revoke admin access
 const ADMIN_EMPLOYEE_IDS = [
-  "Emp188",  // SHAFNA ISMAIL - Admin
-  "emp188",  // Case-insensitive variant
-  // Add more employeeIds here as needed:
-  // "Emp001",
-  // "Emp002",
+    "Emp188",  // SHAFNA ISMAIL - Admin
+    "Emp233",  // New Admin
+    "Emp345",  // New Admin
+    "Emp410",  // New Admin
+    "Emp436",  // New Admin
 ];
 
 // Helper function to check if employeeId should be admin
 const isAdminEmployee = (employeeId) => {
-  if (!employeeId) return false;
-  return ADMIN_EMPLOYEE_IDS.some(
-    adminId => adminId.toLowerCase() === employeeId.toLowerCase()
-  );
+    if (!employeeId) return false;
+    return ADMIN_EMPLOYEE_IDS.some(
+        adminId => adminId.toLowerCase() === employeeId.toLowerCase()
+    );
 };
 
 // Helper function to map API role to our role system
 const mapRoleFromAPI = (apiRole, employeeId) => {
-  // First check if this employeeId is designated as admin in code
-  if (isAdminEmployee(employeeId)) {
-    return "admin";
-  }
-  
-  if (!apiRole) return "telecaller";
-  
-  const roleLower = apiRole.toLowerCase().trim();
-  
-  if (roleLower.includes("admin") || roleLower.includes("director") || roleLower.includes("managing")) {
-    return "admin";
-  } else if (roleLower.includes("lead") || roleLower.includes("team") || roleLower.includes("manager")) {
-    return "teamLead";
-  } else {
-    return "telecaller";
-  }
+    // First check if this employeeId is designated as admin in code
+    if (isAdminEmployee(employeeId)) {
+        return "admin";
+    }
+
+    if (!apiRole) return "telecaller";
+
+    const roleLower = apiRole.toLowerCase().trim();
+
+    if (roleLower.includes("admin") || roleLower.includes("director") || roleLower.includes("managing")) {
+        return "admin";
+    } else if (roleLower.includes("lead") || roleLower.includes("team") || roleLower.includes("manager")) {
+        return "teamLead";
+    } else {
+        return "telecaller";
+    }
 };
 
 export const login = async (req, res) => {
@@ -77,7 +77,7 @@ export const login = async (req, res) => {
 
         // Validate input
         if (!employeeId || !password) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 message: "Employee ID and Password are required",
                 success: false
             });
@@ -112,7 +112,7 @@ export const login = async (req, res) => {
         // CRITICAL: If API response is null (network error, timeout, etc.), reject login
         if (!apiResponse) {
             console.log(`❌ External API unavailable or returned null response for: ${employeeId}`);
-            return res.status(503).json({ 
+            return res.status(503).json({
                 message: "Unable to verify credentials. Authentication service is temporarily unavailable. Please try again later.",
                 success: false,
                 error: "External API unavailable"
@@ -125,7 +125,7 @@ export const login = async (req, res) => {
                 status: apiResponse.status,
                 hasData: !!apiResponse.data
             });
-            return res.status(401).json({ 
+            return res.status(401).json({
                 message: "Invalid Employee ID or Password",
                 success: false
             });
@@ -136,7 +136,7 @@ export const login = async (req, res) => {
             console.log(`❌ External API verification failed for: ${employeeId}`, {
                 status: apiResponse.status
             });
-            return res.status(401).json({ 
+            return res.status(401).json({
                 message: "Invalid Employee ID or Password",
                 success: false
             });
@@ -158,7 +158,7 @@ export const login = async (req, res) => {
         // Validate that we have essential data from API
         if (!employeeIdFromAPI || !name) {
             console.error(`⚠️ External API response missing essential data for: ${employeeId}`, apiUserData);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 message: "Invalid response from authentication service",
                 success: false
             });
@@ -180,7 +180,7 @@ export const login = async (req, res) => {
         } else {
             // Create new user with data from external API
             const hashedPassword = await bcrypt.hash(password, 10);
-            
+
             user = await User.create({
                 employeeId: employeeIdFromAPI,
                 name: name,
@@ -196,7 +196,7 @@ export const login = async (req, res) => {
         // Step 6: Generate JWT token (only after external API verification succeeded)
         if (!process.env.JWT_SECRET) {
             console.error("❌ JWT_SECRET is not defined in environment variables");
-            return res.status(500).json({ 
+            return res.status(500).json({
                 message: "Server configuration error. Please contact administrator.",
                 success: false,
                 error: "JWT_SECRET missing"
@@ -222,7 +222,7 @@ export const login = async (req, res) => {
 
     } catch (error) {
         console.error("Login error:", error.message);
-        res.status(500).json({ 
+        res.status(500).json({
             message: "An error occurred during login. Please try again.",
             success: false,
             error: process.env.NODE_ENV === "development" ? error.message : undefined
