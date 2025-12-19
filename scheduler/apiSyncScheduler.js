@@ -9,9 +9,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Configuration
-const SYNC_TIME = process.env.API_SYNC_TIME || '0 9 * * *'; // Default: 6:00 AM daily
+// Default: Run every 5 minutes from 8 AM to 8 PM (Business Hours)
+const SYNC_TIME = process.env.API_SYNC_TIME || '*/5 8-20 * * *';
 const SYNC_ENABLED = process.env.API_SYNC_ENABLED !== 'false'; // Default: enabled
-const SYNC_TIMEZONE = process.env.API_SYNC_TIMEZONE || 'UTC'; // Default: UTC
+const SYNC_TIMEZONE = process.env.API_SYNC_TIMEZONE || 'Asia/Kolkata'; // Default: IST
 
 let isRunning = false;
 
@@ -23,7 +24,7 @@ const runApiSync = async () => {
 
   isRunning = true;
   const startTime = new Date();
-  
+
   console.log('🕐 Scheduled API sync started at:', startTime.toISOString());
   console.log('📡 Running: npm run sync:all');
 
@@ -37,7 +38,7 @@ const runApiSync = async () => {
     syncProcess.on('close', (code) => {
       const endTime = new Date();
       const duration = ((endTime - startTime) / 1000).toFixed(2);
-      
+
       if (code === 0) {
         console.log('✅ Scheduled API sync completed successfully');
         console.log(`⏱️  Duration: ${duration} seconds`);
@@ -46,7 +47,7 @@ const runApiSync = async () => {
         console.error('❌ Scheduled API sync failed with exit code:', code);
         console.log(`⏱️  Duration: ${duration} seconds (failed)`);
       }
-      
+
       isRunning = false;
       resolve(code);
     });
@@ -61,7 +62,7 @@ const runApiSync = async () => {
 
 const getNextRunTime = () => {
   try {
-    const task = cron.schedule(SYNC_TIME, () => {}, { scheduled: false, timezone: SYNC_TIMEZONE });
+    const task = cron.schedule(SYNC_TIME, () => { }, { scheduled: false, timezone: SYNC_TIMEZONE });
     return task.nextDate().toISOString();
   } catch (error) {
     return 'Unable to calculate next run time';
@@ -83,7 +84,7 @@ const startScheduler = () => {
   // Validate cron expression
   if (!cron.validate(SYNC_TIME)) {
     console.error('❌ Invalid cron expression:', SYNC_TIME);
-    console.error('   Using default: 0 6 * * * (6:00 AM daily)');
+    console.error('   Using default: */5 8-20 * * * (Every 5 mins, 8 AM - 8 PM)');
     return null;
   }
 
@@ -94,7 +95,7 @@ const startScheduler = () => {
   });
 
   console.log('✅ API sync scheduler started successfully');
-  
+
   return task;
 };
 
@@ -112,7 +113,7 @@ export { startScheduler, stopScheduler, runApiSync };
 if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('🧪 Testing API sync scheduler...');
   startScheduler();
-  
+
   // Keep process alive for testing
   process.on('SIGINT', () => {
     console.log('\n👋 Shutting down scheduler...');

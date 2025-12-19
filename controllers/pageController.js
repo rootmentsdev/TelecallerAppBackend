@@ -247,8 +247,18 @@ export const getLeads = async (req, res) => {
       sortOrder = 'desc'
     } = normalizedQuery;
 
+    // Remap friendly leadType names to DB values using fuzzy matching
+    let dbLeadType = leadType;
+    if (leadType) {
+      const lowerType = leadType.toLowerCase();
+      if (lowerType.includes('rent') || lowerType.includes('out')) dbLeadType = 'rentOutFeedback';
+      else if (lowerType.includes('book')) dbLeadType = 'bookingConfirmation';
+      else if (lowerType.includes('loss')) dbLeadType = 'lossOfSale';
+      else if (lowerType.includes('walk')) dbLeadType = 'general';
+    }
+
     const filters = {};
-    if (leadType) filters.leadType = leadType;
+    if (dbLeadType) filters.leadType = dbLeadType;
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
     if (store) {
