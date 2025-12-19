@@ -578,7 +578,7 @@ export const mapLossOfSale = (row) => {
     attendedBy: attendedBy || undefined,
 
     // Dates (if available)
-    enquiryDate: enquiryDate,
+    enquiryDate: enquiryDate || visitDate,
     functionDate: functionDate,
     visitDate: visitDate,
 
