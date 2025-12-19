@@ -1,3 +1,5 @@
+
+
 // Script to delete all Loss of Sale leads from database
 // Run this before re-importing to start fresh
 import mongoose from "mongoose";
