@@ -362,15 +362,21 @@ export const getLeads = async (req, res) => {
     if (source) filters.source = source;
 
     // Date filtering logic
+    // Date filtering logic
     // Priority: specific date fields > generic date range
     if (enquiryDateFrom || enquiryDateTo) {
       filters.enquiryDate = {};
       if (enquiryDateFrom) {
-        filters.enquiryDate.$gte = new Date(enquiryDateFrom);
+        const parsed = parseQueryDate(enquiryDateFrom);
+        if (parsed) filters.enquiryDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.enquiryDate.$gte = new Date(enquiryDateFrom);
       }
       if (enquiryDateTo) {
-        // Set to end of day for inclusive range
-        const endDate = new Date(enquiryDateTo);
+        const parsed = parseQueryDate(enquiryDateTo);
+        let endDate;
+        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else endDate = new Date(enquiryDateTo);
+
         endDate.setHours(23, 59, 59, 999);
         filters.enquiryDate.$lte = endDate;
       }
@@ -379,10 +385,16 @@ export const getLeads = async (req, res) => {
     if (functionDateFrom || functionDateTo) {
       filters.functionDate = {};
       if (functionDateFrom) {
-        filters.functionDate.$gte = new Date(functionDateFrom);
+        const parsed = parseQueryDate(functionDateFrom);
+        if (parsed) filters.functionDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.functionDate.$gte = new Date(functionDateFrom);
       }
       if (functionDateTo) {
-        const endDate = new Date(functionDateTo);
+        const parsed = parseQueryDate(functionDateTo);
+        let endDate;
+        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else endDate = new Date(functionDateTo);
+
         endDate.setHours(23, 59, 59, 999);
         filters.functionDate.$lte = endDate;
       }
@@ -391,41 +403,82 @@ export const getLeads = async (req, res) => {
     if (visitDateFrom || visitDateTo) {
       filters.visitDate = {};
       if (visitDateFrom) {
-        filters.visitDate.$gte = new Date(visitDateFrom);
+        const parsed = parseQueryDate(visitDateFrom);
+        if (parsed) filters.visitDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.visitDate.$gte = new Date(visitDateFrom);
       }
       if (visitDateTo) {
-        const endDate = new Date(visitDateTo);
+        const parsed = parseQueryDate(visitDateTo);
+        let endDate;
+        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else endDate = new Date(visitDateTo);
+
         endDate.setHours(23, 59, 59, 999);
         filters.visitDate.$lte = endDate;
       }
     }
 
+    // Helper to robustly parse date strings (YYYY-MM-DD or DD-MM-YYYY)
+    const parseQueryDate = (dateStr) => {
+      if (!dateStr) return null;
+
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        // Check for YYYY-MM-DD
+        if (parts[0].length === 4) {
+          return {
+            year: parseInt(parts[0], 10),
+            month: parseInt(parts[1], 10) - 1,
+            day: parseInt(parts[2], 10)
+          };
+        }
+        // Check for DD-MM-YYYY
+        if (parts[2].length === 4) {
+          return {
+            year: parseInt(parts[2], 10),
+            month: parseInt(parts[1], 10) - 1,
+            day: parseInt(parts[0], 10)
+          };
+        }
+      }
+      // Fallback for unexpected formats
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return {
+          year: d.getUTCFullYear(),
+          month: d.getUTCMonth(),
+          day: d.getUTCDate()
+        };
+      }
+      return null;
+    };
+
     // Single date filter for createdAt (takes priority over range)
     if (createdAt) {
-      // Filter for leads created on this specific date (entire day)
-      // Parse date string and create UTC date range to avoid timezone issues
-      const dateParts = createdAt.split('-');
-      const year = parseInt(dateParts[0], 10);
-      const month = parseInt(dateParts[1], 10) - 1; // Month is 0-indexed
-      const day = parseInt(dateParts[2], 10);
+      const parsed = parseQueryDate(createdAt);
+      if (parsed) {
+        const startOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 0, 0, 0, 0));
+        const endOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
 
-      // Create start of day in UTC (00:00:00.000)
-      const startOfDay = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-      // Create end of day in UTC (23:59:59.999)
-      const endOfDay = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
-
-      filters.createdAt = {
-        $gte: startOfDay,
-        $lte: endOfDay
-      };
+        filters.createdAt = {
+          $gte: startOfDay,
+          $lte: endOfDay
+        };
+      }
     } else if (createdAtFrom || createdAtTo) {
       // Date range filter for createdAt
       filters.createdAt = {};
       if (createdAtFrom) {
-        filters.createdAt.$gte = new Date(createdAtFrom);
+        const parsed = parseQueryDate(createdAtFrom);
+        if (parsed) filters.createdAt.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.createdAt.$gte = new Date(createdAtFrom);
       }
       if (createdAtTo) {
-        const endDate = new Date(createdAtTo);
+        const parsed = parseQueryDate(createdAtTo);
+        let endDate;
+        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else endDate = new Date(createdAtTo);
+
         endDate.setHours(23, 59, 59, 999);
         filters.createdAt.$lte = endDate;
       }
@@ -440,10 +493,16 @@ export const getLeads = async (req, res) => {
 
       filters[dateFieldName] = {};
       if (dateFrom) {
-        filters[dateFieldName].$gte = new Date(dateFrom);
+        const parsed = parseQueryDate(dateFrom);
+        if (parsed) filters[dateFieldName].$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters[dateFieldName].$gte = new Date(dateFrom);
       }
       if (dateTo) {
-        const endDate = new Date(dateTo);
+        const parsed = parseQueryDate(dateTo);
+        let endDate;
+        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else endDate = new Date(dateTo);
+
         endDate.setHours(23, 59, 59, 999);
         filters[dateFieldName].$lte = endDate;
       }
