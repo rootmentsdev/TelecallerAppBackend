@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const testApi = async () => {
-    const baseUrl = "http://15.207.90.158:5000";
-    const endpoint = "/api/Reports/GetBookingReport";
+    const baseUrl = "https://rentalapi.rootments.live";
+    const endpoint = "/api/Reports/GetReturnReport";
     const apiUrl = `${baseUrl}${endpoint}`;
 
     // Request for last month (known to have data)

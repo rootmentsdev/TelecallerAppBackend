@@ -6,15 +6,15 @@ dotenv.config();
 
 const run = async () => {
   console.log("🔄 Starting Store List API sync...");
-  
+
   // Use full URL or construct from base URL + endpoint
   // API: /api/Location/LocationList
-  const baseUrl = process.env.API_BASE_URL || "http://15.207.90.158:5000";
+  const baseUrl = process.env.API_BASE_URL || "https://rentalapi.rootments.live";
   const endpoint = "/api/Location/LocationList";
   const apiUrl = process.env.STORE_LIST_API_URL || `${baseUrl}${endpoint}`;
   const apiToken = process.env.STORE_API_KEY || process.env.API_TOKEN;
   const usePost = process.env.STORE_USE_POST === "true" || false;
-  
+
   console.log(`📡 Calling API: ${apiUrl}`);
   console.log(`🔐 Method: ${usePost ? "POST" : "GET"}`);
   if (apiToken) console.log(`🔑 Using authentication token`);
@@ -87,7 +87,7 @@ const run = async () => {
         row.city || row.City || row.CITY || ""
       ).trim(),
       // Map status: 1 = active, 0 or null = inactive
-      isActive: row.status !== undefined 
+      isActive: row.status !== undefined
         ? (row.status === 1 || row.status === "1" || row.status === true)
         : (row.isActive !== undefined ? row.isActive : (row.active !== undefined ? row.active : true)),
     };

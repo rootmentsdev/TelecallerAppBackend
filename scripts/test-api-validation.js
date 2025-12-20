@@ -32,8 +32,8 @@ const APIs = {
   rentOut: {
     name: 'Rent-Out API',
     type: 'rentOutFeedback',
-    url: process.env.RENTOUT_API_BASE_URL || process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || 'https://rentalapi.rootments.live',
-    endpoint: '/api/Reports/GetBookingReport',
+    url: process.env.RENTOUT_API_BASE_URL || 'https://rentalapi.rootments.live',
+    endpoint: process.env.RENTOUT_API_ENDPOINT || '/api/Reports/GetReturnReport',
     method: 'POST',
     token: process.env.RENTOUT_API_KEY || process.env.BOOKING_API_KEY || process.env.API_TOKEN,
     body: {
@@ -138,14 +138,14 @@ const testAllAPIs = async () => {
   Object.entries(results).forEach(([key, validation]) => {
     if (validation) {
       const apiName = APIs[key].name;
-      const successRate = validation.totalRecords > 0 
-        ? ((validation.validRecords / validation.totalRecords) * 100).toFixed(2) 
+      const successRate = validation.totalRecords > 0
+        ? ((validation.validRecords / validation.totalRecords) * 100).toFixed(2)
         : 0;
-      
+
       console.log(`\n${apiName}:`);
       console.log(`   Status: ${validation.valid ? '✅ PASS' : '❌ FAIL'}`);
       console.log(`   Records: ${validation.validRecords}/${validation.totalRecords} valid (${successRate}%)`);
-      
+
       if (!validation.valid) {
         console.log(`   ⚠️  Issues found - see detailed report above`);
       }

@@ -34,11 +34,11 @@ VERIFY_EMPLOYEE_API_URL=https://rootments.in/api/verify_employee
 VERIFY_EMPLOYEE_API_TOKEN=RootX-production-9d17d9485eb772e79df8564004d4a4d4
 
 # External API - Booking
-BOOKING_API_BASE_URL=http://15.207.90.158:5000
+BOOKING_API_BASE_URL=https://rentalapi.rootments.live
 BOOKING_API_KEY=your-booking-api-token
 
 # External API - Rent-Out
-RENTOUT_API_BASE_URL=http://15.207.90.158:5000
+RENTOUT_API_BASE_URL=https://rentalapi.rootments.live
 RENTOUT_API_KEY=your-rentout-api-token
 
 # External API - Store

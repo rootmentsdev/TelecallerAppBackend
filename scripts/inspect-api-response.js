@@ -11,9 +11,9 @@ dotenv.config();
 const inspectAPI = async () => {
   console.log('🔍 Inspecting API Response Structure...\n');
 
-  const apiUrl = process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || 'https://rentalapi.rootments.live';
-  const endpoint = '/api/Reports/GetBookingReport';
-  const apiToken = process.env.BOOKING_API_KEY || process.env.API_TOKEN;
+  const apiUrl = process.env.RENTOUT_API_BASE_URL || process.env.API_BASE_URL || 'https://rentalapi.rootments.live';
+  const endpoint = '/api/Reports/GetReturnReport';
+  const apiToken = process.env.RENTOUT_API_KEY || process.env.API_TOKEN;
 
   console.log(`📡 Calling: ${apiUrl}${endpoint}\n`);
 
@@ -73,7 +73,7 @@ const inspectAPI = async () => {
     // Analyze all field names
     console.log('\n📊 All Field Names Found in Records:');
     console.log('='.repeat(80));
-    
+
     const allFields = new Set();
     dataArray.slice(0, 100).forEach(record => {
       Object.keys(record).forEach(key => allFields.add(key));
@@ -89,7 +89,7 @@ const inspectAPI = async () => {
 
     // Check for phone-related fields
     console.log('\n📱 Phone Number Fields:');
-    const phoneFields = Array.from(allFields).filter(f => 
+    const phoneFields = Array.from(allFields).filter(f =>
       /phone|mobile|contact|tel|number/i.test(f)
     );
     phoneFields.forEach(field => {
@@ -99,7 +99,7 @@ const inspectAPI = async () => {
 
     // Check for security/deposit fields
     console.log('\n💰 Security/Deposit Fields:');
-    const securityFields = Array.from(allFields).filter(f => 
+    const securityFields = Array.from(allFields).filter(f =>
       /security|deposit|amount|advance|payment/i.test(f)
     );
     securityFields.forEach(field => {
@@ -109,7 +109,7 @@ const inspectAPI = async () => {
 
     // Check for date fields
     console.log('\n📅 Date Fields:');
-    const dateFields = Array.from(allFields).filter(f => 
+    const dateFields = Array.from(allFields).filter(f =>
       /date|time|day/i.test(f)
     );
     dateFields.forEach(field => {
@@ -119,7 +119,7 @@ const inspectAPI = async () => {
 
     // Check for staff/attended fields
     console.log('\n👤 Staff/Attended Fields:');
-    const staffFields = Array.from(allFields).filter(f => 
+    const staffFields = Array.from(allFields).filter(f =>
       /staff|attended|handled|employee|user|person/i.test(f)
     );
     staffFields.forEach(field => {

@@ -133,7 +133,7 @@ node sync/runAll.js
 
 #### API Configuration
 ```env
-API_BASE_URL=http://15.207.90.158:5000
+API_BASE_URL=https://rentalapi.rootments.live
 STORE_API_KEY=your-api-token
 STORE_USE_POST=false  # true for POST, false for GET
 ```

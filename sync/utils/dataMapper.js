@@ -669,7 +669,7 @@ export const mapRentOut = (row) => {
     name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
     phone: phone,
     store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
-    source: "Rent-out",
+    source: "Return",
     leadType: "rentOutFeedback",
     enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
     bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),

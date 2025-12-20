@@ -24,15 +24,14 @@ const connectDB = async () => {
 };
 
 const run = async () => {
-  console.log("🔄 Starting Rent-Out API sync...");
+  console.log("🔄 Starting Return API sync...");
 
   // Connect to MongoDB
   await connectDB();
 
-  // Step 1: API configuration - Use GetBookingReport (same endpoint as booking, but filter for rent-out data)
-  // Note: The API might return both booking and rent-out data from GetBookingReport
-  const baseUrl = process.env.RENTOUT_API_BASE_URL || process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || "http://15.207.90.158:5000";
-  const endpoint = process.env.RENTOUT_API_ENDPOINT || "/api/Reports/GetBookingReport"; // Use same endpoint as booking
+  // Step 1: API configuration - Use GetReturnReport
+  const baseUrl = process.env.RENTOUT_API_BASE_URL || "https://rentalapi.rootments.live";
+  const endpoint = process.env.RENTOUT_API_ENDPOINT || "/api/Reports/GetReturnReport"; // Use dedicated return report endpoint
   const apiUrl = `${baseUrl}${endpoint}`;
   const apiToken = process.env.RENTOUT_API_KEY || process.env.BOOKING_API_KEY || process.env.API_TOKEN;
   // Always use POST for GetBookingReport
@@ -63,7 +62,7 @@ const run = async () => {
 
   // Step 4: Get last sync time for incremental sync (only fetch new/updated records)
   let lastSyncAt = null;
-  let syncLog = await SyncLog.findOne({ syncType: "rentout" });
+  let syncLog = await SyncLog.findOne({ syncType: "return" });
 
   if (syncLog && syncLog.lastSyncAt) {
     lastSyncAt = syncLog.lastSyncAt;
@@ -117,7 +116,7 @@ const run = async () => {
   const locationIds = Object.keys(LOCATION_ID_TO_STORE_NAME);
 
   console.log(`\n📍 Processing ${locationIds.length} locations using location IDs`);
-  console.log(`   Will fetch rent-out data for each location ID`);
+  console.log(`   Will fetch return data for each location ID`);
 
   for (const locationId of locationIds) {
     const storeName = LOCATION_ID_TO_STORE_NAME[locationId];
@@ -226,7 +225,7 @@ const run = async () => {
     // Filter: Only process records that have rentOutDate or returnDate (rent-out records)
     // The API returns both booking and rent-out records, so we filter for rent-out only
     const rentOutRecords = dataArray.filter(row => {
-      return row.rentOutDate || row.rentOut_date || row.rentOutDate || row.returnDate || row.return_date || row.ReturnDate;
+      return row.rentOutDate || row.rentOut_date || row.returnDate || row.return_date || row.ReturnDate || row.expectedReturnDate || row.ExpectedReturnDate;
     });
 
     if (rentOutRecords.length === 0) {
@@ -234,7 +233,7 @@ const run = async () => {
       continue;
     }
 
-    console.log(`   📊 Found ${dataArray.length} total records, ${rentOutRecords.length} rent-out records for location ID ${locationId}`);
+    console.log(`   📊 Found ${dataArray.length} total records, ${rentOutRecords.length} return records for location ID ${locationId}`);
 
     // Process and save rent-out data with progress indicator
     let saved = 0;
@@ -244,8 +243,8 @@ const run = async () => {
     const progressInterval = Math.max(1, Math.floor(totalRecordsInLocation / 20)); // Update every 5%
 
     // Process in batches for speed (under 1 min requirement)
-    // Batch size of 50 gives a huge speedup (parallel DB checks)
-    const BATCH_SIZE = 50;
+    // Batch size of 100 is stable for MongoDB Atlas
+    const BATCH_SIZE = 100;
 
     for (let i = 0; i < totalRecordsInLocation; i += BATCH_SIZE) {
       const batch = rentOutRecords.slice(i, i + BATCH_SIZE);
@@ -298,7 +297,7 @@ const run = async () => {
   // Update sync log with latest sync time
   const syncEndTime = new Date();
   await SyncLog.findOneAndUpdate(
-    { syncType: "rentout" },
+    { syncType: "return" },
     {
       lastSyncAt: syncEndTime,
       lastSyncCount: totalSaved,
@@ -308,7 +307,7 @@ const run = async () => {
     { upsert: true, new: true }
   );
 
-  console.log(`\n✅ Rent-Out sync completed!`);
+  console.log(`\n✅ Return sync completed!`);
   console.log(`   📊 Locations processed: ${locationsProcessed}/${locationIds.length}`);
   console.log(`   💾 Total new records saved: ${totalSaved}`);
   console.log(`   ⏭️  Total skipped (already exists): ${totalSkipped}`);

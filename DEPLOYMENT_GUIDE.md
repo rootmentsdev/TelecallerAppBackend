@@ -40,14 +40,14 @@ VERIFY_EMPLOYEE_API_URL=https://rootments.in/api/verify_employee
 VERIFY_EMPLOYEE_API_TOKEN=RootX-production-9d17d9485eb772e79df8564004d4a4d4
 
 # Booking API
-BOOKING_API_BASE_URL=http://15.207.90.158:5000
+BOOKING_API_BASE_URL=https://rentalapi.rootments.live
 BOOKING_API_KEY=your-booking-api-token
-BOOKING_API_ENDPOINT=/api/GetBooking/GetBookingList
+BOOKING_API_ENDPOINT=/api/Reports/GetBookingReport
 
 # Rent-Out API
-RENTOUT_API_BASE_URL=http://15.207.90.158:5000
+RENTOUT_API_BASE_URL=https://rentalapi.rootments.live
 RENTOUT_API_KEY=your-rentout-api-token
-RENTOUT_API_ENDPOINT=/api/RentOut/GetRentOutList
+RENTOUT_API_ENDPOINT=/api/Reports/GetReturnReport
 
 # Store API
 STORE_API_KEY=your-store-api-token
@@ -369,9 +369,9 @@ FRONTEND_URL=https://your-frontend.com
 # External APIs
 VERIFY_EMPLOYEE_API_URL=https://rootments.in/api/verify_employee
 VERIFY_EMPLOYEE_API_TOKEN=your-token
-BOOKING_API_BASE_URL=http://15.207.90.158:5000
+BOOKING_API_BASE_URL=https://rentalapi.rootments.live
 BOOKING_API_KEY=your-token
-RENTOUT_API_BASE_URL=http://15.207.90.158:5000
+RENTOUT_API_BASE_URL=https://rentalapi.rootments.live
 RENTOUT_API_KEY=your-token
 STORE_API_KEY=your-token
 ```

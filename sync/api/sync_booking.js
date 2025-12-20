@@ -43,7 +43,7 @@ const run = async () => {
 
   // Step 2: API configuration
   // Use new API base URL for booking confirmation
-  const baseUrl = process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || "http://15.207.90.158:5000";
+  const baseUrl = process.env.BOOKING_API_BASE_URL || process.env.API_BASE_URL || "https://rentalapi.rootments.live";
   const endpoint = process.env.BOOKING_API_ENDPOINT || "/api/GetBooking/GetBookingList";
   const apiUrl = `${baseUrl}${endpoint}`;
   const apiToken = process.env.BOOKING_API_KEY || process.env.API_TOKEN;
@@ -343,40 +343,39 @@ const run = async () => {
   console.log(`   Processing records...`);
   console.log(`   This may take a few minutes for large datasets...`);
 
-  // Process all collected data with progress indicator
+  // Process all collected data with progress indicator in batches
   let totalSaved = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
   const totalRecords = allDataArray.length;
   const progressInterval = Math.max(1, Math.floor(totalRecords / 20)); // Show progress every 5%
-  let lastProgressTime = Date.now();
 
-  for (let i = 0; i < allDataArray.length; i++) {
-    const row = allDataArray[i];
+  const BATCH_SIZE = 100;
 
-    // Store name is already added in the loop above
-    const mapped = mapBooking(row);
-    if (mapped) {
-      const result = await saveToMongo(mapped);
-      if (result.saved) {
-        totalSaved++;
-      } else if (result.skipped) {
-        // Record already exists - skipped (not updated)
-        totalSkipped++;
+  for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
+    const batch = allDataArray.slice(i, i + BATCH_SIZE);
+
+    await Promise.all(batch.map(async (row) => {
+      const mapped = mapBooking(row);
+      if (mapped) {
+        const result = await saveToMongo(mapped);
+        if (result.saved) {
+          totalSaved++;
+        } else if (result.skipped) {
+          totalSkipped++;
+        } else {
+          totalErrors++;
+        }
       } else {
-        totalErrors++;
+        totalSkipped++;
       }
-    } else {
-      totalSkipped++;
-    }
+    }));
 
-    // Show progress AFTER processing (so counters are accurate)
-    if (i % progressInterval === 0 || i === allDataArray.length - 1) {
-      const progress = ((i + 1) / totalRecords * 100).toFixed(1);
-      const elapsed = ((Date.now() - lastProgressTime) / 1000).toFixed(1);
-      const rate = progressInterval > 0 ? (progressInterval / (elapsed || 1)).toFixed(0) : 0;
-      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Rate: ~${rate} records/sec | Saved: ${totalSaved}, Skipped: ${totalSkipped}, Errors: ${totalErrors}`);
-      lastProgressTime = Date.now();
+    // Show progress
+    if (totalRecords > 500) {
+      const currentCount = Math.min(i + BATCH_SIZE, totalRecords);
+      const progress = (currentCount / totalRecords * 100).toFixed(1);
+      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${currentCount}/${totalRecords}) | Saved: ${totalSaved}, Skipped: ${totalSkipped}, Err: ${totalErrors}`);
     }
   }
 
