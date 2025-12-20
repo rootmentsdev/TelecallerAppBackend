@@ -72,13 +72,16 @@ const run = async () => {
     if (lastSyncAt) {
 
 
-      // Robust Sync Strategy: Always check the last 30 days
-      // This ensures that if a record was deleted recently, it gets re-fetched and restored.
-      // 30 days is fast to sync but provides good coverage for corrections.
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      dateFrom = thirtyDaysAgo.toISOString().split('T')[0];
-      console.log(`   Using ROBUST sync: FROM ${dateFrom} (last 30 days)`);
-      console.log(`   ℹ️  This strategy restores any data deleted in the last month.`);
+      // Last 10 Days Sync Strategy
+      const today = new Date();
+      const tenDaysAgo = new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000);
+
+      dateFrom = tenDaysAgo.toISOString().split('T')[0];
+      dateTo = today.toISOString().split('T')[0];
+      months = "1"; // Set to 1 month to cover the 10-day range
+
+      console.log(`   Using 10-DAY sync: FROM ${dateFrom} TO ${dateTo}`);
+      console.log(`   ℹ️  Fetching records for the last 10 days.`);
     } else {
       // First sync - default to last 12 months
       months = "12";
@@ -137,19 +140,15 @@ const run = async () => {
 
     // Use GetBookingReport API (POST) with locationID
     // Note: API prefers months parameter over dateFrom/dateTo
+    // Simplified request body: Only send what is absolutely necessary
+    // API often fails if too many empty strings are sent
     const requestBody = {
-      bookingNo: "",
-      dateFrom: dateFrom || "", // Uses the calculated dateFrom from above
-      dateTo: dateTo || "",
-      userName: "",
-      months: months || "",
-      fromLocation: "",
-      userID: "",
-      locationID: locationId,
+      locationID: String(locationId),
+      months: "12", // Force 12 months to get all data
     };
 
     console.log(`📡 Calling API: ${fallbackUrl}`);
-    console.log(`   📤 Location ID: ${locationId}`);
+    console.log(`   📤 Request:`, JSON.stringify(requestBody));
 
     let data = await postAPI(
       fallbackUrl,

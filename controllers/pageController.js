@@ -75,8 +75,10 @@ const buildLeadQuery = (user, filters = {}) => {
       query.store = { $regex: escapeRegex(user.store), $options: 'i' };
     }
   } else if (user.role === "telecaller") {
-    // Telecaller can see only assigned leads
-    query.assignedTo = user._id;
+    // Telecaller can see only assigned leads, EXCEPT for Bookings which are visible to everyone
+    if (query.leadType !== 'bookingConfirmation') {
+      query.assignedTo = user._id;
+    }
   }
 
   return query;
