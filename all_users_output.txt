@@ -1,5 +1,0 @@
-All users:
-- SHAFNA ISMAIL (EmployeeID: Emp188, Role: admin, Store: No Store, ID: 693a6ade8a1f302ab296c8df)
-- ZIYAD K RAHMAN (EmployeeID: Emp163, Role: telecaller, Store: No Store, ID: 693bd70098153928e37252c1)
-- Varsha N. C (EmployeeID: Emp436, Role: telecaller, Store: No Store, ID: 6944c98cb44a0f635f515ab8)
-- Nandana Babu (EmployeeID: Emp410, Role: telecaller, Store: No Store, ID: 6944c9c2b44a0f635f515acd)
