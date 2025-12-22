@@ -94,7 +94,7 @@ const run = async () => {
     if (months) console.log(`📅 Months: ${months}`);
   }
 
-  // Location ID to Store Name mapping (same as rent-out)
+  // Location ID to Store Name mapping (same as return)
   const LOCATION_ID_TO_STORE_NAME = {
     '1': 'Z- Edapally',
     '3': 'SG-Edappally',
@@ -221,7 +221,7 @@ const run = async () => {
 
     if (locationData.length > 0) {
       // Filter: Only process records that have bookingDate (booking records)
-      // The API returns both booking and rent-out records, so we filter for booking only
+      // The API returns both booking and return records, so we filter for booking only
       const bookingRecords = locationData.filter(row => {
         return row.bookingDate || row.booking_date || row.BookingDate;
       });

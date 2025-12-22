@@ -18,8 +18,8 @@ const REQUIRED_FIELDS = {
       functionDate: ['functionDate', 'eventDate', 'function_date', 'event_date', 'deliveryDate', 'trialDate']
     }
   },
-  rentOutFeedback: {
-    mandatory: ['name', 'phone', 'store', 'bookingNo', 'returnDate', 'securityAmount'],
+  return: {
+    mandatory: ['name', 'phone', 'store', 'bookingNo', 'returnDate'],
     optional: ['attendedBy', 'enquiryDate', 'functionDate', 'enquiryType', 'remarks'],
     fieldVariations: {
       name: ['name', 'Name', 'customerName', 'CustomerName', 'customer_name'],

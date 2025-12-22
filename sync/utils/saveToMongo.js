@@ -23,7 +23,7 @@ const connectDB = async () => {
   }
 };
 
-// Save Lead to MongoDB (prevents duplicates for booking/rent-out, allows for walk-in revisits)
+// Save Lead to MongoDB (prevents duplicates for booking/return, allows for walk-in revisits)
 export const saveToMongo = async (leadData) => {
   try {
     await connectDB();
@@ -38,8 +38,8 @@ export const saveToMongo = async (leadData) => {
     // New Report schema stores flattened lead in `leadData`. Support both old snapshot fields and new leadData fields.
     const reportOrClauses = [];
 
-    // For booking/rent-out, match by phone + bookingNo for accuracy
-    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+    // For booking/return, match by phone + bookingNo for accuracy
+    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
       const bookingNo = leadData.bookingNo.trim();
       reportOrClauses.push(
         { "beforeSnapshot.phone": leadData.phone, "beforeSnapshot.bookingNo": bookingNo },
@@ -63,12 +63,12 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Lead exists in reports (moved after edit)" };
     }
 
-    // For booking confirmation and rent-out: check for duplicates and skip (don't update to preserve user edits)
+    // For booking confirmation and return: check for duplicates and skip (don't update to preserve user edits)
     // These come from API and should only add new records (incremental sync)
-    if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "rentOutFeedback") {
+    if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
       let duplicateQuery = null;
 
-      // For booking/rent-out: Primary check: bookingNo + phone + leadType (most reliable)
+      // For booking/return: Primary check: bookingNo + phone + leadType (most reliable)
       if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
         duplicateQuery = {
           bookingNo: leadData.bookingNo.trim(),

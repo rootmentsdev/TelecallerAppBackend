@@ -1,18 +1,16 @@
-// Daily API Sync Scheduler
-// Automatically runs API sync every day at configured time
+// API-Only Sync Scheduler
+// Automatically runs API sync every 5 minutes
 // Does NOT affect CSV imports (remain manual)
 
 import cron from 'node-cron';
-import { spawn } from 'child_process';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 // Configuration
-// Default: Run every 5 minutes from 8 AM to 8 PM (Business Hours)
-const SYNC_TIME = process.env.API_SYNC_TIME || '*/5 8-20 * * *';
+const SYNC_TIME = process.env.API_SYNC_TIME || '*/5 * * * *'; // Default: Every 5 minutes
 const SYNC_ENABLED = process.env.API_SYNC_ENABLED !== 'false'; // Default: enabled
-const SYNC_TIMEZONE = process.env.API_SYNC_TIMEZONE || 'Asia/Kolkata'; // Default: IST
+const SYNC_TIMEZONE = process.env.API_SYNC_TIMEZONE || 'UTC'; // Default: UTC
 
 let isRunning = false;
 
@@ -24,40 +22,30 @@ const runApiSync = async () => {
 
   isRunning = true;
   const startTime = new Date();
+  
+  console.log('🕐 Starting automatic API sync at:', startTime.toISOString());
 
-  console.log('🕐 Scheduled API sync started at:', startTime.toISOString());
-  console.log('📡 Running: npm run sync:all');
-
-  return new Promise((resolve) => {
-    // Use spawn to run the existing sync command exactly as it would be run manually
-    const syncProcess = spawn('npm', ['run', 'sync:all'], {
-      stdio: 'inherit', // Show output in console
-      shell: true
-    });
-
-    syncProcess.on('close', (code) => {
-      const endTime = new Date();
-      const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-      if (code === 0) {
-        console.log('✅ Scheduled API sync completed successfully');
-        console.log(`⏱️  Duration: ${duration} seconds`);
-        console.log(`📅 Next sync: ${getNextRunTime()}`);
-      } else {
-        console.error('❌ Scheduled API sync failed with exit code:', code);
-        console.log(`⏱️  Duration: ${duration} seconds (failed)`);
-      }
-
-      isRunning = false;
-      resolve(code);
-    });
-
-    syncProcess.on('error', (error) => {
-      console.error('❌ Failed to start scheduled API sync:', error.message);
-      isRunning = false;
-      resolve(1);
-    });
-  });
+  try {
+    // Import and run API-only sync (no CSV imports)
+    const { runApiOnlySync } = await import('../sync/apiOnly.js');
+    await runApiOnlySync();
+    
+    const endTime = new Date();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    
+    console.log('✅ Automatic API sync completed successfully');
+    console.log(`⏱️  Duration: ${duration} seconds`);
+    console.log(`📅 Next sync: ${getNextRunTime()}`);
+    
+  } catch (error) {
+    const endTime = new Date();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    
+    console.error('❌ Automatic API sync failed:', error.message);
+    console.log(`⏱️  Duration: ${duration} seconds (failed)`);
+  } finally {
+    isRunning = false;
+  }
 };
 
 const getNextRunTime = () => {
@@ -79,12 +67,13 @@ const startScheduler = () => {
   console.log('📅 Starting API sync scheduler...');
   console.log(`   Schedule: ${SYNC_TIME} (${SYNC_TIMEZONE})`);
   console.log(`   Next run: ${getNextRunTime()}`);
-  console.log('   Scope: API sync only (CSV imports remain manual)');
+  console.log('   Scope: External APIs only (CSV imports remain manual)');
+  console.log('   Frequency: Every 5 minutes');
 
   // Validate cron expression
   if (!cron.validate(SYNC_TIME)) {
     console.error('❌ Invalid cron expression:', SYNC_TIME);
-    console.error('   Using default: */5 8-20 * * * (Every 5 mins, 8 AM - 8 PM)');
+    console.error('   Using default: */5 * * * * (Every 5 minutes)');
     return null;
   }
 
