@@ -49,9 +49,9 @@ const checkAssignedLeads = async (employeeId) => {
     leadType: "bookingConfirmation"
   });
 
-  const rentOutAssigned = await Lead.countDocuments({
+  const returnAssigned = await Lead.countDocuments({
     assignedTo: user._id,
-    leadType: "rentOutFeedback"
+    leadType: "return"
   });
 
   const walkinAssigned = await Lead.countDocuments({

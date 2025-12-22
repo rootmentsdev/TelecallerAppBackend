@@ -688,53 +688,6 @@ export const mapReturn = (row) => {
   return leadData;
 };
 
-// Map Rent-Out API data to Lead model
-export const mapRentOut = (row) => {
-  // Phone field: API uses 'phoneNo'
-  const phone = cleanPhone(
-    row.phoneNo || row.phone || row.Phone || row.customerPhone ||
-    row.mobile || row.Mobile || row.contact || row.Contact
-  );
-  if (!phone) return null;
-
-  // Parse dates
-  const rentOutDate = parseApiDate(row.rentOutDate || row.rentOut_date || row.rent_date);
-  const enquiryDate = parseApiDate(row.enquiryDate || row.enquiry_date || row.rentDate);
-  const returnDate = parseApiDate(row.returnDate || row.return_date || row.expectedReturnDate);
-  const functionDate = parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date);
-
-  // Set createdAt from rentOutDate or enquiryDate (actual lead creation date, not import date)
-  // IMPORTANT: Use the earliest available date as the creation date
-  const createdAt = rentOutDate || enquiryDate || undefined;
-
-  const leadData = {
-    name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
-    phone: phone,
-    store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
-    source: "Return",
-    leadType: "rentOutFeedback",
-    enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
-    bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),
-    // Security Amount: API uses 'price' field
-    securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit
-      ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit)
-      : undefined,
-    returnDate: returnDate,
-    enquiryDate: enquiryDate,
-    functionDate: functionDate,
-    // Attended By: API uses 'bookingBy'
-    attendedBy: (row.attendedBy || row.attended_by || row.staff || row.Staff || row.bookingBy || row.handledBy || "").trim() || undefined,
-    remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
-  };
-
-  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
-  if (createdAt) {
-    leadData.createdAt = createdAt;
-  }
-
-  return leadData;
-};
-
 // Map Booking Item API data to Lead model
 export const mapBookingItem = (row) => {
   const phone = cleanPhone(row.phone || row.Phone || row.customerPhone || row.mobile || row.Mobile);

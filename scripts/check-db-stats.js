@@ -11,7 +11,7 @@ const checkData = async () => {
 
         const total = await Lead.countDocuments();
         const bookings = await Lead.countDocuments({ leadType: 'bookingConfirmation' });
-        const returns = await Lead.countDocuments({ leadType: 'rentOutFeedback' });
+        const returns = await Lead.countDocuments({ leadType: 'return' });
         const lossOfSale = await Lead.countDocuments({ leadType: 'lossOfSale' });
 
         console.log('--- Database Stats ---');

@@ -43,15 +43,15 @@ const verifyData = async () => {
 
     // Count by leadType
     const bookingCount = await Lead.countDocuments({ leadType: "bookingConfirmation" });
-    const rentoutCount = await Lead.countDocuments({ leadType: "rentOutFeedback" });
+    const returnCount = await Lead.countDocuments({ leadType: "return" });
     const walkinCount = await Lead.countDocuments({ leadType: "general", source: "Walk-in" });
     const lossOfSaleCount = await Lead.countDocuments({ leadType: "lossOfSale" });
     const justDialCount = await Lead.countDocuments({ leadType: "justDial" });
-    const otherCount = totalLeads - bookingCount - rentoutCount - walkinCount - lossOfSaleCount - justDialCount;
+    const otherCount = totalLeads - bookingCount - returnCount - walkinCount - lossOfSaleCount - justDialCount;
 
     console.log("   📋 Leads by Type:");
     console.log(`      ✅ Booking Confirmation: ${bookingCount.toLocaleString()}`);
-    console.log(`      ✅ Rent-Out: ${rentoutCount.toLocaleString()}`);
+    console.log(`      ✅ Return: ${returnCount.toLocaleString()}`);
     console.log(`      ✅ Walk-in: ${walkinCount.toLocaleString()}`);
     console.log(`      ✅ Loss of Sale: ${lossOfSaleCount.toLocaleString()}`);
     console.log(`      ✅ Just Dial: ${justDialCount.toLocaleString()}`);
@@ -60,18 +60,18 @@ const verifyData = async () => {
 
     // Count by source
     const bookingSource = await Lead.countDocuments({ source: "Booking" });
-    const rentoutSource = await Lead.countDocuments({ source: "Rent-out" });
+    const returnSource = await Lead.countDocuments({ source: "Return" });
     const walkinSource = await Lead.countDocuments({ source: "Walk-in" });
     const lossOfSaleSource = await Lead.countDocuments({ source: "Loss of Sale" });
 
     console.log("   📋 Leads by Source:");
     console.log(`      Booking: ${bookingSource.toLocaleString()}`);
-    console.log(`      Rent-out: ${rentoutSource.toLocaleString()}`);
+    console.log(`      Return: ${returnSource.toLocaleString()}`);
     console.log(`      Walk-in: ${walkinSource.toLocaleString()}`);
     console.log(`      Loss of Sale: ${lossOfSaleSource.toLocaleString()}`);
     console.log();
 
-    // Check for duplicates in booking/rent-out
+    // Check for duplicates in booking/return
     const bookingDuplicates = await Lead.aggregate([
       { $match: { leadType: "bookingConfirmation", bookingNo: { $exists: true, $ne: "" } } },
       { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
@@ -79,8 +79,8 @@ const verifyData = async () => {
       { $count: "duplicateSets" }
     ]);
 
-    const rentoutDuplicates = await Lead.aggregate([
-      { $match: { leadType: "rentOutFeedback", bookingNo: { $exists: true, $ne: "" } } },
+    const returnDuplicates = await Lead.aggregate([
+      { $match: { leadType: "return", bookingNo: { $exists: true, $ne: "" } } },
       { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
       { $match: { count: { $gt: 1 } } },
       { $count: "duplicateSets" }
@@ -88,8 +88,8 @@ const verifyData = async () => {
 
     console.log("   🔍 Duplicate Check:");
     console.log(`      Booking Confirmation duplicates: ${bookingDuplicates[0]?.duplicateSets || 0}`);
-    console.log(`      Rent-Out duplicates: ${rentoutDuplicates[0]?.duplicateSets || 0}`);
-    if ((bookingDuplicates[0]?.duplicateSets || 0) > 0 || (rentoutDuplicates[0]?.duplicateSets || 0) > 0) {
+    console.log(`      Return duplicates: ${returnDuplicates[0]?.duplicateSets || 0}`);
+    if ((bookingDuplicates[0]?.duplicateSets || 0) > 0 || (returnDuplicates[0]?.duplicateSets || 0) > 0) {
       console.log(`      ⚠️  Run: npm run cleanup:duplicates`);
     }
     console.log();
@@ -266,17 +266,17 @@ const verifyData = async () => {
       console.log();
     }
 
-    // Sample Rent-Out
-    const sampleRentout = await Lead.findOne({ leadType: "rentOutFeedback" })
+    // Sample Return
+    const sampleReturn = await Lead.findOne({ leadType: "return" })
       .select("name phone store bookingNo returnDate securityAmount attendedBy")
       .lean();
-    if (sampleRentout) {
-      console.log("   ✅ Rent-Out Sample:");
-      console.log(`      Name: ${sampleRentout.name}`);
-      console.log(`      Phone: ${sampleRentout.phone}`);
-      console.log(`      Store: ${sampleRentout.store}`);
-      console.log(`      Booking No: ${sampleRentout.bookingNo || "N/A"}`);
-      console.log(`      Return Date: ${sampleRentout.returnDate ? new Date(sampleRentout.returnDate).toLocaleDateString() : "N/A"}`);
+    if (sampleReturn) {
+      console.log("   ✅ Return Sample:");
+      console.log(`      Name: ${sampleReturn.name}`);
+      console.log(`      Phone: ${sampleReturn.phone}`);
+      console.log(`      Store: ${sampleReturn.store}`);
+      console.log(`      Booking No: ${sampleReturn.bookingNo || "N/A"}`);
+      console.log(`      Return Date: ${sampleReturn.returnDate ? new Date(sampleReturn.returnDate).toLocaleDateString() : "N/A"}`);
       console.log();
     }
 
@@ -301,7 +301,7 @@ const verifyData = async () => {
 
     const allSynced = syncLogs.length >= 2 && 
       syncLogs.some(log => log.syncType === "booking") && 
-      syncLogs.some(log => log.syncType === "rentout");
+      syncLogs.some(log => log.syncType === "return");
 
     if (allSynced) {
       console.log("   ✅ All major syncs completed!");
@@ -313,8 +313,8 @@ const verifyData = async () => {
       if (!syncLogs.some(log => log.syncType === "booking")) {
         console.log("      ❌ Booking sync not run - Run: npm run sync:booking");
       }
-      if (!syncLogs.some(log => log.syncType === "rentout")) {
-        console.log("      ❌ Rent-out sync not run - Run: npm run sync:rentout");
+      if (!syncLogs.some(log => log.syncType === "return")) {
+        console.log("      ❌ Return sync not run - Run: npm run sync:return");
       }
       console.log("   💡 Run full sync: npm run sync:all");
     }

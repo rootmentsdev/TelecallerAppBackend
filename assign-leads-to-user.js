@@ -15,12 +15,12 @@ const connectDB = async () => {
   }
 };
 
-const VALID_LEAD_TYPES = ["lossOfSale", "rentOutFeedback", "bookingConfirmation", "justDial", "general"];
+const VALID_LEAD_TYPES = ["lossOfSale", "return", "bookingConfirmation", "justDial", "general"];
 
 const getLeadTypeDisplayName = (leadType) => {
   const displayNames = {
     lossOfSale: "Loss of Sale",
-    rentOutFeedback: "Rent-Out Feedback",
+    return: "Return",
     bookingConfirmation: "Booking Confirmation",
     justDial: "Just Dial",
     general: "General"
@@ -131,14 +131,14 @@ if (!employeeId) {
   console.error("Valid leadTypes:");
   console.error("  - lossOfSale          (default)");
   console.error("  - bookingConfirmation");
-  console.error("  - rentOutFeedback");
+  console.error("  - return");
   console.error("  - justDial");
   console.error("  - general");
   console.error("");
   console.error("Examples:");
   console.error("  node assign-leads-to-user.js Emp188 100");
   console.error("  node assign-leads-to-user.js Emp188 100 bookingConfirmation");
-  console.error("  node assign-leads-to-user.js Emp188 50 rentOutFeedback");
+  console.error("  node assign-leads-to-user.js Emp188 50 return");
   console.error("  node assign-leads-to-user.js Emp188 100 lossOfSale");
   process.exit(1);
 }

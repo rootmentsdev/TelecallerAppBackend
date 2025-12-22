@@ -29,19 +29,19 @@ const APIs = {
       locationID: '' // Will be set per store
     }
   },
-  rentOut: {
-    name: 'Rent-Out API',
-    type: 'rentOutFeedback',
-    url: process.env.RENTOUT_API_BASE_URL || 'https://rentalapi.rootments.live',
-    endpoint: process.env.RENTOUT_API_ENDPOINT || '/api/Reports/GetReturnReport',
+  return: {
+    name: 'Return API',
+    type: 'return',
+    url: process.env.RETURN_API_BASE_URL || 'https://rentalapi.rootments.live',
+    endpoint: process.env.RETURN_API_ENDPOINT || '/api/Reports/GetReturnReport',
     method: 'POST',
-    token: process.env.RENTOUT_API_KEY || process.env.BOOKING_API_KEY || process.env.API_TOKEN,
+    token: process.env.RETURN_API_KEY || process.env.API_TOKEN,
     body: {
       bookingNo: '',
-      dateFrom: process.env.RENTOUT_DATE_FROM || '',
-      dateTo: process.env.RENTOUT_DATE_TO || '',
+      dateFrom: process.env.RETURN_DATE_FROM || '',
+      dateTo: process.env.RETURN_DATE_TO || '',
       userName: '',
-      months: process.env.RENTOUT_MONTHS || '',
+      months: process.env.RETURN_MONTHS || '',
       fromLocation: '',
       userID: '',
       locationID: '' // Will be set per store
@@ -124,9 +124,9 @@ const testAllAPIs = async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-  // Test Rent-Out API
-  if (APIs.rentOut.url && APIs.rentOut.endpoint) {
-    results.rentOut = await testAPI(APIs.rentOut);
+  // Test Return API
+  if (APIs.return.url && APIs.return.endpoint) {
+    results.return = await testAPI(APIs.return);
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 

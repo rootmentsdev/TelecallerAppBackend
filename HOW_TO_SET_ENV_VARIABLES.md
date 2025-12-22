@@ -37,9 +37,9 @@ VERIFY_EMPLOYEE_API_TOKEN=RootX-production-9d17d9485eb772e79df8564004d4a4d4
 BOOKING_API_BASE_URL=https://rentalapi.rootments.live
 BOOKING_API_KEY=your-booking-api-token
 
-# External API - Rent-Out
-RENTOUT_API_BASE_URL=https://rentalapi.rootments.live
-RENTOUT_API_KEY=your-rentout-api-token
+# External API - Return
+RETURN_API_BASE_URL=https://rentalapi.rootments.live
+RETURN_API_KEY=your-return-api-token
 
 # External API - Store
 STORE_API_KEY=your-store-api-token
@@ -89,8 +89,8 @@ Make sure `.env` is in `.gitignore` (already done ✅)
    - `VERIFY_EMPLOYEE_API_TOKEN`
    - `BOOKING_API_BASE_URL`
    - `BOOKING_API_KEY`
-   - `RENTOUT_API_BASE_URL`
-   - `RENTOUT_API_KEY`
+   - `RETURN_API_BASE_URL`
+   - `RETURN_API_KEY`
    - `STORE_API_KEY`
 
 5. **Redeploy**

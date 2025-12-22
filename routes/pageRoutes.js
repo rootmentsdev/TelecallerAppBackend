@@ -115,7 +115,7 @@
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by source (e.g., "Walk-in", "Booking", "Rent-out", "Loss of Sale").
+ *         description: Filter by source (e.g., "Walk-in", "Booking", "Return", "Loss of Sale").
  *       - in: query
  *         name: enquiryDateFrom
  *         required: false
@@ -149,7 +149,7 @@
  *         description: |
  *           Filter leads with function/event date on or after this date (YYYY-MM-DD).
  *           Example: `?functionDateFrom=2024-03-01` returns leads with function date from March 1, 2024 onwards.
- *           Useful for filtering booking confirmation and rent-out leads by event date.
+ *           Useful for filtering booking confirmation and return leads by event date.
  *           Can be combined with `functionDateTo` for a date range.
  *       - in: query
  *         name: functionDateTo
