@@ -47,7 +47,7 @@ const router = express.Router();
  *         name: leadType
  *         schema:
  *           type: string
- *         description: Filter by lead type (lossOfSale, bookingConfirmation, rentOutFeedback, justDial, etc.)
+ *         description: Filter by lead type (lossOfSale, bookingConfirmation, return, justDial, etc.)
  *       - in: query
  *         name: editedBy
  *         schema:

@@ -32,8 +32,8 @@ const leadIdValidator = param('id')
 export const leadsListValidator = [
   query('leadType')
     .optional()
-    .isIn(['lossOfSale', 'rentOutFeedback', 'bookingConfirmation', 'justDial', 'general'])
-    .withMessage('leadType must be one of: lossOfSale, rentOutFeedback, bookingConfirmation, justDial, general'),
+    .isIn(['lossOfSale', 'return', 'bookingConfirmation', 'justDial', 'general'])
+    .withMessage('leadType must be one of: lossOfSale, return, bookingConfirmation, justDial, general'),
   query('page')
     .optional()
     .isInt({ min: 1 })
@@ -92,8 +92,8 @@ export const lossOfSalePostValidator = [
     .withMessage('Remarks must be a string')
 ];
 
-// Rent-Out Page Validators
-export const rentOutGetValidator = [
+// Return Page Validators
+export const returnGetValidator = [
   param('id')
     .notEmpty()
     .withMessage('Lead ID is required')
@@ -105,7 +105,7 @@ export const rentOutGetValidator = [
     })
 ];
 
-export const rentOutPostValidator = [
+export const returnPostValidator = [
   param('id')
     .notEmpty()
     .withMessage('Lead ID is required')
@@ -129,11 +129,6 @@ export const rentOutPostValidator = [
     .optional()
     .isBoolean()
     .withMessage('Follow up flag must be a boolean'),
-  dateValidator('call_date'),
-  body('rating')
-    .optional()
-    .isInt({ min: 1, max: 5 })
-    .withMessage('Rating must be between 1 and 5'),
   body('remarks')
     .optional()
     .isString()

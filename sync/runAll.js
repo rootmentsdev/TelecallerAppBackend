@@ -45,12 +45,12 @@ const runAll = async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log();
 
-    // Step 3: Sync Return (API)
+    // Step 3: Sync Returns (API)
     console.log("📦 Step 3/5: Syncing Returns...");
     console.log("-".repeat(60));
-    const { run: syncRentout } = await import("./api/sync_rentout.js");
-    await syncRentout();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const { run: syncReturn } = await import("./api/sync_return.js");
+    await syncReturn();
+    await new Promise(resolve => setTimeout(resolve, 1000));
     console.log();
 
     // Step 4: Import Walk-in (CSV/Excel) - Import ALL walkin files
