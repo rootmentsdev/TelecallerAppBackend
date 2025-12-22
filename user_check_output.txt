@@ -1,7 +1,0 @@
-Found users:
-- SHAFNA ISMAIL (ID: Emp188, Role: admin, Store: No Store)
-- Nandana Babu (ID: Emp410, Role: telecaller, Store: No Store)
-- Varsha N. C (ID: Emp436, Role: telecaller, Store: No Store)
-
-Admin users:
-- SHAFNA ISMAIL (ID: Emp188, Role: admin)
