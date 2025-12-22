@@ -11,7 +11,7 @@ const leadSchema = new mongoose.Schema(
     source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.
     leadType: { 
       type: String, 
-      enum: ["lossOfSale", "rentOutFeedback", "bookingConfirmation", "justDial", "general"],
+      enum: ["lossOfSale", "return", "bookingConfirmation", "justDial", "general"],
       default: "general" 
     },
     brand: { type: String }, // For Add Lead page

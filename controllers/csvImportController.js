@@ -211,7 +211,7 @@ export const importLeadsFromCSV = async (req, res) => {
         }
 
         // Validate leadType
-        const validLeadTypes = ["general", "lossOfSale", "rentOutFeedback", "bookingConfirmation", "justDial"];
+        const validLeadTypes = ["general", "lossOfSale", "return", "bookingConfirmation", "justDial"];
         if (leadData.leadType && !validLeadTypes.includes(leadData.leadType)) {
           leadData.leadType = "general"; // Default to general if invalid
         }

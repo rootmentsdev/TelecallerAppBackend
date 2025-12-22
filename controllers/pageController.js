@@ -253,7 +253,7 @@ export const getLeads = async (req, res) => {
     let dbLeadType = leadType;
     if (leadType) {
       const lowerType = leadType.toLowerCase();
-      if (lowerType.includes('rent') || lowerType.includes('out')) dbLeadType = 'rentOutFeedback';
+      if (lowerType.includes('return')) dbLeadType = 'return';
       else if (lowerType.includes('book')) dbLeadType = 'bookingConfirmation';
       else if (lowerType.includes('loss')) dbLeadType = 'lossOfSale';
       else if (lowerType.includes('walk')) dbLeadType = 'general';
@@ -580,7 +580,7 @@ export const getLeads = async (req, res) => {
         baseLead.visit_date = lead.visitDate;
         baseLead.reason_collected_from_store = lead.reasonCollectedFromStore;
         baseLead.attended_by = lead.attendedBy;
-      } else if (lead.leadType === "rentOutFeedback") {
+      } else if (lead.leadType === "return") {
         baseLead.booking_number = lead.bookingNo;
         baseLead.return_date = lead.returnDate;
         baseLead.attended_by = lead.attendedBy;
@@ -680,10 +680,10 @@ export const updateLossOfSaleLead = async (req, res) => {
   }
 };
 
-// ==================== Rent-Out Page ====================
+// ==================== Return Page ====================
 
-// GET - Fetch Rent-Out lead data (GET fields only)
-export const getRentOutLead = async (req, res) => {
+// GET - Fetch Return lead data (GET fields only)
+export const getReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
     const lead = await Lead.findById(id);
@@ -704,18 +704,17 @@ export const getRentOutLead = async (req, res) => {
       booking_number: lead.bookingNo,
       return_date: lead.returnDate || null, // null is valid for items not yet returned
       attended_by: lead.attendedBy || null, // Optional field, may be empty
-      security_amount: lead.securityAmount,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// POST - Update Rent-Out lead data (POST fields only)
-export const updateRentOutLead = async (req, res) => {
+// POST - Update Return lead data (POST fields only)
+export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, call_date, rating, remarks } = req.body;
+    const { call_status, lead_status, follow_up_flag, remarks } = req.body;
 
     const lead = await Lead.findById(id);
     if (!lead) {
@@ -735,12 +734,10 @@ export const updateRentOutLead = async (req, res) => {
         updateData.followUpDate = new Date();
       }
     }
-    if (call_date !== undefined) updateData.callDate = call_date;
-    if (rating !== undefined) updateData.rating = rating;
     if (remarks !== undefined) updateData.remarks = remarks;
 
     if (!lead.leadType || lead.leadType === "general") {
-      updateData.leadType = "rentOutFeedback";
+      updateData.leadType = "return";
     }
 
     const beforeLead = lead.toObject();
@@ -756,7 +753,7 @@ export const updateRentOutLead = async (req, res) => {
 
     await Lead.findByIdAndDelete(id);
 
-    res.json({ message: "Rent-Out lead updated and moved to reports", report });
+    res.json({ message: "Return lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

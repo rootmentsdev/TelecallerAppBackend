@@ -646,6 +646,48 @@ export const mapBooking = (row) => {
   return leadData;
 };
 
+// Map Return API data to Lead model
+export const mapReturn = (row) => {
+  // Phone field: API uses 'phoneNo'
+  const phone = cleanPhone(
+    row.phoneNo || row.phone || row.Phone || row.customerPhone ||
+    row.mobile || row.Mobile || row.contact || row.Contact
+  );
+  if (!phone) return null;
+
+  // Parse dates
+  const returnDate = parseApiDate(row.returnDate || row.return_date || row.ReturnDate);
+  const enquiryDate = parseApiDate(row.enquiryDate || row.enquiry_date || row.date);
+  const functionDate = parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date);
+
+  // Set createdAt from returnDate or enquiryDate (actual lead creation date, not import date)
+  // IMPORTANT: Use the earliest available date as the creation date
+  const createdAt = returnDate || enquiryDate || undefined;
+
+  const leadData = {
+    name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
+    phone: phone,
+    store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
+    source: "Return",
+    leadType: "return",
+    enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
+    bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),
+    returnDate: returnDate,
+    enquiryDate: enquiryDate,
+    functionDate: functionDate,
+    // Attended By: API uses 'bookingBy'
+    attendedBy: (row.attendedBy || row.attended_by || row.staff || row.Staff || row.bookingBy || row.handledBy || "").trim() || undefined,
+    remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
+  };
+
+  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
+  if (createdAt) {
+    leadData.createdAt = createdAt;
+  }
+
+  return leadData;
+};
+
 // Map Rent-Out API data to Lead model
 export const mapRentOut = (row) => {
   // Phone field: API uses 'phoneNo'

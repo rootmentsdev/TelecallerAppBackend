@@ -49,7 +49,7 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, bookingConfirmation, rentOutFeedback, justDial]
+ *           enum: [lossOfSale, general, bookingConfirmation, return, justDial]
  *         description: Type of lead to fetch. If omitted, returns leads of all types.
  *       - in: query
  *         name: store
@@ -80,20 +80,20 @@
  *             - Searching `"Suitor Guy - Edappally"` will NOT match stores with `"Edappal"`
  *             - Searching `"Suitor Guy - Edappal"` will NOT match stores with `"Edappally"`
  *           - Case-insensitive matching (e.g., `"kottayam"` matches `"Kottayam"`)
- *           - Works with all lead types (lossOfSale, rentOutFeedback, bookingConfirmation, general, justDial)
+ *           - Works with all lead types (lossOfSale, return, bookingConfirmation, general, justDial)
  *           
  *           **Examples:**
  *           - Get all leads for a store: `?store=Suitor Guy - Edappally`
  *           - Get specific lead type: `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
  *           - Get all leads for location: `?store=Kottayam`
- *           - Get rent-out leads: `?leadType=rentOutFeedback&store=Suitor Guy - Kottayam`
+ *           - Get return leads: `?leadType=return&store=Suitor Guy - Kottayam`
  *           - Get loss of sale leads: `?leadType=lossOfSale&store=Suitor Guy - Manjeri`
  *           
  *           **Use Cases:**
  *           - **Loss of Sale Area**: Filter by store for loss of sale leads
  *             - `?leadType=lossOfSale&store=Suitor Guy - Edappally`
- *           - **Rent Out Area**: Filter by store for rent-out leads
- *             - `?leadType=rentOutFeedback&store=Suitor Guy - Kottayam`
+ *           - **Return Area**: Filter by store for return leads
+ *             - `?leadType=return&store=Suitor Guy - Kottayam`
  *           - **Booking Confirmation Area**: Filter by store for booking confirmation leads
  *             - `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
  *           - **All Leads**: Get all lead types for a store
@@ -405,8 +405,8 @@
  *                   2. Get Loss of Sale leads for a store:
  *                      `GET /api/pages/leads?leadType=lossOfSale&store=Suitor Guy - Edappally`
  *                   
- *                   3. Get Rent Out leads for a store:
- *                      `GET /api/pages/leads?leadType=rentOutFeedback&store=Suitor Guy - Kottayam`
+ *                   3. Get Return leads for a store:
+ *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Kottayam`
  *                   
  *                   4. Get Booking Confirmation leads for a store:
  *                      `GET /api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
@@ -467,7 +467,7 @@
  *                      `GET /api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally&createdAt=2024-12-08`
  *                   
  *                   3. Lead Type + Store + Function Date:
- *                      `GET /api/pages/leads?leadType=rentOutFeedback&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
  *                   
  *                   4. Loss of Sale + Store + Visit Date:
  *                      `GET /api/pages/leads?leadType=lossOfSale&store=Suitor Guy - Manjeri&visitDateFrom=2024-02-01&visitDateTo=2024-02-28`
@@ -559,11 +559,11 @@
 
 /**
  * @swagger
- * /api/pages/rent-out/{id}:
+ * /api/pages/return/{id}:
  *   get:
- *     summary: Get Rent-Out lead details
+ *     summary: Get Return lead details
  *     tags:
- *       - Rent Out
+ *       - Return
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -574,7 +574,7 @@
  *           type: string
  *     responses:
  *       200:
- *         description: Rent-Out lead details
+ *         description: Return lead details
  *         content:
  *           application/json:
  *             schema:
@@ -585,7 +585,6 @@
  *                 booking_number: { type: string }
  *                 return_date: { type: string, format: date-time }
  *                 attended_by: { type: string }
- *                 security_amount: { type: string }
  *       400:
  *         description: Validation error
  *       401:
@@ -597,11 +596,11 @@
  */
 /**
  * @swagger
- * /api/pages/rent-out/{id}:
+ * /api/pages/return/{id}:
  *   post:
- *     summary: Update Rent-Out lead
+ *     summary: Update Return lead
  *     tags:
- *       - Rent Out
+ *       - Return
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -620,12 +619,10 @@
  *               call_status: { type: string }
  *               lead_status: { type: string }
  *               follow_up_flag: { type: boolean }
- *               call_date: { type: string, format: date-time }
- *               rating: { type: integer, minimum: 1, maximum: 5 }
  *               remarks: { type: string }
  *     responses:
  *       200:
- *         description: Rent-Out lead updated successfully
+ *         description: Return lead updated successfully
  *       400:
  *         description: Validation error
  *       401:
@@ -830,8 +827,8 @@ import {
   getLeads,
   getLossOfSaleLead,
   updateLossOfSaleLead,
-  getRentOutLead,
-  updateRentOutLead,
+  getReturnLead,
+  updateReturnLead,
   getBookingConfirmationLead,
   updateBookingConfirmationLead,
   getJustDialLead,
@@ -843,8 +840,8 @@ import {
 import {
   lossOfSaleGetValidator,
   lossOfSalePostValidator,
-  rentOutGetValidator,
-  rentOutPostValidator,
+  returnGetValidator,
+  returnPostValidator,
   bookingConfirmationGetValidator,
   bookingConfirmationPostValidator,
   justDialGetValidator,
@@ -1020,23 +1017,23 @@ router.post(
   updateLossOfSaleLead
 );
 
-// ==================== Rent-Out Page Routes ====================
-// GET /api/pages/rent-out/:id - Fetch Rent-Out lead data
+// ==================== Return Page Routes ====================
+// GET /api/pages/return/:id - Fetch Return lead data
 router.get(
-  "/rent-out/:id",
+  "/return/:id",
   protect,
-  rentOutGetValidator,
+  returnGetValidator,
   handleValidation,
-  getRentOutLead
+  getReturnLead
 );
 
-// POST /api/pages/rent-out/:id - Update Rent-Out lead data
+// POST /api/pages/return/:id - Update Return lead data
 router.post(
-  "/rent-out/:id",
+  "/return/:id",
   protect,
-  rentOutPostValidator,
+  returnPostValidator,
   handleValidation,
-  updateRentOutLead
+  updateReturnLead
 );
 
 // ==================== Booking Confirmation Page Routes ====================
