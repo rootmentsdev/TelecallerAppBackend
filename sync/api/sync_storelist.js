@@ -1,5 +1,6 @@
 import { fetchAPI, postAPI } from "../utils/apiClient.js";
 import { saveStoreToMongo } from "../utils/saveToMongo.js";
+import { normalizeStoreName } from "../utils/storeMap.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -72,12 +73,16 @@ const run = async () => {
 
   for (const row of dataArray) {
     // Map API response fields to Store model
-    // API fields: locName, locCode, city, status, etc.
+    const rawName = (
+      row.locName || row.LocName || row.LOCNAME ||
+      row.name || row.Name || row.storeName || row.StoreName || ""
+    ).trim();
+
+    // Normalize name
+    const normalizedName = normalizeStoreName(rawName);
+
     const storeData = {
-      name: (
-        row.locName || row.LocName || row.LOCNAME ||
-        row.name || row.Name || row.storeName || row.StoreName || ""
-      ).trim(),
+      name: normalizedName || rawName, // Fallback to raw if empty (shouldn't happen)
       code: (
         row.locCode || row.LocCode || row.LOCCODE ||
         row.code || row.Code || row.storeCode || row.StoreCode || ""
@@ -98,6 +103,7 @@ const run = async () => {
       continue;
     }
 
+    // Pass normalized name to save function
     const result = await saveStoreToMongo(storeData);
     if (result.saved) {
       saved++;
@@ -109,7 +115,32 @@ const run = async () => {
     }
   }
 
+  // Create sync log entry
+  const syncEndTime = new Date();
+  const trigger = process.env.SYNC_TRIGGER || "auto";
+
+  try {
+    const { default: SyncLog } = await import("../../models/SyncLog.js");
+    await SyncLog.create({
+      syncType: "store",
+      trigger: trigger,
+      lastSyncAt: syncEndTime,
+      lastSyncCount: saved,
+      status: errors > 0 ? "partial" : "success",
+      errorMessage: errors > 0 ? `${errors} errors occurred` : null,
+    });
+    console.log(`📝 Sync log saved`);
+  } catch (error) {
+    console.error("❌ Error saving sync log:", error.message);
+  }
+
   console.log(`✅ Store List sync completed: ${saved} new saved, ${skipped} skipped (already exists), ${errors} errors`);
+
+  return {
+    saved,
+    skipped,
+    errors
+  };
 };
 
 // Export run function for use in runAll.js

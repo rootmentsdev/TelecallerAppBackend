@@ -315,6 +315,10 @@ export const getLeads = async (req, res) => {
           const locationVariations = getVariants(locationPart, 'location');
 
           const orConditions = [];
+
+          // Check if this is a Suitor Guy query
+          const isSuitorGuy = brandVariations.some(v => ['Suitor Guy', 'SG'].includes(v));
+
           for (const brandVar of brandVariations) {
             for (const locVar of locationVariations) {
               orConditions.push({
@@ -325,6 +329,21 @@ export const getLeads = async (req, res) => {
               });
             }
           }
+
+          // Special handling for implicit Suitor Guy stores (e.g. "Kottayam" implies "Suitor Guy - Kottayam")
+          // But we must be careful NOT to match Zorucci stores (e.g. "Z- Edapally")
+          if (isSuitorGuy) {
+            for (const locVar of locationVariations) {
+              // Strict location match AND NOT Zorucci/Z
+              orConditions.push({
+                $and: [
+                  { store: { $regex: buildStrictRegex(locVar), $options: 'i' } },
+                  { store: { $not: { $regex: /(^|[\s.-])(Z|Zorucci|Zurocci)([\s.-]|$)/i } } }
+                ]
+              });
+            }
+          }
+
           filters.$or = orConditions;
         } else {
           // Fallback for weirdly formatted dash query

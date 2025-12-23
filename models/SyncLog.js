@@ -6,7 +6,12 @@ const syncLogSchema = new mongoose.Schema(
       type: String,
       enum: ["booking", "rentout", "walkin", "lossofsale", "store"],
       required: true,
-      unique: true, // Only one log per sync type
+      // unique: true, // Removed to allow history
+    },
+    trigger: {
+      type: String,
+      enum: ["manual", "auto"],
+      default: "auto",
     },
     lastSyncAt: {
       type: Date,
@@ -30,8 +35,8 @@ const syncLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster queries (unique index is already created by unique: true above, so we don't need this)
-// syncLogSchema.index({ syncType: 1 }); // Removed to avoid duplicate index warning
+// Index for faster queries
+syncLogSchema.index({ syncType: 1, lastSyncAt: -1 });
 
 export default mongoose.model("SyncLog", syncLogSchema);
 
