@@ -4,6 +4,7 @@ import { saveToMongo } from "../utils/saveToMongo.js";
 import Store from "../../models/Store.js";
 import Lead from "../../models/Lead.js";
 import SyncLog from "../../models/SyncLog.js";
+import { LEAD_API_ID_MAP } from "../utils/storeMap.js";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
@@ -51,7 +52,8 @@ const run = async () => {
 
   // Step 3: Get last sync time for incremental sync (only fetch new/updated records)
   let lastSyncAt = null;
-  let syncLog = await SyncLog.findOne({ syncType: "booking" });
+  // Get the most recent successful sync log
+  let syncLog = await SyncLog.findOne({ syncType: "booking", status: "success" }).sort({ lastSyncAt: -1 });
 
   if (syncLog && syncLog.lastSyncAt) {
     lastSyncAt = syncLog.lastSyncAt;
@@ -95,27 +97,8 @@ const run = async () => {
   }
 
   // Location ID to Store Name mapping (same as return)
-  const LOCATION_ID_TO_STORE_NAME = {
-    '1': 'Z- Edapally',
-    '3': 'SG-Edappally',
-    '5': 'Trivandrum',
-    '6': 'Z- Edapally',
-    '7': 'PMNA',
-    '8': 'Z.Kottakkal',
-    '9': 'Kottayam',
-    '10': 'Perumbavoor',
-    '11': 'Trissur',
-    '12': 'Chavakkad',
-    '13': 'CALICUT',
-    '14': 'VATAKARA',
-    '15': 'SG-Edappally',
-    '16': 'PMNA',
-    '17': 'KOTTAKAL',
-    '18': 'MANJERY',
-    '19': 'Palakkad',
-    '20': 'KALPETTA',
-    '21': 'KANNUR'
-  };
+  // Use centralized map for consistency
+  const LOCATION_ID_TO_STORE_NAME = LEAD_API_ID_MAP;
 
   console.log(`\n📍 Fetching booking data using location IDs`);
   console.log(`   Will fetch data for each location separately`);
@@ -378,18 +361,23 @@ const run = async () => {
     }
   }
 
-  // Update sync log with latest sync time
+  // Update sync log with latest sync time (create new entry for history)
   const syncEndTime = new Date();
-  await SyncLog.findOneAndUpdate(
-    { syncType: "booking" },
-    {
+  const trigger = process.env.SYNC_TRIGGER || "auto";
+
+  try {
+    await SyncLog.create({
+      syncType: "booking",
+      trigger: trigger,
       lastSyncAt: syncEndTime,
       lastSyncCount: totalSaved,
       status: totalErrors > 0 ? "partial" : "success",
       errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : null,
-    },
-    { upsert: true, new: true }
-  );
+    });
+    console.log(`📝 Sync log saved`);
+  } catch (error) {
+    console.error("❌ Error saving sync log:", error.message);
+  }
 
   console.log(`\n✅ Booking sync completed!`);
   console.log(`   📊 Locations processed: ${locationIds.length}`);

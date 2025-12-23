@@ -37,12 +37,14 @@ const runApiOnlySync = async () => {
   };
 
   try {
+    // Set trigger for logging
+    process.env.SYNC_TRIGGER = "auto";
+
     // Step 1: Sync Stores (needed for booking/return sync)
     console.log("📦 Step 1/3: Syncing Stores...");
     console.log("-".repeat(60));
     const { run: syncStores } = await import("./api/sync_storelist.js");
     await syncStores();
-    await new Promise(resolve => setTimeout(resolve, 500)); // Reduced delay for faster sync
     console.log();
 
     // Step 2: Sync Booking Confirmation (API)
@@ -50,7 +52,6 @@ const runApiOnlySync = async () => {
     console.log("-".repeat(60));
     const { run: syncBooking } = await import("./api/sync_booking.js");
     await syncBooking();
-    await new Promise(resolve => setTimeout(resolve, 500));
     console.log();
 
     // Step 3: Sync Returns (API)
@@ -58,7 +59,6 @@ const runApiOnlySync = async () => {
     console.log("-".repeat(60));
     const { run: syncReturn } = await import("./api/sync_return.js");
     await syncReturn();
-    await new Promise(resolve => setTimeout(resolve, 500));
     console.log();
 
     const endTime = Date.now();
