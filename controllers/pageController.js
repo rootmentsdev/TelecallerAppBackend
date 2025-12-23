@@ -289,6 +289,12 @@ export const getLeads = async (req, res) => {
           if (lower.includes('edappally') || lower.includes('edapally') || lower.includes('edappall')) {
             variants.push('Edappally', 'Edapally');
           }
+          if (lower.includes('vadakara') || lower.includes('vatakara')) {
+            variants.push('Vatakara', 'Vadakara');
+          }
+          if (lower.includes('calicut') || lower.includes('kozhikode')) {
+            variants.push('Calicut', 'Kozhikode');
+          }
         }
         return [...new Set(variants)];
       };
