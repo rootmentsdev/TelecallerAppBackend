@@ -9,6 +9,8 @@ import assignmentRoutes from './routes/assignmentRoutes.js';
 import csvImportRoutes from './routes/csvImportRoutes.js';
 import pageRoutes from './routes/pageRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import healthRoutes from "./routes/healthRoutes.js";
+
 
 // 👉 IMPORTANT: use import instead of require (ESM)
 import { swaggerUi, swaggerSpec } from './config/swaggerConfig.js';
@@ -47,11 +49,8 @@ app.use('/api/assign', assignmentRoutes);
 app.use('/api/import', csvImportRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
+app.use("/api", healthRoutes);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
-});
 
 const PORT = process.env.PORT || 8800;
 app.listen(PORT, () => {
