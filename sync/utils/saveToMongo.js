@@ -23,6 +23,137 @@ const connectDB = async () => {
   }
 };
 
+// Bulk save leads to MongoDB for better performance
+export const bulkSaveToMongo = async (leadsData) => {
+  try {
+    await connectDB();
+
+    if (!Array.isArray(leadsData) || leadsData.length === 0) {
+      return { saved: 0, skipped: 0, errors: 0 };
+    }
+
+    const results = { saved: 0, skipped: 0, errors: 0 };
+    const bulkOps = [];
+    const skipReasons = [];
+
+    // Process each lead and prepare bulk operations
+    for (const leadData of leadsData) {
+      // Validate required fields
+      if (!leadData.name || !leadData.phone || !leadData.store) {
+        results.skipped++;
+        skipReasons.push({ phone: leadData.phone, reason: "Missing required fields" });
+        continue;
+      }
+
+      // Check if lead exists in reports (skip if moved to reports)
+      const reportOrClauses = [];
+      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+        const bookingNo = leadData.bookingNo.trim();
+        reportOrClauses.push(
+          { "beforeSnapshot.phone": leadData.phone, "beforeSnapshot.bookingNo": bookingNo },
+          { "leadSnapshot.phone": leadData.phone, "leadSnapshot.bookingNo": bookingNo },
+          { "leadData.phone": leadData.phone, "leadData.booking_number": bookingNo },
+          { "leadData.phone": leadData.phone, "leadData.bookingNo": bookingNo }
+        );
+      }
+      reportOrClauses.push(
+        { "beforeSnapshot.phone": leadData.phone },
+        { "leadSnapshot.phone": leadData.phone },
+        { "leadData.phone": leadData.phone },
+        { "leadData.phone_number": leadData.phone }
+      );
+
+      const existingReport = await Report.findOne({ $or: reportOrClauses });
+      if (existingReport) {
+        results.skipped++;
+        skipReasons.push({ phone: leadData.phone, reason: "Lead exists in reports" });
+        continue;
+      }
+
+      // Prepare duplicate check query
+      let duplicateQuery = null;
+      if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
+        if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+          duplicateQuery = {
+            bookingNo: leadData.bookingNo.trim(),
+            phone: leadData.phone,
+            leadType: leadData.leadType,
+          };
+        } else {
+          duplicateQuery = {
+            phone: leadData.phone,
+            name: leadData.name,
+            leadType: leadData.leadType,
+            store: leadData.store,
+          };
+        }
+
+        // For booking/return, skip if exists (don't update)
+        const existing = await Lead.findOne(duplicateQuery);
+        if (existing) {
+          results.skipped++;
+          skipReasons.push({ phone: leadData.phone, reason: "Already exists" });
+          continue;
+        }
+
+        // Add to bulk insert
+        bulkOps.push({
+          insertOne: {
+            document: leadData
+          }
+        });
+      } else {
+        // For loss of sale and general, use upsert (update if exists, insert if new)
+        if (leadData.leadType === "lossOfSale") {
+          duplicateQuery = {
+            phone: leadData.phone,
+            name: leadData.name,
+            leadType: leadData.leadType,
+            store: leadData.store,
+          };
+          if (leadData.enquiryDate) duplicateQuery.enquiryDate = leadData.enquiryDate;
+          else if (leadData.visitDate) duplicateQuery.visitDate = leadData.visitDate;
+          else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
+        } else if (leadData.leadType === "general") {
+          duplicateQuery = {
+            phone: leadData.phone,
+            name: leadData.name,
+            leadType: leadData.leadType,
+            store: leadData.store,
+          };
+          if (leadData.enquiryDate) duplicateQuery.enquiryDate = leadData.enquiryDate;
+          else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
+        }
+
+        // Add to bulk upsert
+        const updateData = { ...leadData };
+        delete updateData._id;
+        delete updateData.createdAt;
+
+        bulkOps.push({
+          updateOne: {
+            filter: duplicateQuery,
+            update: { $set: updateData },
+            upsert: true
+          }
+        });
+      }
+    }
+
+    // Execute bulk operations if any
+    if (bulkOps.length > 0) {
+      const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
+      results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
+      results.errors = bulkResult.writeErrors ? bulkResult.writeErrors.length : 0;
+    }
+
+    return results;
+  } catch (error) {
+    console.error("Error in bulk save:", error.message);
+    return { saved: 0, skipped: 0, errors: 1, errorMessage: error.message };
+  }
+};
+
 // Save Lead to MongoDB (prevents duplicates for booking/return, allows for walk-in revisits)
 export const saveToMongo = async (leadData) => {
   try {

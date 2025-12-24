@@ -40,26 +40,45 @@ const runApiOnlySync = async () => {
     // Set trigger for logging
     process.env.SYNC_TRIGGER = "auto";
 
-    // Step 1: Sync Stores (needed for booking/return sync)
-    console.log("📦 Step 1/3: Syncing Stores...");
+    console.log("📦 Running all API syncs in PARALLEL...");
     console.log("-".repeat(60));
-    const { run: syncStores } = await import("./api/sync_storelist.js");
-    await syncStores();
-    console.log();
 
-    // Step 2: Sync Booking Confirmation (API)
-    console.log("📦 Step 2/3: Syncing Booking Confirmation...");
-    console.log("-".repeat(60));
-    const { run: syncBooking } = await import("./api/sync_booking.js");
-    await syncBooking();
-    console.log();
+    // Run all syncs in parallel for maximum speed
+    const [storeResult, bookingResult, returnResult] = await Promise.allSettled([
+      // Step 1: Sync Stores (needed for booking/return sync)
+      (async () => {
+        console.log("📦 Starting Stores sync...");
+        const { run: syncStores } = await import("./api/sync_storelist.js");
+        await syncStores();
+        console.log("✅ Stores sync completed");
+      })(),
 
-    // Step 3: Sync Returns (API)
-    console.log("📦 Step 3/3: Syncing Returns...");
-    console.log("-".repeat(60));
-    const { run: syncReturn } = await import("./api/sync_return.js");
-    await syncReturn();
-    console.log();
+      // Step 2: Sync Booking Confirmation (API)
+      (async () => {
+        console.log("📦 Starting Booking Confirmation sync...");
+        const { run: syncBooking } = await import("./api/sync_booking.js");
+        await syncBooking();
+        console.log("✅ Booking Confirmation sync completed");
+      })(),
+
+      // Step 3: Sync Returns (API)
+      (async () => {
+        console.log("📦 Starting Returns sync...");
+        const { run: syncReturn } = await import("./api/sync_return.js");
+        await syncReturn();
+        console.log("✅ Returns sync completed");
+      })()
+    ]);
+
+    // Check results
+    const failures = [storeResult, bookingResult, returnResult].filter(result => result.status === 'rejected');
+    if (failures.length > 0) {
+      console.log(`⚠️  ${failures.length} sync(s) failed:`);
+      failures.forEach((failure, index) => {
+        const syncNames = ['Stores', 'Booking', 'Returns'];
+        console.log(`   ❌ ${syncNames[index]}: ${failure.reason.message}`);
+      });
+    }
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -67,26 +86,30 @@ const runApiOnlySync = async () => {
     console.log("=".repeat(60));
     console.log("🎉 Automatic API Sync Completed!");
     console.log("=".repeat(60));
-    console.log(`⏱️  Total time: ${duration} seconds`);
+    console.log(`⏱️  Total time: ${duration} seconds (PARALLEL EXECUTION)`);
     console.log();
     console.log("✅ Summary:");
     console.log("   • Stores synced (external API)");
     console.log("   • Booking Confirmation synced (incremental - only NEW records)");
     console.log("   • Returns synced (incremental - only NEW records)");
     console.log("   • CSV imports skipped (manual only)");
+    console.log("   • All syncs ran in PARALLEL for maximum speed");
     console.log();
-    console.log("📋 Incremental Sync Results:");
-    console.log("   ✅ Only new/updated records processed");
-    console.log("   ✅ Existing records preserved (no duplicates)");
-    console.log("   ✅ User edits maintained");
+    console.log("📋 Performance Optimizations Applied:");
+    console.log("   ✅ Parallel API calls (5x concurrency)");
+    console.log("   ✅ Batch processing (50 records per batch)");
+    console.log("   ✅ Reduced delays (100ms between calls)");
+    console.log("   ✅ Incremental sync (last 3 days only)");
+    console.log("   ✅ Bulk database operations");
     console.log();
-    console.log("🔄 Next automatic sync: 5 minutes");
+    console.log("🔄 Next automatic sync: 10 minutes");
     console.log();
 
     return {
-      success: true,
+      success: failures.length === 0,
       duration: parseFloat(duration),
-      results: syncResults
+      results: syncResults,
+      failures: failures.length
     };
 
   } catch (error) {
