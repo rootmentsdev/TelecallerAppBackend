@@ -284,11 +284,15 @@ const run = async () => {
   const syncEndTime = new Date();
   const trigger = process.env.SYNC_TRIGGER || "auto";
 
+  // Convert to IST for logging
+  const istTime = new Date(syncEndTime.getTime() + (5.5 * 60 * 60 * 1000));
+  console.log(`📅 Sync completed at: ${istTime.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+
   try {
     await SyncLog.create({
       syncType: "return",
       trigger: trigger,
-      lastSyncAt: syncEndTime,
+      lastSyncAt: syncEndTime, // Store in UTC
       lastSyncCount: totalSaved,
       status: totalErrors > 0 ? "partial" : "success",
       errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : null,

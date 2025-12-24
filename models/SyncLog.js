@@ -4,7 +4,7 @@ const syncLogSchema = new mongoose.Schema(
   {
     syncType: {
       type: String,
-      enum: ["booking", "rentout", "walkin", "lossofsale", "store"],
+      enum: ["booking", "return", "walkin", "lossofsale", "store"],
       required: true,
       // unique: true, // Removed to allow history
     },
