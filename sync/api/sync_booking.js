@@ -72,18 +72,17 @@ const run = async () => {
   // Date range configuration - prioritize months parameter for better API compatibility
   if (!dateFrom && !dateTo && !months) {
     if (lastSyncAt) {
-
-
-      // Last 10 Days Sync Strategy
+      // For incremental sync, use 7 days (configurable via environment)
+      const incrementalDays = parseInt(process.env.API_SYNC_INCREMENTAL_DAYS) || 7;
       const today = new Date();
-      const tenDaysAgo = new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000);
+      const daysAgo = new Date(today.getTime() - incrementalDays * 24 * 60 * 60 * 1000);
 
-      dateFrom = tenDaysAgo.toISOString().split('T')[0];
+      dateFrom = daysAgo.toISOString().split('T')[0];
       dateTo = today.toISOString().split('T')[0];
-      months = "1"; // Set to 1 month to cover the 10-day range
+      months = "1"; // Set to 1 month to cover the date range
 
-      console.log(`   Using 10-DAY sync: FROM ${dateFrom} TO ${dateTo}`);
-      console.log(`   ℹ️  Fetching records for the last 10 days.`);
+      console.log(`   Using ${incrementalDays}-DAY incremental sync: FROM ${dateFrom} TO ${dateTo}`);
+      console.log(`   ℹ️  Fetching records for the last ${incrementalDays} days only.`);
     } else {
       // First sync - default to last 12 months
       months = "12";
@@ -228,7 +227,7 @@ const run = async () => {
     }
 
     // Small delay between API calls
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   // If all locations returned no data, try fetching all data with empty locationID

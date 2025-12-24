@@ -61,11 +61,15 @@ const run = async () => {
   // Date range configuration - prioritize months parameter for better API compatibility
   if (!dateFrom && !dateTo && !months) {
     if (lastSyncAt) {
-      // For incremental sync, use months parameter (more reliable than dateFrom)
-      // Calculate months since last sync (minimum 1 month, maximum 12 months)
-      const monthsSinceSync = Math.min(12, Math.max(1, Math.floor((Date.now() - lastSyncAt.getTime()) / (1000 * 60 * 60 * 24 * 30))));
-      months = String(monthsSinceSync);
-      console.log(`   Using incremental sync: last ${months} months`);
+      // For incremental sync, use configurable days (default 7 days)
+      const incrementalDays = parseInt(process.env.API_SYNC_INCREMENTAL_DAYS) || 7;
+      const today = new Date();
+      const daysAgo = new Date(today.getTime() - incrementalDays * 24 * 60 * 60 * 1000);
+      
+      dateFrom = daysAgo.toISOString().split('T')[0];
+      dateTo = today.toISOString().split('T')[0];
+      months = "1";
+      console.log(`   Using ${incrementalDays}-DAY incremental sync: FROM ${dateFrom} TO ${dateTo}`);
     } else {
       // First sync - default to last 12 months
       months = "12";
@@ -91,171 +95,190 @@ const run = async () => {
   // Get unique location IDs and their corresponding store names
   const locationIds = Object.keys(LOCATION_ID_TO_STORE_NAME);
 
-  console.log(`\n📍 Processing ${locationIds.length} locations using location IDs`);
-  console.log(`   Will fetch return data for each location ID`);
+  console.log(`\n📍 Processing ${locationIds.length} locations using location IDs (PARALLEL)`);
+  console.log(`   Will fetch return data for each location ID concurrently`);
 
-  for (const locationId of locationIds) {
-    const storeName = LOCATION_ID_TO_STORE_NAME[locationId];
+  // Process locations in parallel with concurrency limit
+  const CONCURRENCY_LIMIT = 5; // Process 5 locations at once
+  const results = [];
 
-    console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
+  for (let i = 0; i < locationIds.length; i += CONCURRENCY_LIMIT) {
+    const batch = locationIds.slice(i, i + CONCURRENCY_LIMIT);
+    
+    const batchPromises = batch.map(async (locationId) => {
+      const storeName = LOCATION_ID_TO_STORE_NAME[locationId];
+      console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
 
-    // Use POST request with GetReturnReport endpoint
-    let finalDateFrom = dateFrom;
-    let finalDateTo = dateTo;
-    let finalMonths = months;
+      // Use POST request with GetReturnReport endpoint
+      let finalDateFrom = dateFrom;
+      let finalDateTo = dateTo;
+      let finalMonths = months;
 
-    // If no date range specified and no last sync, default to last 12 months (first sync)
-    if (!finalDateFrom && !finalDateTo && !finalMonths && !lastSyncAt) {
-      finalMonths = "12";
-    }
-
-    const requestBody = {
-      bookingNo: "",
-      dateFrom: finalDateFrom || "",
-      dateTo: finalDateTo || "",
-      userName: "",
-      months: finalMonths || "",
-      fromLocation: "",
-      userID: "",
-      locationID: String(locationId), // Ensure it's a string
-    };
-
-    console.log(`📡 Calling API: ${apiUrl}`);
-    console.log(`   📤 Request body:`, JSON.stringify(requestBody));
-
-    const data = await postAPI(
-      apiUrl,
-      requestBody,
-      {
-        headers: {
-          "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
-          "Content-Type": "application/json-patch+json",
-          "accept": "text/plain",
-        },
+      // If no date range specified and no last sync, default to last 12 months (first sync)
+      if (!finalDateFrom && !finalDateTo && !finalMonths && !lastSyncAt) {
+        finalMonths = "12";
       }
-    );
 
-    // Check if API returned error or empty data
-    if (!data) {
-      console.log(`   ⚠️  API returned null/undefined for location ID ${locationId}`);
-      continue;
-    }
-
-    // Log full response for debugging
-    if (data.status !== undefined) {
-      console.log(`   📥 Response status: ${data.status}`);
-    }
-    if (data.errorDescription) {
-      console.log(`   ⚠️  Error: ${data.errorDescription}`);
-    }
-
-    // Debug: Log response structure for first location
-    if (locationId === '1') {
-      console.log(`   🔍 Debug - Response structure:`, JSON.stringify(data, null, 2).substring(0, 500));
-      console.log(`   🔍 Response keys:`, Object.keys(data || {}));
-    }
-
-    // Check if status is false
-    if (data.status === false) {
-      console.log(`   ℹ️  API returned status=false for location ID ${locationId}`);
-      continue;
-    }
-
-    // Handle different response formats
-    let dataArray = null;
-    if (!Array.isArray(data)) {
-      // Check for dataSet.data structure
-      if (data.dataSet) {
-        if (data.dataSet === null) {
-          console.log(`   ℹ️  dataSet is null - no return data available`);
-          continue;
-        } else if (data.dataSet.data && Array.isArray(data.dataSet.data)) {
-          dataArray = data.dataSet.data;
-        } else if (Array.isArray(data.dataSet)) {
-          dataArray = data.dataSet;
-        }
-      } else if (data.data && Array.isArray(data.data)) {
-        dataArray = data.data;
-      } else if (data.result && Array.isArray(data.result)) {
-        dataArray = data.result;
-      } else {
-        console.warn(`   ⚠️  Invalid response format`);
-        totalErrors++;
-        continue;
-      }
-    } else {
-      dataArray = data;
-    }
-
-    if (!dataArray || dataArray.length === 0) {
-      console.log(`   ℹ️  No data for location ID ${locationId}`);
-      continue;
-    }
-
-    // Filter: Only process records that have returnDate or return_date (return records)
-    const returnRecords = dataArray.filter(row => {
-      return row.returnDate || row.return_date || row.ReturnDate;
-    });
-
-    if (returnRecords.length === 0) {
-      console.log(`   ℹ️  No return data for location ID ${locationId} (${dataArray.length} total records, none are returns)`);
-      continue;
-    }
-
-    console.log(`   📊 Found ${dataArray.length} total records, ${returnRecords.length} return records for location ID ${locationId}`);
-
-    // Process and save return data with progress indicator
-    let saved = 0;
-    let skipped = 0;
-    let errors = 0;
-    const totalRecordsInLocation = returnRecords.length;
-    const progressInterval = Math.max(1, Math.floor(totalRecordsInLocation / 20)); // Update every 5%
-
-    for (let i = 0; i < totalRecordsInLocation; i++) {
-      const row = returnRecords[i];
-
-      // Add store name to the row data for mapping
-      const rowWithStore = {
-        ...row,
-        store: storeName, // Use store name from location ID mapping
+      const requestBody = {
+        bookingNo: "",
+        dateFrom: finalDateFrom || "",
+        dateTo: finalDateTo || "",
+        userName: "",
+        months: finalMonths || "",
+        fromLocation: "",
+        userID: "",
+        locationID: String(locationId), // Ensure it's a string
       };
 
-      const mapped = mapReturn(rowWithStore);
-      if (mapped) {
-        const result = await saveToMongo(mapped);
-        if (result.saved) {
-          saved++;
-        } else if (result.skipped) {
-          // Record already exists - skipped (not updated)
-          skipped++;
+      console.log(`📡 Calling API: ${apiUrl}`);
+      console.log(`   📤 Request body:`, JSON.stringify(requestBody));
+
+      const data = await postAPI(
+        apiUrl,
+        requestBody,
+        {
+          headers: {
+            "Authorization": apiToken ? `Bearer ${apiToken}` : undefined,
+            "Content-Type": "application/json-patch+json",
+            "accept": "text/plain",
+          },
+        }
+      );
+
+      // Check if API returned error or empty data
+      if (!data) {
+        console.log(`   ⚠️  API returned null/undefined for location ID ${locationId}`);
+        return { saved: 0, skipped: 0, errors: 0 };
+      }
+
+      // Log full response for debugging
+      if (data.status !== undefined) {
+        console.log(`   📥 Response status: ${data.status}`);
+      }
+      if (data.errorDescription) {
+        console.log(`   ⚠️  Error: ${data.errorDescription}`);
+      }
+
+      // Debug: Log response structure for first location
+      if (locationId === '1') {
+        console.log(`   🔍 Debug - Response structure:`, JSON.stringify(data, null, 2).substring(0, 500));
+        console.log(`   🔍 Response keys:`, Object.keys(data || {}));
+      }
+
+      // Check if status is false
+      if (data.status === false) {
+        console.log(`   ℹ️  API returned status=false for location ID ${locationId}`);
+        return { saved: 0, skipped: 0, errors: 0 };
+      }
+
+      // Handle different response formats
+      let dataArray = null;
+      if (!Array.isArray(data)) {
+        // Check for dataSet.data structure
+        if (data.dataSet) {
+          if (data.dataSet === null) {
+            console.log(`   ℹ️  dataSet is null - no return data available`);
+            return { saved: 0, skipped: 0, errors: 0 };
+          } else if (data.dataSet.data && Array.isArray(data.dataSet.data)) {
+            dataArray = data.dataSet.data;
+          } else if (Array.isArray(data.dataSet)) {
+            dataArray = data.dataSet;
+          }
+        } else if (data.data && Array.isArray(data.data)) {
+          dataArray = data.data;
+        } else if (data.result && Array.isArray(data.result)) {
+          dataArray = data.result;
         } else {
-          errors++;
+          console.warn(`   ⚠️  Invalid response format`);
+          return { saved: 0, skipped: 0, errors: 1 };
         }
       } else {
-        skipped++;
+        dataArray = data;
       }
 
-      // Show progress AFTER processing (so counters are accurate)
-      if (totalRecordsInLocation > 100 && (i % progressInterval === 0 || i === totalRecordsInLocation - 1)) {
-        const progress = ((i + 1) / totalRecordsInLocation * 100).toFixed(1);
-        process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecordsInLocation}) | Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`);
+      if (!dataArray || dataArray.length === 0) {
+        console.log(`   ℹ️  No data for location ID ${locationId}`);
+        return { saved: 0, skipped: 0, errors: 0 };
       }
-    }
 
-    if (totalRecordsInLocation > 100) {
-      process.stdout.write('\n'); // New line after progress indicator
-    }
+      // Filter: Only process records that have returnDate or return_date (return records)
+      const returnRecords = dataArray.filter(row => {
+        return row.returnDate || row.return_date || row.ReturnDate;
+      });
 
-    console.log(`   ✅ New records saved: ${saved}, ⏭️  Skipped (exists): ${skipped}, ❌ Errors: ${errors}`);
+      if (returnRecords.length === 0) {
+        console.log(`   ℹ️  No return data for location ID ${locationId} (${dataArray.length} total records, none are returns)`);
+        return { saved: 0, skipped: 0, errors: 0 };
+      }
 
-    totalSaved += saved;
-    totalSkipped += skipped;
-    totalErrors += errors;
-    locationsProcessed++;
+      console.log(`   📊 Found ${dataArray.length} total records, ${returnRecords.length} return records for location ID ${locationId}`);
 
-    // Small delay between API calls to avoid overwhelming the server
-    await new Promise(resolve => setTimeout(resolve, 500));
+      // Process and save return data in batches
+      let saved = 0;
+      let skipped = 0;
+      let errors = 0;
+      const BATCH_SIZE = 50;
+
+      for (let i = 0; i < returnRecords.length; i += BATCH_SIZE) {
+        const batch = returnRecords.slice(i, i + BATCH_SIZE);
+        
+        const batchResults = await Promise.all(batch.map(async (row) => {
+          // Add store name to the row data for mapping
+          const rowWithStore = {
+            ...row,
+            store: storeName, // Use store name from location ID mapping
+          };
+
+          const mapped = mapReturn(rowWithStore);
+          if (mapped) {
+            const result = await saveToMongo(mapped);
+            if (result.saved) {
+              return { saved: 1, skipped: 0, errors: 0 };
+            } else if (result.skipped) {
+              return { saved: 0, skipped: 1, errors: 0 };
+            } else {
+              return { saved: 0, skipped: 0, errors: 1 };
+            }
+          } else {
+            return { saved: 0, skipped: 1, errors: 0 };
+          }
+        }));
+
+        // Aggregate batch results
+        batchResults.forEach(result => {
+          saved += result.saved;
+          skipped += result.skipped;
+          errors += result.errors;
+        });
+
+        // Show progress
+        const progress = ((i + batch.length) / returnRecords.length * 100).toFixed(1);
+        if (returnRecords.length > 100) {
+          process.stdout.write(`\r   ⏳ Progress: ${progress}% | Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`);
+        }
+      }
+
+      if (returnRecords.length > 100) {
+        process.stdout.write('\n'); // New line after progress indicator
+      }
+
+      console.log(`   ✅ New records saved: ${saved}, ⏭️  Skipped (exists): ${skipped}, ❌ Errors: ${errors}`);
+      return { saved, skipped, errors };
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+    
+    console.log(`\n✅ Completed batch ${Math.floor(i/CONCURRENCY_LIMIT) + 1}/${Math.ceil(locationIds.length/CONCURRENCY_LIMIT)}`);
   }
+
+  // Aggregate all results
+  results.forEach(result => {
+    totalSaved += result.saved;
+    totalSkipped += result.skipped;
+    totalErrors += result.errors;
+    locationsProcessed++;
+  });
 
   // Update sync log with latest sync time (create new entry for history)
   const syncEndTime = new Date();
