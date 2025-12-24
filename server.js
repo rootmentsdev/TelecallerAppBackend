@@ -40,8 +40,6 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// DB
-connectDB();
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -53,9 +51,20 @@ app.use("/api", healthRoutes);
 
 
 const PORT = process.env.PORT || 8800;
-app.listen(PORT, () => {
-  console.log(`Backend running on port ${PORT}`);
-  
-  // Start API sync scheduler (CSV imports remain manual)
-  startScheduler();
-});
+
+(async () => {
+  try {
+    await connectDB();                // ✅ WAIT for DB
+    console.log("✅ Database connected");
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Backend running on port ${PORT}`);
+      startScheduler();               // ✅ safe to start now
+    });
+
+  } catch (error) {
+    console.error("❌ DB connection failed", error);
+    process.exit(1);
+  }
+})();
+
