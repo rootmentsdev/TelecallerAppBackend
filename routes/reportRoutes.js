@@ -37,7 +37,7 @@ const router = express.Router();
  * @swagger
  * /api/reports:
  *   get:
- *     summary: List report documents (edited leads)
+ *     summary:List report documents (edited leads)
  *     tags:
  *       - Reports
  *     security:
