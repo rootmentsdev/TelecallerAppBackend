@@ -66,6 +66,18 @@ const router = express.Router();
  *           format: date
  *         description: Filter reports edited on or before this date (YYYY-MM-DD)
  *       - in: query
+ *         name: leadCreatedFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by original lead creation date - on or after this date (YYYY-MM-DD)
+ *       - in: query
+ *         name: leadCreatedTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by original lead creation date - on or before this date (YYYY-MM-DD)
+ *       - in: query
  *         name: page
  *         schema:
  *           type: integer
