@@ -1,7 +1,7 @@
 import Report from "../models/Report.js";
 
 // GET /api/reports
-// Query params: leadType (optional - must match flat field lead_type), editedBy, dateFrom, dateTo, page, limit
+// Query params: leadType (optional - must match flat field lead_type), editedBy, dateFrom, dateTo, leadCreatedFrom, leadCreatedTo, page, limit
 export const getReports = async (req, res) => {
   try {
     const {
@@ -9,6 +9,8 @@ export const getReports = async (req, res) => {
       editedBy,
       dateFrom,
       dateTo,
+      leadCreatedFrom,
+      leadCreatedTo,
       page = 1,
       limit = 50,
     } = req.query;
@@ -16,6 +18,8 @@ export const getReports = async (req, res) => {
     const query = {};
     if (editedBy) query.editedBy = editedBy;
     if (leadType) query.lead_type = leadType; // flat field
+    
+    // Filter by report edit date (when report was created/moved)
     if (dateFrom || dateTo) {
       query.editedAt = {};
       if (dateFrom) query.editedAt.$gte = new Date(dateFrom);
@@ -23,6 +27,17 @@ export const getReports = async (req, res) => {
         const end = new Date(dateTo);
         end.setHours(23, 59, 59, 999);
         query.editedAt.$lte = end;
+      }
+    }
+
+    // Filter by original lead creation date
+    if (leadCreatedFrom || leadCreatedTo) {
+      query.created_at = {};
+      if (leadCreatedFrom) query.created_at.$gte = new Date(leadCreatedFrom);
+      if (leadCreatedTo) {
+        const end = new Date(leadCreatedTo);
+        end.setHours(23, 59, 59, 999);
+        query.created_at.$lte = end;
       }
     }
 
