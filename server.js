@@ -26,19 +26,13 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.json());
 
 // CORS configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:8080',
-].filter(Boolean);
-
 app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+  origin: true,          // allow all origins (safe for mobile apps)
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
 
 
 // Routes
