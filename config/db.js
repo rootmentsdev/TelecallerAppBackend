@@ -1,18 +1,30 @@
 import mongoose from 'mongoose';
 
+let isConnected = false;
+
 const connectDB = async () => {
   try {
-    if (!process.env.MONGO_URI) {
-      console.error("❌ MONGO_URI is not defined in environment variables");
-      throw new Error("MONGO_URI environment variable is required");
+    if (isConnected) {
+      return;
     }
 
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB Connected");
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined");
+    }
+
+    await mongoose.connect(process.env.MONGO_URI, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+
+    isConnected = true;
+    console.log("✅ MongoDB Connected (singleton)");
+
   } catch (err) {
     console.error("❌ MongoDB Connection Error:", err.message);
-    throw err; // always throw so server startup stops
+    throw err;
   }
-}
+};
 
 export default connectDB;
