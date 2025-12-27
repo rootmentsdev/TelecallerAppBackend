@@ -836,6 +836,8 @@ import {
   createAddLead,
   updateGenericLead,
   getLeadById,
+  getGeneralLead,
+  updateGeneralLead,
 } from "../controllers/pageController.js";
 import {
   lossOfSaleGetValidator,
@@ -1072,6 +1074,25 @@ router.post(
   justDialPostValidator,
   handleValidation,
   updateJustDialLead
+);
+
+// ==================== General Lead Page Routes ====================
+// GET /api/pages/general/:id - Fetch General lead data
+router.get(
+  "/general/:id",
+  protect,
+  leadGetValidator,
+  handleValidation,
+  getGeneralLead
+);
+
+// POST /api/pages/general/:id - Update General lead data
+router.post(
+  "/general/:id",
+  protect,
+  leadUpdateValidator,
+  handleValidation,
+  updateGeneralLead
 );
 
 // ==================== Add Lead Page Routes ====================

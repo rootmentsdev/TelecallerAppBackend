@@ -111,8 +111,43 @@ const buildListSnapshot = (lead) => {
   };
 };
 
+// Helper function to validate and normalize remarks input
+const validateAndNormalizeRemarks = (remarks) => {
+  // If remarks is null or undefined, return null
+  if (remarks === null || remarks === undefined) {
+    return { isValid: true, normalizedRemarks: null, error: null };
+  }
+  
+  // Convert to string if not already
+  const stringRemarks = typeof remarks === 'string' ? remarks : String(remarks);
+  
+  // Check length limit (1000 characters)
+  if (stringRemarks.length > 1000) {
+    return { 
+      isValid: false, 
+      normalizedRemarks: null, 
+      error: 'Remarks field cannot exceed 1000 characters' 
+    };
+  }
+  
+  // Check if it's empty or whitespace-only
+  const trimmed = stringRemarks.trim();
+  if (trimmed === '') {
+    return { isValid: true, normalizedRemarks: null, error: null };
+  }
+  
+  // Return original formatting if not empty
+  return { isValid: true, normalizedRemarks: stringRemarks, error: null };
+};
+
 // Helper to create a Report entry from a Lead document using a completely flat structure
-const createReportFromLead = async (leadDoc, userId, note = 'moved after edit', editedFields = null) => {
+const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null) => {
+  // Validate and normalize remarks
+  const remarksValidation = validateAndNormalizeRemarks(userRemarks);
+  if (!remarksValidation.isValid) {
+    throw new Error(remarksValidation.error);
+  }
+
   // Normalize lead object
   const lead = (leadDoc && typeof leadDoc.toObject === 'function') ? leadDoc.toObject() : (leadDoc || {});
 
@@ -175,7 +210,7 @@ const createReportFromLead = async (leadDoc, userId, note = 'moved after edit', 
   // Metadata
   payload.editedBy = userId;
   payload.editedAt = new Date();
-  payload.note = note;
+  payload.note = remarksValidation.normalizedRemarks;
 
   // Create the report document (schema allows dynamic fields via strict:false)
   const report = await Report.create(payload);
@@ -665,6 +700,12 @@ export const updateLossOfSaleLead = async (req, res) => {
     const { id } = req.params;
     const { call_status, lead_status, follow_up_date, reason_collected_from_store, remarks } = req.body;
 
+    // Validate remarks input
+    const remarksValidation = validateAndNormalizeRemarks(remarks);
+    if (!remarksValidation.isValid) {
+      return res.status(400).json({ message: remarksValidation.error });
+    }
+
     const lead = await Lead.findById(id);
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
@@ -679,7 +720,7 @@ export const updateLossOfSaleLead = async (req, res) => {
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
-    if (remarks !== undefined) updateData.remarks = remarks;
+    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "lossOfSale";
@@ -694,7 +735,7 @@ export const updateLossOfSaleLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
 
     // Remove the lead from active collection
     await Lead.findByIdAndDelete(id);
@@ -741,6 +782,12 @@ export const updateReturnLead = async (req, res) => {
     const { id } = req.params;
     const { call_status, lead_status, follow_up_flag, remarks } = req.body;
 
+    // Validate remarks input
+    const remarksValidation = validateAndNormalizeRemarks(remarks);
+    if (!remarksValidation.isValid) {
+      return res.status(400).json({ message: remarksValidation.error });
+    }
+
     const lead = await Lead.findById(id);
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
@@ -759,7 +806,7 @@ export const updateReturnLead = async (req, res) => {
         updateData.followUpDate = new Date();
       }
     }
-    if (remarks !== undefined) updateData.remarks = remarks;
+    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "return";
@@ -774,7 +821,7 @@ export const updateReturnLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -820,6 +867,12 @@ export const updateBookingConfirmationLead = async (req, res) => {
     const { id } = req.params;
     const { call_status, lead_status, follow_up_flag, call_date, remarks } = req.body;
 
+    // Validate remarks input
+    const remarksValidation = validateAndNormalizeRemarks(remarks);
+    if (!remarksValidation.isValid) {
+      return res.status(400).json({ message: remarksValidation.error });
+    }
+
     const lead = await Lead.findById(id);
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
@@ -839,7 +892,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
       }
     }
     if (call_date !== undefined) updateData.callDate = call_date;
-    if (remarks !== undefined) updateData.remarks = remarks;
+    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "bookingConfirmation";
@@ -857,7 +910,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
       };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -940,7 +993,7 @@ export const updateJustDialLead = async (req, res) => {
       };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -1066,7 +1119,7 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, "moved after edit", changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields);
 
     await Lead.findByIdAndDelete(id);
 
@@ -1090,6 +1143,96 @@ export const getLeadById = async (req, res) => {
     const list = buildListSnapshot(lead);
 
     res.json(list);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// ==================== General Lead Page ====================
+
+// GET - Fetch General lead data (GET fields only)
+export const getGeneralLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const lead = await Lead.findById(id);
+
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Return only GET fields for general leads
+    res.json({
+      lead_name: lead.name,
+      phone_number: lead.phone,
+      enquiry_date: lead.enquiryDate,
+      function_date: lead.functionDate,
+      store: lead.store,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST - Update General lead data (POST fields only)
+export const updateGeneralLead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating } = req.body;
+
+    // Validate remarks input
+    const remarksValidation = validateAndNormalizeRemarks(remarks);
+    if (!remarksValidation.isValid) {
+      return res.status(400).json({ message: remarksValidation.error });
+    }
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    if (!checkAccess(lead, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (follow_up_flag !== undefined) {
+      updateData.followUpFlag = follow_up_flag;
+      if (follow_up_flag && !lead.followUpDate) {
+        updateData.followUpDate = new Date();
+      }
+    }
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    if (call_date !== undefined) updateData.callDate = call_date;
+    if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
+    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
+    if (closing_status !== undefined) updateData.closingStatus = closing_status;
+    if (rating !== undefined) updateData.rating = rating;
+
+    // Ensure leadType is set to general
+    if (!lead.leadType || lead.leadType === "general") {
+      updateData.leadType = "general";
+    }
+
+    const beforeLead = lead.toObject();
+
+    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
+
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
+    });
+
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
+
+    // Remove the lead from active collection
+    await Lead.findByIdAndDelete(id);
+
+    res.json({ message: "General lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
