@@ -370,7 +370,7 @@ export const getCallStatusSummary = async (req, res) => {
     const end = new Date(`${date}T23:59:59.999Z`);
 
     let match = {
-      created_at: { $gte: start, $lte: end }   // ✅ FIXED: use created_at for date filtering
+      editedAt: { $gte: start, $lte: end }   // ✅ FIXED: use editedAt for date filtering (shows work done on that date)
     };
 
     // Telecaller can only see their own reports

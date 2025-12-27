@@ -320,29 +320,64 @@ router.get("/", protect, getReports);
  * @swagger
  * /api/reports/call-summary:
  *   get:
- *     summary: Get call status summary for a selected date and store
+ *     summary: Get call status summary for reports edited/processed on a selected date and store
  *     tags:
  *       - Reports
  *     security:
  *       - bearerAuth: []
+ *     description: |
+ *       Returns call status summary for reports that were edited/processed on the specified date.
+ *       
+ *       **Important**: This endpoint uses the **report edit date** (when telecallers processed the leads), 
+ *       NOT the original lead creation date. This shows the actual work completed on the specified date.
+ *       
+ *       **Use Cases:**
+ *       - Daily productivity reporting
+ *       - Telecaller performance tracking
+ *       - Work completion summaries
+ *       
+ *       **Date Behavior:**
+ *       - Shows reports edited/moved on the specified date
+ *       - Reflects actual telecaller activity for that day
+ *       - More accurate for daily business reporting
+ *       
+ *       **Examples:**
+ *       - Get summary for all stores: `/api/reports/call-summary?date=2025-12-25`
+ *       - Get summary for specific store: `/api/reports/call-summary?date=2025-12-25&store=Suitor Guy - Calicut`
  *     parameters:
  *       - in: query
  *         name: date
  *         required: true
  *         schema:
  *           type: string
- *           example: "2025-12-10"
- *         description: Date to filter the summary (YYYY-MM-DD)
+ *           example: "2025-12-25"
+ *         description: |
+ *           Date to filter the summary (YYYY-MM-DD format). 
+ *           
+ *           **Shows call status summary for reports edited/processed on this date.**
+ *           
+ *           This uses the `editedAt` field (when the report was created/moved), 
+ *           NOT the `created_at` field (when the original lead was created).
+ *           
+ *           Examples:
+ *           - `2025-12-25` - Shows work completed on December 25, 2025
+ *           - `2025-12-22` - Shows work completed on December 22, 2025
  *       - in: query
  *         name: store
  *         required: false
  *         schema:
  *           type: string
- *           example: "Suitor Guy - Edappal"
- *         description: Store name (optional). If not provided, results include all stores.
+ *           example: "Suitor Guy - Calicut"
+ *         description: |
+ *           Store name filter (optional). If not provided, results include all stores.
+ *           
+ *           **Supported Formats:**
+ *           - Full store name: `"Suitor Guy - Calicut"`
+ *           - Location only: `"Calicut"` (matches all brands in that location)
+ *           - Brand only: `"Suitor Guy"` (matches all locations for that brand)
  *     responses:
  *       200:
- *         description: Summary fetched successfully
+ *         description: Call status summary fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -350,20 +385,45 @@ router.get("/", protect, getReports);
  *               properties:
  *                 connected:
  *                   type: integer
- *                   example: 12
+ *                   example: 21
+ *                   description: Number of reports with "Connected" call status
  *                 not_connected:
  *                   type: integer
- *                   example: 8
+ *                   example: 9
+ *                   description: Number of reports with "Not Connected" call status
  *                 call_back_later:
  *                   type: integer
- *                   example: 3
+ *                   example: 2
+ *                   description: Number of reports with "Call Back Later" call status
  *                 confirmed:
  *                   type: integer
- *                   example: 5
+ *                   example: 3
+ *                   description: Number of reports with "Confirmed" call status
+ *             examples:
+ *               dailySummary:
+ *                 summary: Daily work summary example
+ *                 value:
+ *                   connected: 21
+ *                   not_connected: 9
+ *                   call_back_later: 2
+ *                   confirmed: 3
+ *                 description: |
+ *                   Example response showing call status summary for work completed on a specific date.
+ *                   Total reports processed: 35 (21+9+2+3)
  *       400:
  *         description: Missing or invalid date parameter
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Date is required"
  *       401:
  *         description: Unauthorized – Token missing or invalid
+ *       403:
+ *         description: Access denied – Telecallers can only see their own reports
  *       500:
  *         description: Internal Server Error
  */
