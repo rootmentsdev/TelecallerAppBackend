@@ -1,6 +1,6 @@
 // API-Only sync script
 // Runs ONLY external API syncs (no CSV imports)
-// Used by automatic scheduler every 10 minutes
+// Used by automatic scheduler every 15 minutes
 // IMPORTANT: Assumes MongoDB is ALREADY connected by server.js
 
 import dotenv from "dotenv";
@@ -10,7 +10,7 @@ const runApiOnlySync = async () => {
   const startTime = Date.now();
 
   console.log("=".repeat(60));
-  console.log("🚀 Starting Automatic API Sync (10-minute interval)");
+  console.log("🚀 Starting Automatic API Sync (15-minute interval)");
   console.log("=".repeat(60));
   console.log("📋 Scope: External APIs only (CSV imports remain manual)");
   console.log();
@@ -76,7 +76,7 @@ const runApiOnlySync = async () => {
     console.log("   • CSV imports skipped (manual only)");
     console.log("   • MongoDB connection reused (singleton)");
     console.log();
-    console.log("🔄 Next automatic sync: 10 minutes");
+    console.log("🔄 Next automatic sync: 15 minutes");
     console.log();
 
     return {
