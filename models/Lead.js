@@ -43,6 +43,9 @@ const leadSchema = new mongoose.Schema(
     attendedBy: { type: String },
     remarks: { type: String, default: "" },
     
+    // Call Duration (in seconds)
+    callDuration: { type: Number, default: 0 },
+    
     // User Tracking
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
