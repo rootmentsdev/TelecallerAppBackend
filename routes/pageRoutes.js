@@ -842,6 +842,9 @@ import {
   getLeadById,
   getGeneralLead,
   updateGeneralLead,
+  getFollowUps,
+  getFollowUpById,
+  updateFollowUp,
 } from "../controllers/pageController.js";
 import {
   lossOfSaleGetValidator,
@@ -1191,6 +1194,556 @@ router.post(
   addLeadPostValidator,
   handleValidation,
   createAddLead
+);
+
+// ==================== Follow-Up Page Routes ====================
+/**
+ * @swagger
+ * /api/pages/follow-ups:
+ *   get:
+ *     summary: Fetch FollowUp leads with optional filters
+ *     tags:
+ *       - Follow-Up
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Returns FollowUp leads filtered by optional parameters. FollowUp leads are leads that were moved from the Leads collection with `followUpFlag=true`.
+ *       
+ *       **3-Stage Lifecycle:**
+ *       - **Leads** → Edited with `followUpFlag=true` → **FollowUps**
+ *       - **FollowUps** → Edited → **Reports** (final state)
+ *       
+ *       **Filtering Options:**
+ *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
+ *       - **Date Filtering**: Multiple date fields available with both range and single-day options
+ *       - **Status Filtering**: Filter by callStatus, leadStatus, source
+ *       - **Sorting**: Sort by createdAt, enquiryDate, functionDate, visitDate, name, or store (asc/desc)
+ *       - **Pagination**: Control page size and navigation
+ *       
+ *       **Store Filter Examples:**
+ *       - Get all FollowUp leads for a store: `/api/pages/follow-ups?store=Suitor Guy - Edappally`
+ *       - Get specific lead type: `/api/pages/follow-ups?leadType=bookingConfirmation&store=Zorucci - Kottayam`
+ *       
+ *       **Date Filter Examples:**
+ *       - Filter by enquiry date: `/api/pages/follow-ups?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
+ *       - Filter by function date: `/api/pages/follow-ups?functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *       - Filter by creation date range: `/api/pages/follow-ups?createdAtFrom=2024-01-01&createdAtTo=2024-12-31`
+ *     parameters:
+ *       - in: query
+ *         name: leadType
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [lossOfSale, general, bookingConfirmation, return, justDial]
+ *         description: Type of FollowUp lead to fetch. If omitted, returns FollowUp leads of all types.
+ *       - in: query
+ *         name: store
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "Suitor Guy - Edappally"
+ *         description: Filter FollowUp leads by store name using "Brand - Location" format.
+ *       - in: query
+ *         name: callStatus
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by call status.
+ *       - in: query
+ *         name: leadStatus
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by lead status.
+ *       - in: query
+ *         name: source
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by source (e.g., "Walk-in", "Booking", "Return", "Loss of Sale").
+ *       - in: query
+ *         name: enquiryDateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-01-01"
+ *         description: Filter FollowUp leads with enquiry date on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: enquiryDateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-12-31"
+ *         description: Filter FollowUp leads with enquiry date on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: functionDateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-03-01"
+ *         description: Filter FollowUp leads with function/event date on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: functionDateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-03-31"
+ *         description: Filter FollowUp leads with function/event date on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: visitDateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-02-01"
+ *         description: Filter FollowUp leads with visit date on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: visitDateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-02-28"
+ *         description: Filter FollowUp leads with visit date on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: createdAtFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-01-01"
+ *         description: Filter FollowUp leads created on or after this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: createdAtTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-12-31"
+ *         description: Filter FollowUp leads created on or before this date (YYYY-MM-DD).
+ *       - in: query
+ *         name: createdAt
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-12-08"
+ *         description: Filter FollowUp leads created on a specific date (YYYY-MM-DD).
+ *       - in: query
+ *         name: dateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-01-01"
+ *         description: Generic date range start (applies to the field specified by `dateField`, default: `enquiryDate`).
+ *       - in: query
+ *         name: dateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: "2024-12-31"
+ *         description: Generic date range end (applies to the field specified by `dateField`, default: `enquiryDate`).
+ *       - in: query
+ *         name: dateField
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [enquiryDate, functionDate, visitDate, createdAt]
+ *           default: enquiryDate
+ *         description: Which date field to use with `dateFrom`/`dateTo` parameters.
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number (1-indexed).
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 100
+ *         description: Number of records per page.
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store]
+ *           default: createdAt
+ *         description: Field to sort results by.
+ *       - in: query
+ *         name: sortOrder
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order: ascending (`asc`) or descending (`desc`).
+ *     responses:
+ *       200:
+ *         description: Returns a list of FollowUp leads and pagination info.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 leads:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       lead_name:
+ *                         type: string
+ *                       phone_number:
+ *                         type: string
+ *                       store:
+ *                         type: string
+ *                       lead_type:
+ *                         type: string
+ *                       call_status:
+ *                         type: string
+ *                       lead_status:
+ *                         type: string
+ *                       enquiry_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       function_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       visit_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       booking_number:
+ *                         type: string
+ *                         nullable: true
+ *                       return_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       call_duration:
+ *                         type: number
+ *                         description: "Call duration in seconds"
+ *                       remarks:
+ *                         type: string
+ *                       follow_up_date:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       assigned_to:
+ *                         type: object
+ *                         nullable: true
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           employee_id:
+ *                             type: string
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     total:
+ *                       type: integer
+ *                     pages:
+ *                       type: integer
+ *             examples:
+ *               allFollowUps:
+ *                 summary: Get all FollowUp leads
+ *                 value:
+ *                   leads: []
+ *                   pagination:
+ *                     page: 1
+ *                     limit: 100
+ *                     total: 0
+ *                     pages: 0
+ *               filteredByStore:
+ *                 summary: Get FollowUp leads for a specific store
+ *                 value:
+ *                   leads: []
+ *                   pagination:
+ *                     page: 1
+ *                     limit: 100
+ *                     total: 0
+ *                     pages: 0
+ *       401:
+ *         description: Unauthorized. Token missing or invalid.
+ *       500:
+ *         description: Internal server error.
+ */
+// GET /api/pages/follow-ups - Fetch list of FollowUp leads
+router.get(
+  "/follow-ups",
+  protect,
+  leadsListValidator,
+  handleValidation,
+  getFollowUps
+);
+
+/**
+ * @swagger
+ * /api/pages/follow-ups/{id}:
+ *   get:
+ *     summary: Get FollowUp lead details by ID
+ *     tags:
+ *       - Follow-Up
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Returns a single FollowUp lead by its ID. FollowUp leads are leads that were moved from the Leads collection with `followUpFlag=true` and are awaiting final follow-up before being moved to Reports.
+ *       
+ *       **Access Control:**
+ *       - Admin: Can access all FollowUp leads
+ *       - Team Lead: Can access FollowUp leads in their store
+ *       - Telecaller: Can access only FollowUp leads assigned to them
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: FollowUp lead ID
+ *     responses:
+ *       200:
+ *         description: FollowUp lead details in listing format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 lead_name:
+ *                   type: string
+ *                 phone_number:
+ *                   type: string
+ *                 store:
+ *                   type: string
+ *                 lead_type:
+ *                   type: string
+ *                 call_status:
+ *                   type: string
+ *                 lead_status:
+ *                   type: string
+ *                 enquiry_date:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 function_date:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 visit_date:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 booking_number:
+ *                   type: string
+ *                   nullable: true
+ *                 return_date:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 call_duration:
+ *                   type: number
+ *                   description: "Call duration in seconds"
+ *                 remarks:
+ *                   type: string
+ *                 follow_up_date:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 assigned_to:
+ *                   type: object
+ *                   nullable: true
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     employee_id:
+ *                       type: string
+ *       401:
+ *         description: Unauthorized. Token missing or invalid.
+ *       403:
+ *         description: Access denied. User doesn't have permission to access this FollowUp lead.
+ *       404:
+ *         description: FollowUp lead not found.
+ *       500:
+ *         description: Internal server error.
+ */
+// GET /api/pages/follow-ups/:id - Fetch FollowUp lead by id
+router.get(
+  "/follow-ups/:id",
+  protect,
+  leadGetValidator,
+  handleValidation,
+  getFollowUpById
+);
+
+/**
+ * @swagger
+ * /api/pages/follow-ups/{id}:
+ *   post:
+ *     summary: Update FollowUp lead and move to Reports
+ *     tags:
+ *       - Follow-Up
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Updates a FollowUp lead with new call status, lead status, remarks, and call duration. After updating, the FollowUp lead is moved to the Reports collection (final state).
+ *       
+ *       **3-Stage Lifecycle:**
+ *       1. **Leads** → Edited with `followUpFlag=true` → **FollowUps**
+ *       2. **FollowUps** → Edited (this endpoint) → **Reports** (final state)
+ *       
+ *       **Important Notes:**
+ *       - FollowUp leads can only be moved to Reports (final state)
+ *       - All fields (callStatus, leadStatus, callDuration, remarks, leadType, store) are preserved
+ *       - The FollowUp lead is removed from FollowUps collection after update
+ *       - A Report entry is created with the final state
+ *       
+ *       **Access Control:**
+ *       - Admin: Can update all FollowUp leads
+ *       - Team Lead: Can update FollowUp leads in their store
+ *       - Telecaller: Can update only FollowUp leads assigned to them
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: FollowUp lead ID to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               call_status:
+ *                 type: string
+ *                 description: Updated call status
+ *                 example: "Called"
+ *               lead_status:
+ *                 type: string
+ *                 description: Updated lead status
+ *                 example: "Interested"
+ *               remarks:
+ *                 type: string
+ *                 description: Updated remarks (max 1000 characters)
+ *                 example: "Customer confirmed booking for March 2024"
+ *               call_duration:
+ *                 type: number
+ *                 description: Call duration in seconds
+ *                 example: 300
+ *                 minimum: 0
+ *           required:
+ *             - call_status
+ *             - lead_status
+ *     responses:
+ *       200:
+ *         description: FollowUp lead updated and moved to Reports successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Follow-up lead updated and moved to reports"
+ *                 report:
+ *                   type: object
+ *                   description: Created Report entry with final state
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     lead_name:
+ *                       type: string
+ *                     phone_number:
+ *                       type: string
+ *                     store:
+ *                       type: string
+ *                     lead_type:
+ *                       type: string
+ *                     call_status:
+ *                       type: string
+ *                     lead_status:
+ *                       type: string
+ *                     call_duration:
+ *                       type: number
+ *                     remarks:
+ *                       type: string
+ *                     editedBy:
+ *                       type: string
+ *                     editedAt:
+ *                       type: string
+ *                       format: date-time
+ *             examples:
+ *               success:
+ *                 summary: Successful update
+ *                 value:
+ *                   message: "Follow-up lead updated and moved to reports"
+ *                   report:
+ *                     _id: "507f1f77bcf86cd799439011"
+ *                     lead_name: "John Doe"
+ *                     phone_number: "9876543210"
+ *                     store: "Suitor Guy - Edappally"
+ *                     lead_type: "bookingConfirmation"
+ *                     call_status: "Called"
+ *                     lead_status: "Interested"
+ *                     call_duration: 300
+ *                     remarks: "Customer confirmed booking for March 2024"
+ *                     editedBy: "507f1f77bcf86cd799439012"
+ *                     editedAt: "2024-12-29T10:30:00.000Z"
+ *       400:
+ *         description: Validation error (e.g., remarks exceeds 1000 characters)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Remarks field cannot exceed 1000 characters"
+ *       401:
+ *         description: Unauthorized. Token missing or invalid.
+ *       403:
+ *         description: Access denied. User doesn't have permission to update this FollowUp lead.
+ *       404:
+ *         description: FollowUp lead not found.
+ *       500:
+ *         description: Internal server error.
+ */
+// POST /api/pages/follow-ups/:id - Update FollowUp lead (moves to Reports)
+router.post(
+  "/follow-ups/:id",
+  protect,
+  leadUpdateValidator,
+  handleValidation,
+  updateFollowUp
 );
 
 // Simple test route (for Swagger sanity check)

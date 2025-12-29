@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Lead from "../../models/Lead.js";
+import FollowUp from "../../models/FollowUp.js";
 import Report from "../../models/Report.js";
 import Store from "../../models/Store.js";
 import User from "../../models/User.js";
@@ -45,7 +46,7 @@ export const bulkSaveToMongo = async (leadsData) => {
         continue;
       }
 
-      // Check if lead exists in reports (skip if moved to reports)
+      // Check if lead exists in reports or follow-ups (skip if moved)
       const reportOrClauses = [];
       if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
         const bookingNo = leadData.bookingNo.trim();
@@ -67,6 +68,19 @@ export const bulkSaveToMongo = async (leadsData) => {
       if (existingReport) {
         results.skipped++;
         skipReasons.push({ phone: leadData.phone, reason: "Lead exists in reports" });
+        continue;
+      }
+
+      // Also check FollowUps collection
+      const followUpQuery = { phone: leadData.phone };
+      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+        followUpQuery.bookingNo = leadData.bookingNo.trim();
+        followUpQuery.leadType = leadData.leadType;
+      }
+      const existingFollowUp = await FollowUp.findOne(followUpQuery);
+      if (existingFollowUp) {
+        results.skipped++;
+        skipReasons.push({ phone: leadData.phone, reason: "Lead exists in follow-ups" });
         continue;
       }
 
@@ -165,7 +179,7 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Missing required fields" };
     }
 
-    // IMPORTANT: Check if lead already exists in Report collection (moved after edit)
+    // IMPORTANT: Check if lead already exists in Report or FollowUp collection (moved after edit)
     // New Report schema stores flattened lead in `leadData`. Support both old snapshot fields and new leadData fields.
     const reportOrClauses = [];
 
@@ -192,6 +206,22 @@ export const saveToMongo = async (leadData) => {
     if (existingReport) {
       // Lead was moved to reports - skip importing to prevent it from reappearing in leads list
       return { skipped: true, reason: "Lead exists in reports (moved after edit)" };
+    }
+
+    // Also check FollowUps collection
+    const followUpQuery = { phone: leadData.phone };
+    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+      followUpQuery.bookingNo = leadData.bookingNo.trim();
+      followUpQuery.leadType = leadData.leadType;
+    } else {
+      followUpQuery.name = leadData.name;
+      followUpQuery.leadType = leadData.leadType;
+      followUpQuery.store = leadData.store;
+    }
+    const existingFollowUp = await FollowUp.findOne(followUpQuery);
+    if (existingFollowUp) {
+      // Lead was moved to follow-ups - skip importing to prevent it from reappearing in leads list
+      return { skipped: true, reason: "Lead exists in follow-ups (moved after edit)" };
     }
 
     // For booking confirmation and return: check for duplicates and skip (don't update to preserve user edits)

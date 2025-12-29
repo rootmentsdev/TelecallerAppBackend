@@ -1,4 +1,5 @@
 import Lead from "../models/Lead.js";
+import FollowUp from "../models/FollowUp.js";
 import Report from "../models/Report.js";
 
 // Helper function to check access permissions
@@ -140,7 +141,33 @@ const validateAndNormalizeRemarks = (remarks) => {
   return { isValid: true, normalizedRemarks: stringRemarks, error: null };
 };
 
-// Helper to create a Report entry from a Lead document using a completely flat structure
+// Helper to move a Lead to FollowUp collection
+const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
+  // Normalize lead object
+  const lead = (leadDoc && typeof leadDoc.toObject === 'function') ? leadDoc.toObject() : (leadDoc || {});
+  
+  // Remove _id and __v to allow MongoDB to create new _id
+  delete lead._id;
+  delete lead.__v;
+  
+  // Add FollowUp-specific fields
+  lead.movedToFollowUpAt = new Date();
+  lead.movedToFollowUpBy = userId;
+  
+  // Ensure callDuration is set
+  if (callDuration !== undefined && callDuration !== null) {
+    lead.callDuration = callDuration;
+  } else {
+    lead.callDuration = lead.callDuration || 0;
+  }
+  
+  // Create FollowUp document
+  const followUp = await FollowUp.create(lead);
+  
+  return followUp;
+};
+
+// Helper to create a Report entry from a Lead or FollowUp document using a completely flat structure
 const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0) => {
   // Validate and normalize remarks
   const remarksValidation = validateAndNormalizeRemarks(userRemarks);
@@ -175,10 +202,11 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.security_amount = lead.securityAmount ?? lead.security_amount ?? null;
   payload.remarks = lead.remarks ?? "";
   payload.reason_collected_from_store = lead.reasonCollectedFromStore ?? lead.reason_collected_from_store ?? "";
+  payload.call_duration = lead.callDuration ?? callDuration ?? 0;
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -724,6 +752,7 @@ export const updateLossOfSaleLead = async (req, res) => {
     if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "lossOfSale";
@@ -738,12 +767,20 @@ export const updateLossOfSaleLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    // Check followUpFlag to determine destination
+    const followUpFlag = updatedLead.followUpFlag;
 
-    // Remove the lead from active collection
-    await Lead.findByIdAndDelete(id);
-
-    res.json({ message: "Loss of Sale lead updated and moved to reports", report });
+    if (followUpFlag === true) {
+      // Move to FollowUps collection
+      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp });
+    } else {
+      // Move to Reports collection (existing behavior)
+      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Loss of Sale lead updated and moved to reports", report });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -810,6 +847,7 @@ export const updateReturnLead = async (req, res) => {
       }
     }
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "return";
@@ -824,11 +862,20 @@ export const updateReturnLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    // Check followUpFlag to determine destination
+    const followUpFlag = updatedLead.followUpFlag;
 
-    await Lead.findByIdAndDelete(id);
-
-    res.json({ message: "Return lead updated and moved to reports", report });
+    if (followUpFlag === true) {
+      // Move to FollowUps collection
+      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Return lead updated and moved to follow-ups", followUp });
+    } else {
+      // Move to Reports collection (existing behavior)
+      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Return lead updated and moved to reports", report });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -896,6 +943,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
     }
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "bookingConfirmation";
@@ -913,11 +961,20 @@ export const updateBookingConfirmationLead = async (req, res) => {
       };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    // Check followUpFlag to determine destination
+    const followUpFlag = updatedLead.followUpFlag;
 
-    await Lead.findByIdAndDelete(id);
-
-    res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
+    if (followUpFlag === true) {
+      // Move to FollowUps collection
+      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp });
+    } else {
+      // Move to Reports collection (existing behavior)
+      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -979,6 +1036,7 @@ export const updateJustDialLead = async (req, res) => {
     }
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarks;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     if (!lead.leadType || lead.leadType === "general") {
       updateData.leadType = "justDial";
@@ -996,11 +1054,20 @@ export const updateJustDialLead = async (req, res) => {
       };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+    // Check followUpFlag to determine destination
+    const followUpFlag = updatedLead.followUpFlag;
 
-    await Lead.findByIdAndDelete(id);
-
-    res.json({ message: "Just Dial lead updated and moved to reports", report });
+    if (followUpFlag === true) {
+      // Move to FollowUps collection
+      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp });
+    } else {
+      // Move to Reports collection (existing behavior)
+      const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "Just Dial lead updated and moved to reports", report });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1108,6 +1175,7 @@ export const updateGenericLead = async (req, res) => {
     if (remarks !== undefined) updateData.remarks = remarks;
     if (closing_status !== undefined) updateData.closingStatus = closing_status;
     if (rating !== undefined) updateData.rating = rating;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     // If lead was general and client intends to keep it general, don't overwrite leadType.
     // If you want to change leadType, frontend can call a specific endpoint or include lead_type in body.
@@ -1123,11 +1191,20 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+    // Check followUpFlag to determine destination
+    const followUpFlag = updatedLead.followUpFlag;
 
-    await Lead.findByIdAndDelete(id);
-
-    res.json({ message: 'Lead updated and moved to reports', report });
+    if (followUpFlag === true) {
+      // Move to FollowUps collection
+      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: 'Lead updated and moved to follow-ups', followUp });
+    } else {
+      // Move to Reports collection (existing behavior)
+      const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: 'Lead updated and moved to reports', report });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1216,6 +1293,7 @@ export const updateGeneralLead = async (req, res) => {
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (closing_status !== undefined) updateData.closingStatus = closing_status;
     if (rating !== undefined) updateData.rating = rating;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     // Ensure leadType is set to general
     if (!lead.leadType || lead.leadType === "general") {
@@ -1231,12 +1309,228 @@ export const updateGeneralLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    // Check followUpFlag to determine destination
+    const followUpFlag = updatedLead.followUpFlag;
 
-    // Remove the lead from active collection
-    await Lead.findByIdAndDelete(id);
+    if (followUpFlag === true) {
+      // Move to FollowUps collection
+      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "General lead updated and moved to follow-ups", followUp });
+    } else {
+      // Move to Reports collection (existing behavior)
+      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      await Lead.findByIdAndDelete(id);
+      res.json({ message: "General lead updated and moved to reports", report });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
-    res.json({ message: "General lead updated and moved to reports", report });
+// ==================== Follow-Up Page ====================
+
+// GET - Fetch list of FollowUp leads (similar to getLeads)
+export const getFollowUps = async (req, res) => {
+  try {
+    const {
+      leadType,
+      store,
+      callStatus,
+      leadStatus,
+      source,
+      enquiryDateFrom,
+      enquiryDateTo,
+      functionDateFrom,
+      functionDateTo,
+      visitDateFrom,
+      visitDateTo,
+      createdAtFrom,
+      createdAtTo,
+      createdAt,
+      dateFrom,
+      dateTo,
+      dateField,
+      page = 1,
+      limit = 100,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    const filters = {};
+    if (leadType) filters.leadType = leadType;
+    if (store) {
+      // Support "Brand - Location" format
+      if (store.includes(" - ")) {
+        const [brand, location] = store.split(" - ").map((s) => s.trim());
+        filters.$or = [
+          { store: { $regex: store, $options: "i" } },
+          { store: { $regex: brand, $options: "i" } },
+          { store: { $regex: location, $options: "i" } },
+        ];
+      } else {
+        filters.store = { $regex: store, $options: "i" };
+      }
+    }
+    if (callStatus) filters.callStatus = callStatus;
+    if (leadStatus) filters.leadStatus = leadStatus;
+    if (source) filters.source = source;
+
+    // Date filtering
+    if (enquiryDateFrom || enquiryDateTo) {
+      filters.enquiryDate = {};
+      if (enquiryDateFrom) filters.enquiryDate.$gte = new Date(enquiryDateFrom);
+      if (enquiryDateTo) {
+        const endDate = new Date(enquiryDateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.enquiryDate.$lte = endDate;
+      }
+    } else if (functionDateFrom || functionDateTo) {
+      filters.functionDate = {};
+      if (functionDateFrom) filters.functionDate.$gte = new Date(functionDateFrom);
+      if (functionDateTo) {
+        const endDate = new Date(functionDateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.functionDate.$lte = endDate;
+      }
+    } else if (visitDateFrom || visitDateTo) {
+      filters.visitDate = {};
+      if (visitDateFrom) filters.visitDate.$gte = new Date(visitDateFrom);
+      if (visitDateTo) {
+        const endDate = new Date(visitDateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.visitDate.$lte = endDate;
+      }
+    } else if (createdAt) {
+      // Single day filter
+      const startDate = new Date(createdAt);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(createdAt);
+      endDate.setHours(23, 59, 59, 999);
+      filters.createdAt = { $gte: startDate, $lte: endDate };
+    } else if (createdAtFrom || createdAtTo) {
+      filters.createdAt = {};
+      if (createdAtFrom) filters.createdAt.$gte = new Date(createdAtFrom);
+      if (createdAtTo) {
+        const endDate = new Date(createdAtTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters.createdAt.$lte = endDate;
+      }
+    } else if (dateFrom || dateTo) {
+      const field = dateField || "enquiryDate";
+      filters[field] = {};
+      if (dateFrom) filters[field].$gte = new Date(dateFrom);
+      if (dateTo) {
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        filters[field].$lte = endDate;
+      }
+    }
+
+    // Apply role-based filtering
+    const query = buildLeadQuery(filters, req.user);
+
+    // Sorting
+    const sortOptions = {};
+    const validSortFields = ["createdAt", "enquiryDate", "functionDate", "visitDate", "name", "store"];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+    sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
+
+    // Pagination
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 100;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Execute query
+    const [followUps, total] = await Promise.all([
+      FollowUp.find(query).sort(sortOptions).skip(skip).limit(limitNum).populate("assignedTo", "name employeeId").lean(),
+      FollowUp.countDocuments(query),
+    ]);
+
+    // Transform to list format
+    const leadsList = followUps.map((followUp) => buildListSnapshot(followUp));
+
+    res.json({
+      leads: leadsList,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET - Fetch FollowUp lead by id
+export const getFollowUpById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const followUp = await FollowUp.findById(id).populate("assignedTo", "name employeeId");
+    if (!followUp) return res.status(404).json({ message: "Follow-up lead not found" });
+
+    if (!checkAccess(followUp, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const list = buildListSnapshot(followUp);
+    res.json(list);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// POST - Update FollowUp lead (moves to Reports)
+export const updateFollowUp = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      call_status,
+      lead_status,
+      remarks,
+      call_duration
+    } = req.body;
+
+    // Validate remarks input
+    const remarksValidation = validateAndNormalizeRemarks(remarks);
+    if (!remarksValidation.isValid) {
+      return res.status(400).json({ message: remarksValidation.error });
+    }
+
+    const followUp = await FollowUp.findById(id);
+    if (!followUp) {
+      return res.status(404).json({ message: "Follow-up lead not found" });
+    }
+
+    if (!checkAccess(followUp, req.user)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Update FollowUp with new data
+    const updateData = {};
+    if (call_status !== undefined) updateData.callStatus = call_status;
+    if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
+    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
+
+    const beforeFollowUp = followUp.toObject();
+    const updatedFollowUp = await FollowUp.findByIdAndUpdate(id, updateData, { new: true });
+
+    // Build changedFields for report
+    const changedFields = {};
+    Object.keys(updateData).forEach((key) => {
+      changedFields[key] = { before: beforeFollowUp[key], after: updatedFollowUp[key] };
+    });
+
+    // Move to Reports collection (final state)
+    const report = await createReportFromLead(updatedFollowUp, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration || updatedFollowUp.callDuration || 0);
+
+    // Remove from FollowUps collection
+    await FollowUp.findByIdAndDelete(id);
+
+    res.json({ message: "Follow-up lead updated and moved to reports", report });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
