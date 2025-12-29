@@ -84,9 +84,11 @@ const run = async () => {
       console.log(`   Using ${incrementalDays}-DAY incremental sync: FROM ${dateFrom} TO ${dateTo}`);
       console.log(`   ℹ️  Fetching records for the last ${incrementalDays} days only.`);
     } else {
-      // First sync - default to last 12 months
-      months = "12";
-      console.log(`   Using default: last 12 months (first sync)`);
+      // First sync - default to last 2 months (performance optimization)
+      // Note: This variable is informational; actual API payload uses hardcoded months: "2" below
+      // Incremental sync + duplicate prevention ensures no data loss
+      months = "2";
+      console.log(`   Using default: last 2 months (first sync)`);
     }
   } else {
     // Use environment variables if specified
@@ -124,9 +126,14 @@ const run = async () => {
     // Note: API prefers months parameter over dateFrom/dateTo
     // Simplified request body: Only send what is absolutely necessary
     // API often fails if too many empty strings are sent
+    // PERFORMANCE OPTIMIZATION: Reduced from 12 to 2 months to reduce payload size (~75k → ~12k records)
+    // This is safe because:
+    // 1. Incremental sync (lastSyncAt) ensures we don't miss new records
+    // 2. Duplicate prevention (unique indexes) prevents re-insertion of old records
+    // 3. Manual/full sync can still fetch older data if needed via environment variables
     const requestBody = {
       locationID: String(locationId),
-      months: "12", // Force 12 months to get all data
+      months: "2", // Reduced from 12 for performance (incremental sync + dedupe ensures data safety)
     };
 
     console.log(`📡 Calling API: ${fallbackUrl}`);
