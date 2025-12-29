@@ -197,24 +197,14 @@ export const saveToMongo = async (leadData) => {
     // For booking confirmation and return: check for duplicates and skip (don't update to preserve user edits)
     // These come from API and should only add new records (incremental sync)
     if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
-      let duplicateQuery = null;
-
-      // For booking/return: Primary check: bookingNo + phone + leadType (most reliable)
-      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        duplicateQuery = {
-          bookingNo: leadData.bookingNo.trim(),
-          phone: leadData.phone,
-          leadType: leadData.leadType,
-        };
-      } else {
-        // Fallback: phone + name + leadType + store (if bookingNo is missing)
-        duplicateQuery = {
-          phone: leadData.phone,
-          name: leadData.name,
-          leadType: leadData.leadType,
-          store: leadData.store,
-        };
-      }
+      // Check using the unique index key: name + phone + leadType + store
+      // This matches the database unique index to prevent E11000 errors
+      const duplicateQuery = {
+        name: leadData.name,
+        phone: leadData.phone,
+        leadType: leadData.leadType,
+        store: leadData.store,
+      };
 
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
@@ -304,9 +294,26 @@ export const saveToMongo = async (leadData) => {
     }
 
     // For other lead types (justDial) or new records: create new lead
-    const lead = await Lead.create(leadData);
-    return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
+    // Use try-catch to handle duplicate key errors gracefully
+    try {
+      const lead = await Lead.create(leadData);
+      return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
+    } catch (createError) {
+      // Handle duplicate key errors (E11000) - treat as skipped, not error
+      if (createError.code === 11000 || createError.name === 'MongoServerError' && createError.code === 11000) {
+        // Duplicate detected by unique index - this is expected, treat as skipped
+        return { skipped: true, reason: "Duplicate detected by unique index" };
+      }
+      // Re-throw other errors to be caught by outer catch
+      throw createError;
+    }
   } catch (error) {
+    // Handle duplicate key errors gracefully (E11000)
+    if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) {
+      // Duplicate detected - treat as skipped, not error
+      return { skipped: true, reason: "Duplicate detected by unique index" };
+    }
+    // Log other errors
     console.error("Error saving lead:", error.message);
     return { error: true, message: error.message };
   }

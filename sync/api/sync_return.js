@@ -236,8 +236,11 @@ const run = async () => {
               return { saved: 1, skipped: 0, errors: 0 };
             } else if (result.skipped) {
               return { saved: 0, skipped: 1, errors: 0 };
-            } else {
+            } else if (result.error) {
               return { saved: 0, skipped: 0, errors: 1 };
+            } else {
+              // Unknown result type - treat as skipped
+              return { saved: 0, skipped: 1, errors: 0 };
             }
           } else {
             return { saved: 0, skipped: 1, errors: 0 };

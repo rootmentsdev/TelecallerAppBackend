@@ -1,5 +1,5 @@
 // API-Only Sync Scheduler
-// Automatically runs API sync every 10 minutes
+// Automatically runs API sync every 15 minutes
 // Does NOT affect CSV imports (remain manual)
 
 import cron from 'node-cron';
@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Configuration
-const SYNC_TIME = process.env.API_SYNC_TIME || '*/10 * * * *'; // Default: Every 10 minutes
+const SYNC_TIME = process.env.API_SYNC_TIME || '*/15 * * * *'; // Default: Every 15 minutes
 const SYNC_ENABLED = process.env.API_SYNC_ENABLED !== 'false'; // Default: enabled
 const SYNC_TIMEZONE = process.env.API_SYNC_TIMEZONE || 'Asia/Kolkata'; // Default: Asia/Kolkata
 
@@ -44,13 +44,13 @@ const runApiSync = async () => {
 
 const getNextRunTime = () => {
   try {
-    // Calculate next run time manually for */10 * * * * pattern
+    // Calculate next run time manually for */15 * * * * pattern
     const now = new Date();
     const nextRun = new Date(now);
     
-    // Round up to next 10-minute interval
+    // Round up to next 15-minute interval
     const minutes = now.getMinutes();
-    const nextMinutes = Math.ceil(minutes / 10) * 10;
+    const nextMinutes = Math.ceil(minutes / 15) * 15;
     
     if (nextMinutes >= 60) {
       nextRun.setHours(now.getHours() + 1);
@@ -79,14 +79,14 @@ const startScheduler = () => {
 
   console.log('📅 Starting API sync scheduler...');
   console.log(`   Schedule: ${SYNC_TIME} (Asia/Kolkata)`);
-  console.log(`   Frequency: Every 10 minutes`);
+  console.log(`   Frequency: Every 15 minutes`);
   console.log(`   Next run: ${getNextRunTime()}`);
   console.log('   Scope: External APIs only (CSV imports remain manual)');
 
   // Validate cron expression
   if (!cron.validate(SYNC_TIME)) {
     console.error('❌ Invalid cron expression:', SYNC_TIME);
-    console.error('   Using default: */10 * * * * (Every 10 minutes)');
+    console.error('   Using default: */15 * * * * (Every 15 minutes)');
     return null;
   }
 

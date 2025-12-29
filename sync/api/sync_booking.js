@@ -344,8 +344,11 @@ const run = async () => {
           totalSaved++;
         } else if (result.skipped) {
           totalSkipped++;
-        } else {
+        } else if (result.error) {
           totalErrors++;
+        } else {
+          // Unknown result type - treat as skipped
+          totalSkipped++;
         }
       } else {
         totalSkipped++;
