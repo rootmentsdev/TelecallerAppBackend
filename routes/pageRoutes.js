@@ -620,6 +620,7 @@
  *               call_status: { type: string }
  *               lead_status: { type: string }
  *               follow_up_flag: { type: boolean }
+ *               follow_up_date: { type: string, format: date-time, description: "Follow-up date when followUpFlag is true" }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
@@ -696,6 +697,7 @@
  *               call_status: { type: string }
  *               lead_status: { type: string }
  *               follow_up_flag: { type: boolean }
+ *               follow_up_date: { type: string, format: date-time, description: "Follow-up date when followUpFlag is true" }
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
@@ -773,6 +775,7 @@
  *               closing_status: { type: string }
  *               reason: { type: string }
  *               follow_up_flag: { type: boolean }
+ *               follow_up_date: { type: string, format: date-time, description: "Follow-up date when followUpFlag is true" }
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
@@ -1651,6 +1654,11 @@ router.get(
  *                 type: string
  *                 description: Updated lead status
  *                 example: "Interested"
+ *               follow_up_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Follow-up date (optional, preserves existing if not provided)
+ *                 example: "2024-03-15T10:00:00Z"
  *               remarks:
  *                 type: string
  *                 description: Updated remarks (max 1000 characters)
