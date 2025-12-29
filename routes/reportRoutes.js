@@ -15,6 +15,10 @@ const router = express.Router();
  *         leadData:
  *           type: object
  *           description: Flattened lead data as returned by the leads list API (lead_name, phone_number, store, lead_type, etc.)
+ *         callDuration:
+ *           type: number
+ *           description: Call duration in seconds (0 if not provided)
+ *           example: 120
  *         editedBy:
  *           type: object
  *         editedAt:

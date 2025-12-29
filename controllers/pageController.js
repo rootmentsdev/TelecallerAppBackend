@@ -141,7 +141,7 @@ const validateAndNormalizeRemarks = (remarks) => {
 };
 
 // Helper to create a Report entry from a Lead document using a completely flat structure
-const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null) => {
+const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0) => {
   // Validate and normalize remarks
   const remarksValidation = validateAndNormalizeRemarks(userRemarks);
   if (!remarksValidation.isValid) {
@@ -213,7 +213,10 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.note = remarksValidation.normalizedRemarks;
 
   // Create the report document (schema allows dynamic fields via strict:false)
-  const report = await Report.create(payload);
+  const report = await Report.create({
+    ...payload,
+    callDuration: callDuration || 0
+  });
 
   // Ensure report_id field is set to the saved _id string
   try {
@@ -698,7 +701,7 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_date, reason_collected_from_store, remarks } = req.body;
+    const { call_status, lead_status, follow_up_date, reason_collected_from_store, remarks, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -735,7 +738,7 @@ export const updateLossOfSaleLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
 
     // Remove the lead from active collection
     await Lead.findByIdAndDelete(id);
@@ -780,7 +783,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, remarks } = req.body;
+    const { call_status, lead_status, follow_up_flag, remarks, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -821,7 +824,7 @@ export const updateReturnLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
 
     await Lead.findByIdAndDelete(id);
 
@@ -865,7 +868,7 @@ export const getBookingConfirmationLead = async (req, res) => {
 export const updateBookingConfirmationLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, call_date, remarks } = req.body;
+    const { call_status, lead_status, follow_up_flag, call_date, remarks, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -910,7 +913,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
       };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
 
     await Lead.findByIdAndDelete(id);
 
@@ -952,7 +955,7 @@ export const getJustDialLead = async (req, res) => {
 export const updateJustDialLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, closing_status, reason, follow_up_flag, call_date, remarks } = req.body;
+    const { call_status, lead_status, closing_status, reason, follow_up_flag, call_date, remarks, call_duration } = req.body;
 
     const lead = await Lead.findById(id);
     if (!lead) {
@@ -993,7 +996,7 @@ export const updateJustDialLead = async (req, res) => {
       };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
 
     await Lead.findByIdAndDelete(id);
 
@@ -1079,7 +1082,8 @@ export const updateGenericLead = async (req, res) => {
       reason_collected_from_store,
       remarks,
       closing_status,
-      rating
+      rating,
+      call_duration
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1119,7 +1123,7 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
 
     await Lead.findByIdAndDelete(id);
 
@@ -1180,7 +1184,7 @@ export const getGeneralLead = async (req, res) => {
 export const updateGeneralLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1227,7 +1231,7 @@ export const updateGeneralLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields);
+    const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
 
     // Remove the lead from active collection
     await Lead.findByIdAndDelete(id);

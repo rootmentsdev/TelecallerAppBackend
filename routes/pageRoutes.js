@@ -546,6 +546,7 @@
  *               follow_up_date: { type: string, format: date-time }
  *               reason_collected_from_store: { type: string }
  *               remarks: { type: string }
+ *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
  *         description: Loss of Sale lead updated successfully
@@ -620,6 +621,7 @@
  *               lead_status: { type: string }
  *               follow_up_flag: { type: boolean }
  *               remarks: { type: string }
+ *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
  *         description: Return lead updated successfully
@@ -696,6 +698,7 @@
  *               follow_up_flag: { type: boolean }
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
+ *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
  *         description: Booking Confirmation lead updated
@@ -772,6 +775,7 @@
  *               follow_up_flag: { type: boolean }
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
+ *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
  *         description: Just Dial lead updated
@@ -903,6 +907,9 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *                 type: string
  *               rating:
  *                 type: integer
+ *               call_duration:
+ *                 type: number
+ *                 description: "Call duration in seconds"
  *     responses:
  *       200:
  *         description: Lead updated and moved to reports. Returns created report object.
@@ -956,6 +963,7 @@ router.patch(
  *               remarks: { type: string }
  *               closing_status: { type: string }
  *               rating: { type: integer }
+ *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
  *         description: Lead updated and moved to reports
@@ -1077,6 +1085,43 @@ router.post(
 );
 
 // ==================== General Lead Page Routes ====================
+/**
+ * @swagger
+ * /api/pages/general/{id}:
+ *   get:
+ *     summary: Get General lead details
+ *     tags:
+ *       - General Lead
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: General lead details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 lead_name: { type: string }
+ *                 phone_number: { type: string }
+ *                 enquiry_date: { type: string, format: date-time }
+ *                 function_date: { type: string, format: date-time }
+ *                 store: { type: string }
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Lead not found
+ *       500:
+ *         description: Internal server error
+ */
 // GET /api/pages/general/:id - Fetch General lead data
 router.get(
   "/general/:id",
@@ -1086,6 +1131,48 @@ router.get(
   getGeneralLead
 );
 
+/**
+ * @swagger
+ * /api/pages/general/{id}:
+ *   post:
+ *     summary: Update General lead
+ *     tags:
+ *       - General Lead
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               follow_up_flag: { type: boolean }
+ *               follow_up_date: { type: string, format: date-time }
+ *               call_date: { type: string, format: date-time }
+ *               reason_collected_from_store: { type: string }
+ *               remarks: { type: string }
+ *               closing_status: { type: string }
+ *               rating: { type: integer }
+ *               call_duration: { type: number, description: "Call duration in seconds" }
+ *     responses:
+ *       200:
+ *         description: General lead updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 // POST /api/pages/general/:id - Update General lead data
 router.post(
   "/general/:id",

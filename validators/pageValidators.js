@@ -89,7 +89,12 @@ export const lossOfSalePostValidator = [
     .optional()
     .isString()
     .trim()
-    .withMessage('Remarks must be a string')
+    .withMessage('Remarks must be a string'),
+  body('call_duration')
+    .optional()
+    .isNumeric()
+    .withMessage('Call duration must be a number (seconds)')
+    .toFloat()
 ];
 
 // Return Page Validators
@@ -133,7 +138,12 @@ export const returnPostValidator = [
     .optional()
     .isString()
     .trim()
-    .withMessage('Remarks must be a string')
+    .withMessage('Remarks must be a string'),
+  body('call_duration')
+    .optional()
+    .isNumeric()
+    .withMessage('Call duration must be a number (seconds)')
+    .toFloat()
 ];
 
 // Booking Confirmation Page Validators
@@ -178,7 +188,12 @@ export const bookingConfirmationPostValidator = [
     .optional()
     .isString()
     .trim()
-    .withMessage('Remarks must be a string')
+    .withMessage('Remarks must be a string'),
+  body('call_duration')
+    .optional()
+    .isNumeric()
+    .withMessage('Call duration must be a number (seconds)')
+    .toFloat()
 ];
 
 // Just Dial Page Validators
@@ -233,7 +248,12 @@ export const justDialPostValidator = [
     .optional()
     .isString()
     .trim()
-    .withMessage('Remarks must be a string')
+    .withMessage('Remarks must be a string'),
+  body('call_duration')
+    .optional()
+    .isNumeric()
+    .withMessage('Call duration must be a number (seconds)')
+    .toFloat()
 ];
 
 // Add Lead Page Validators
@@ -320,5 +340,10 @@ export const leadUpdateValidator = [
     .optional()
     .isInt({ min: 1, max: 5 })
     .withMessage('Rating must be between 1 and 5'),
+  body('call_duration')
+    .optional()
+    .isNumeric()
+    .withMessage('Call duration must be a number (seconds)')
+    .toFloat()
 ];
 

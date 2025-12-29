@@ -304,6 +304,9 @@ export const getReports = async (req, res) => {
       // Ensure report_id exists
       if (!obj.report_id) obj.report_id = String(r._id);
 
+      // Ensure callDuration is included (default to 0 if not present)
+      if (obj.callDuration === undefined) obj.callDuration = 0;
+
       // Remove internal mongoose fields if present
       delete obj._id;
       delete obj.__v;
@@ -342,6 +345,10 @@ export const getReportById = async (req, res) => {
     const edited_at = report.editedAt;
 
     if (!obj.report_id) obj.report_id = String(report._id);
+    
+    // Ensure callDuration is included (default to 0 if not present)
+    if (obj.callDuration === undefined) obj.callDuration = 0;
+    
     delete obj._id;
     delete obj.__v;
 
