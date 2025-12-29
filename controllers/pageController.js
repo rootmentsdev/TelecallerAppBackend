@@ -195,6 +195,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.enquiry_date = lead.enquiryDate ?? lead.enquiry_date ?? null;
   payload.visit_date = lead.visitDate ?? lead.visit_date ?? null;
   payload.return_date = lead.returnDate ?? lead.return_date ?? null;
+  payload.follow_up_date = lead.followUpDate ?? lead.follow_up_date ?? null;
   payload.created_at = lead.createdAt ?? lead.created_at ?? null;
   payload.assigned_to = (lead.assignedTo !== undefined) ? lead.assignedTo : (lead.assigned_to !== undefined ? lead.assigned_to : null);
   payload.attended_by = lead.attendedBy ?? lead.attended_by ?? "";
@@ -206,7 +207,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -820,7 +821,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, remarks, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -846,6 +847,7 @@ export const updateReturnLead = async (req, res) => {
         updateData.followUpDate = new Date();
       }
     }
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
@@ -915,7 +917,7 @@ export const getBookingConfirmationLead = async (req, res) => {
 export const updateBookingConfirmationLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, call_date, remarks, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, remarks, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -941,6 +943,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
         updateData.followUpDate = new Date();
       }
     }
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -1012,7 +1015,7 @@ export const getJustDialLead = async (req, res) => {
 export const updateJustDialLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, closing_status, reason, follow_up_flag, call_date, remarks, call_duration } = req.body;
+    const { call_status, lead_status, closing_status, reason, follow_up_flag, follow_up_date, call_date, remarks, call_duration } = req.body;
 
     const lead = await Lead.findById(id);
     if (!lead) {
@@ -1034,6 +1037,7 @@ export const updateJustDialLead = async (req, res) => {
         updateData.followUpDate = new Date();
       }
     }
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -1489,6 +1493,7 @@ export const updateFollowUp = async (req, res) => {
     const {
       call_status,
       lead_status,
+      follow_up_date,
       remarks,
       call_duration
     } = req.body;
@@ -1512,6 +1517,7 @@ export const updateFollowUp = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
