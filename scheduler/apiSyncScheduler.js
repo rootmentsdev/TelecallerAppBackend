@@ -1,5 +1,5 @@
 // API-Only Sync Scheduler
-// Automatically runs API sync every 15 minutes
+// Automatically runs API sync every 20 minutes
 // Does NOT affect CSV imports (remain manual)
 
 import cron from 'node-cron';
@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Configuration
-const SYNC_TIME = process.env.API_SYNC_TIME || '*/15 * * * *'; // Default: Every 15 minutes
+const SYNC_TIME = process.env.API_SYNC_TIME || '*/20 * * * *'; // Default: Every 20 minutes
 const SYNC_ENABLED = process.env.API_SYNC_ENABLED !== 'false'; // Default: enabled
 const SYNC_TIMEZONE = process.env.API_SYNC_TIMEZONE || 'Asia/Kolkata'; // Default: Asia/Kolkata
 
@@ -30,9 +30,19 @@ const runApiSync = async () => {
   try {
     // Import and run API-only sync (no CSV imports)
     const { runApiOnlySync } = await import('../sync/apiOnly.js');
-    await runApiOnlySync();
+    const result = await runApiOnlySync();
     
-    console.log('✅ Automatic API sync completed successfully');
+    if (result && result.skipped) {
+      console.log('⏭️  Sync skipped - global lock is active');
+      console.log('   Another sync cycle is already running');
+    } else if (result && result.success) {
+      console.log('✅ Automatic API sync completed successfully');
+    } else if (result && !result.success) {
+      console.log(`⚠️  Automatic API sync completed with ${result.failures || 0} error(s)`);
+    } else {
+      console.log('✅ Automatic API sync completed');
+    }
+    
     console.log(`📅 Next sync: ${getNextRunTime()}`);
     
   } catch (error) {
@@ -44,13 +54,13 @@ const runApiSync = async () => {
 
 const getNextRunTime = () => {
   try {
-    // Calculate next run time manually for */15 * * * * pattern
+    // Calculate next run time manually for */20 * * * * pattern
     const now = new Date();
     const nextRun = new Date(now);
     
-    // Round up to next 15-minute interval
+    // Round up to next 20-minute interval
     const minutes = now.getMinutes();
-    const nextMinutes = Math.ceil(minutes / 15) * 15;
+    const nextMinutes = Math.ceil(minutes / 20) * 20;
     
     if (nextMinutes >= 60) {
       nextRun.setHours(now.getHours() + 1);
@@ -79,14 +89,15 @@ const startScheduler = () => {
 
   console.log('📅 Starting API sync scheduler...');
   console.log(`   Schedule: ${SYNC_TIME} (Asia/Kolkata)`);
-  console.log(`   Frequency: Every 15 minutes`);
+  console.log(`   Frequency: Every 20 minutes`);
   console.log(`   Next run: ${getNextRunTime()}`);
   console.log('   Scope: External APIs only (CSV imports remain manual)');
+  console.log('   Lock: Global sync lock enabled (atomic execution)');
 
   // Validate cron expression
   if (!cron.validate(SYNC_TIME)) {
     console.error('❌ Invalid cron expression:', SYNC_TIME);
-    console.error('   Using default: */15 * * * * (Every 15 minutes)');
+    console.error('   Using default: */20 * * * * (Every 20 minutes)');
     return null;
   }
 
