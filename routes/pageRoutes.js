@@ -543,13 +543,16 @@
  *             properties:
  *               call_status: { type: string }
  *               lead_status: { type: string }
- *               follow_up_date: { type: string, format: date-time }
+ *               follow_up_date: 
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
- *         description: Loss of Sale lead updated successfully
+ *         description: Loss of Sale lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
  *       400:
  *         description: Validation error
  *       401:
@@ -619,13 +622,18 @@
  *             properties:
  *               call_status: { type: string }
  *               lead_status: { type: string }
- *               follow_up_flag: { type: boolean }
- *               follow_up_date: { type: string, format: date-time, description: "Follow-up date when followUpFlag is true" }
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
+ *               follow_up_date: 
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
- *         description: Return lead updated successfully
+ *         description: Return lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
  *       400:
  *         description: Validation error
  *       401:
@@ -696,14 +704,19 @@
  *             properties:
  *               call_status: { type: string }
  *               lead_status: { type: string }
- *               follow_up_flag: { type: boolean }
- *               follow_up_date: { type: string, format: date-time, description: "Follow-up date when followUpFlag is true" }
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
+ *               follow_up_date: 
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
- *         description: Booking Confirmation lead updated
+ *         description: Booking Confirmation lead updated. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
  *       400:
  *         description: Validation error
  *       401:
@@ -774,14 +787,19 @@
  *               lead_status: { type: string }
  *               closing_status: { type: string }
  *               reason: { type: string }
- *               follow_up_flag: { type: boolean }
- *               follow_up_date: { type: string, format: date-time, description: "Follow-up date when followUpFlag is true" }
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
+ *               follow_up_date: 
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
- *         description: Just Dial lead updated
+ *         description: Just Dial lead updated. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
  *       400:
  *         description: Validation error
  *       401:
@@ -899,9 +917,11 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *                 type: string
  *               follow_up_flag:
  *                 type: boolean
+ *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
  *               follow_up_date:
  *                 type: string
  *                 format: date-time
+ *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               call_date:
  *                 type: string
  *                 format: date-time
@@ -1161,8 +1181,13 @@ router.get(
  *             properties:
  *               call_status: { type: string }
  *               lead_status: { type: string }
- *               follow_up_flag: { type: boolean }
- *               follow_up_date: { type: string, format: date-time }
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
+ *               follow_up_date: 
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               call_date: { type: string, format: date-time }
  *               reason_collected_from_store: { type: string }
  *               remarks: { type: string }
@@ -1171,7 +1196,7 @@ router.get(
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *     responses:
  *       200:
- *         description: General lead updated successfully
+ *         description: General lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
  *       400:
  *         description: Validation error
  *       401:

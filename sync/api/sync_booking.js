@@ -133,7 +133,7 @@ const run = async () => {
     // 3. Manual/full sync can still fetch older data if needed via environment variables
     const requestBody = {
       locationID: String(locationId),
-      months: "2", // Reduced from 12 for performance (incremental sync + dedupe ensures data safety)
+      months: lastSyncAt ? "1" : "12",
     };
 
     console.log(`📡 Calling API: ${fallbackUrl}`);
