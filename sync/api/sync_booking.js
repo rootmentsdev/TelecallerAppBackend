@@ -216,9 +216,33 @@ const run = async () => {
     if (locationData.length > 0) {
       // Filter: Only process records that have bookingDate (booking records)
       // The API returns both booking and return records, so we filter for booking only
-      const bookingRecords = locationData.filter(row => {
+      let bookingRecords = locationData.filter(row => {
         return row.bookingDate || row.booking_date || row.BookingDate;
       });
+
+      // CLIENT-SIDE DATE FILTER: Filter by bookingDate for incremental syncs
+      // API ignores dateFrom/dateTo, so we must filter client-side to prevent processing full historical data
+      if (lastSyncAt && dateFrom) {
+        const rawCount = bookingRecords.length;
+        const dateFromDate = new Date(dateFrom);
+        
+        bookingRecords = bookingRecords.filter(row => {
+          // Extract booking date from various field names
+          const bookingDateStr = row.bookingDate || row.booking_date || row.BookingDate;
+          if (!bookingDateStr) return false;
+          
+          const bookingDate = new Date(bookingDateStr);
+          if (isNaN(bookingDate.getTime())) return false; // Invalid date
+          
+          // Keep only records where bookingDate >= dateFrom
+          return bookingDate >= dateFromDate;
+        });
+        
+        const droppedCount = rawCount - bookingRecords.length;
+        if (droppedCount > 0) {
+          console.log(`   🔍 Date filter: ${rawCount} raw → ${bookingRecords.length} kept, ${droppedCount} dropped (before ${dateFrom})`);
+        }
+      }
 
       // Add store name to each booking record
       bookingRecords.forEach(row => {
@@ -293,9 +317,33 @@ const run = async () => {
         console.log(`   📊 Filtering booking records and mapping location IDs...`);
 
         // Filter: Only process records that have bookingDate (booking records)
-        const bookingRecords = allLocationData.filter(row => {
+        let bookingRecords = allLocationData.filter(row => {
           return row.bookingDate || row.booking_date || row.BookingDate;
         });
+
+        // CLIENT-SIDE DATE FILTER: Filter by bookingDate for incremental syncs
+        // API ignores dateFrom/dateTo, so we must filter client-side to prevent processing full historical data
+        if (lastSyncAt && dateFrom) {
+          const rawCount = bookingRecords.length;
+          const dateFromDate = new Date(dateFrom);
+          
+          bookingRecords = bookingRecords.filter(row => {
+            // Extract booking date from various field names
+            const bookingDateStr = row.bookingDate || row.booking_date || row.BookingDate;
+            if (!bookingDateStr) return false;
+            
+            const bookingDate = new Date(bookingDateStr);
+            if (isNaN(bookingDate.getTime())) return false; // Invalid date
+            
+            // Keep only records where bookingDate >= dateFrom
+            return bookingDate >= dateFromDate;
+          });
+          
+          const droppedCount = rawCount - bookingRecords.length;
+          if (droppedCount > 0) {
+            console.log(`   🔍 Date filter: ${rawCount} raw → ${bookingRecords.length} kept, ${droppedCount} dropped (before ${dateFrom})`);
+          }
+        }
 
         // Map location ID from API data to store name
         // The API data should have a location field that we can map

@@ -168,7 +168,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
 };
 
 // Helper to create a Report entry from a Lead or FollowUp document using a completely flat structure
-const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0) => {
+const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0, category = null) => {
   // Validate and normalize remarks
   const remarksValidation = validateAndNormalizeRemarks(userRemarks);
   if (!remarksValidation.isValid) {
@@ -240,6 +240,11 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.editedBy = userId;
   payload.editedAt = new Date();
   payload.note = remarksValidation.normalizedRemarks;
+  
+  // Set category if provided (e.g., "followup" for reports created from FollowUps)
+  if (category) {
+    payload.category = category;
+  }
 
   // Create the report document (schema allows dynamic fields via strict:false)
   const report = await Report.create({
@@ -779,7 +784,9 @@ export const updateLossOfSaleLead = async (req, res) => {
     const followUpFlag = updatedLead.followUpFlag;
 
     if (followUpFlag === true) {
-      // Move to FollowUps collection
+      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
+      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
+      // Lifecycle: Leads → FollowUps → Reports (no skipping)
       const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
       await Lead.findByIdAndDelete(id);
       res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp });
@@ -881,7 +888,9 @@ export const updateReturnLead = async (req, res) => {
     const followUpFlag = updatedLead.followUpFlag;
 
     if (followUpFlag === true) {
-      // Move to FollowUps collection
+      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
+      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
+      // Lifecycle: Leads → FollowUps → Reports (no skipping)
       const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
       await Lead.findByIdAndDelete(id);
       res.json({ message: "Return lead updated and moved to follow-ups", followUp });
@@ -987,7 +996,9 @@ export const updateBookingConfirmationLead = async (req, res) => {
     const followUpFlag = updatedLead.followUpFlag;
 
     if (followUpFlag === true) {
-      // Move to FollowUps collection
+      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
+      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
+      // Lifecycle: Leads → FollowUps → Reports (no skipping)
       const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
       await Lead.findByIdAndDelete(id);
       res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp });
@@ -1087,7 +1098,9 @@ export const updateJustDialLead = async (req, res) => {
     const followUpFlag = updatedLead.followUpFlag;
 
     if (followUpFlag === true) {
-      // Move to FollowUps collection
+      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
+      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
+      // Lifecycle: Leads → FollowUps → Reports (no skipping)
       const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
       await Lead.findByIdAndDelete(id);
       res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp });
@@ -1230,7 +1243,9 @@ export const updateGenericLead = async (req, res) => {
     const followUpFlag = updatedLead.followUpFlag;
 
     if (followUpFlag === true) {
-      // Move to FollowUps collection
+      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
+      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
+      // Lifecycle: Leads → FollowUps → Reports (no skipping)
       const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
       await Lead.findByIdAndDelete(id);
       res.json({ message: 'Lead updated and moved to follow-ups', followUp });
@@ -1354,7 +1369,9 @@ export const updateGeneralLead = async (req, res) => {
     const followUpFlag = updatedLead.followUpFlag;
 
     if (followUpFlag === true) {
-      // Move to FollowUps collection
+      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
+      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
+      // Lifecycle: Leads → FollowUps → Reports (no skipping)
       const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
       await Lead.findByIdAndDelete(id);
       res.json({ message: "General lead updated and moved to follow-ups", followUp });
@@ -1524,6 +1541,8 @@ export const getFollowUpById = async (req, res) => {
 };
 
 // POST - Update FollowUp lead (moves to Reports)
+// CRITICAL: This endpoint ONLY works with FollowUp model, NOT Lead model
+// Lifecycle: Leads → FollowUps → Reports (strict enforcement)
 export const updateFollowUp = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1541,16 +1560,20 @@ export const updateFollowUp = async (req, res) => {
       return res.status(400).json({ message: remarksValidation.error });
     }
 
+    // CRITICAL: Fetch ONLY from FollowUp model (not Lead)
+    // This ensures we're working with leads that have already moved through the lifecycle
     const followUp = await FollowUp.findById(id);
     if (!followUp) {
-      return res.status(404).json({ message: "Follow-up lead not found" });
+      return res.status(404).json({ 
+        message: "Follow-up lead not found. This endpoint only works with leads in the FollowUps collection." 
+      });
     }
 
     if (!checkAccess(followUp, req.user)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // Update FollowUp with new data
+    // Update FollowUp with new data (callStatus, leadStatus, remarks, callDuration)
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
@@ -1567,11 +1590,22 @@ export const updateFollowUp = async (req, res) => {
       changedFields[key] = { before: beforeFollowUp[key], after: updatedFollowUp[key] };
     });
 
-    // Move to Reports collection (final state)
-    const report = await createReportFromLead(updatedFollowUp, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration || updatedFollowUp.callDuration || 0);
+    // Create Report entry with category = "followup"
+    // This is the ONLY place where Reports are created from FollowUps
+    const report = await createReportFromLead(
+      updatedFollowUp, 
+      req.user._id, 
+      remarksValidation.normalizedRemarks, 
+      changedFields, 
+      call_duration || updatedFollowUp.callDuration || 0,
+      "followup" // Category to identify reports created from FollowUps
+    );
 
-    // Remove from FollowUps collection
+    // Remove from FollowUps collection (lifecycle complete: FollowUps → Reports)
     await FollowUp.findByIdAndDelete(id);
+
+    // DEFENSIVE: Ensure we never touch the Leads collection from this endpoint
+    // This endpoint ONLY works with FollowUps → Reports transition
 
     res.json({ message: "Follow-up lead updated and moved to reports", report });
   } catch (error) {
