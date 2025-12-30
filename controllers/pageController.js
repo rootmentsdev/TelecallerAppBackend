@@ -1562,12 +1562,22 @@ export const updateFollowUp = async (req, res) => {
 
     // CRITICAL: Fetch ONLY from FollowUp model (not Lead)
     // This ensures we're working with leads that have already moved through the lifecycle
+    console.log(`🔍 Looking up FollowUp with ID: ${id}`);
     const followUp = await FollowUp.findById(id);
     if (!followUp) {
+      console.error(`❌ FollowUp not found with ID: ${id}`);
+      // Check if it exists in Leads (shouldn't happen, but helpful for debugging)
+      const leadCheck = await Lead.findById(id);
+      if (leadCheck) {
+        console.warn(`⚠️  Lead found in Leads collection instead of FollowUps. This indicates a lifecycle issue.`);
+      }
       return res.status(404).json({ 
-        message: "Follow-up lead not found. This endpoint only works with leads in the FollowUps collection." 
+        message: "Follow-up lead not found. This endpoint only works with leads in the FollowUps collection.",
+        id: id
       });
     }
+
+    console.log(`✅ FollowUp found: ${followUp.name} (${followUp.phone}), leadType: ${followUp.leadType}`);
 
     if (!checkAccess(followUp, req.user)) {
       return res.status(403).json({ message: "Access denied" });
@@ -1592,23 +1602,91 @@ export const updateFollowUp = async (req, res) => {
 
     // Create Report entry with category = "followup"
     // This is the ONLY place where Reports are created from FollowUps
-    const report = await createReportFromLead(
-      updatedFollowUp, 
-      req.user._id, 
-      remarksValidation.normalizedRemarks, 
-      changedFields, 
-      call_duration || updatedFollowUp.callDuration || 0,
-      "followup" // Category to identify reports created from FollowUps
-    );
+    let report;
+    try {
+      console.log(`📝 Creating report for FollowUp ID: ${id}`);
+      console.log(`   FollowUp leadType: ${updatedFollowUp.leadType}`);
+      console.log(`   FollowUp name: ${updatedFollowUp.name}`);
+      console.log(`   FollowUp phone: ${updatedFollowUp.phone}`);
+      
+      report = await createReportFromLead(
+        updatedFollowUp, 
+        req.user._id, 
+        remarksValidation.normalizedRemarks, 
+        changedFields, 
+        call_duration || updatedFollowUp.callDuration || 0,
+        "followup" // Category to identify reports created from FollowUps
+      );
+      
+      // Verify report was created
+      if (!report || !report._id) {
+        throw new Error("Report creation returned null or invalid report");
+      }
+      
+      // Verify report exists in database
+      const verifiedReport = await Report.findById(report._id);
+      if (!verifiedReport) {
+        throw new Error("Report was created but not found in database");
+      }
+      
+      console.log(`✅ Report created successfully with ID: ${report._id}`);
+      console.log(`   Report category: ${verifiedReport.category || "followup"}`);
+      console.log(`   Report lead_type: ${verifiedReport.lead_type || updatedFollowUp.leadType || "general"}`);
+      console.log(`   Report lead_name: ${verifiedReport.lead_name || updatedFollowUp.name}`);
+      console.log(`   Report phone_number: ${verifiedReport.phone_number || updatedFollowUp.phone}`);
+      
+      // Use verified report for response
+      report = verifiedReport;
+    } catch (reportError) {
+      console.error(`❌ Failed to create report for FollowUp ID: ${id}`, reportError);
+      console.error(`   Error details:`, reportError.message);
+      console.error(`   Stack:`, reportError.stack);
+      throw new Error(`Failed to create report: ${reportError.message}`);
+    }
 
     // Remove from FollowUps collection (lifecycle complete: FollowUps → Reports)
-    await FollowUp.findByIdAndDelete(id);
+    // Only delete if report creation succeeded
+    try {
+      // Verify FollowUp still exists before deletion
+      const followUpToDelete = await FollowUp.findById(id);
+      if (!followUpToDelete) {
+        console.warn(`⚠️  FollowUp ID ${id} not found for deletion (may have been already deleted)`);
+        // Report was created, so continue even if deletion fails (idempotency)
+      } else {
+        const deleteResult = await FollowUp.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ FollowUp ID ${id} removed from FollowUps collection`);
+        } else {
+          console.warn(`⚠️  FollowUp ID ${id} deletion returned null`);
+        }
+      }
+    } catch (deleteError) {
+      console.error(`❌ Failed to delete FollowUp ID: ${id}`, deleteError);
+      // Report was already created, so we should still return success
+      // But log the error for investigation
+      console.error(`⚠️  WARNING: Report created but FollowUp deletion failed. Manual cleanup may be needed.`);
+    }
 
     // DEFENSIVE: Ensure we never touch the Leads collection from this endpoint
     // This endpoint ONLY works with FollowUps → Reports transition
 
-    res.json({ message: "Follow-up lead updated and moved to reports", report });
+    // Build response with all necessary fields
+    const reportObj = report.toObject ? report.toObject() : report;
+    res.json({ 
+      message: "Follow-up lead updated and moved to reports", 
+      report: {
+        ...reportObj,
+        category: reportObj.category || "followup",
+        lead_type: reportObj.lead_type || updatedFollowUp.leadType || "general",
+        report_id: reportObj.report_id || String(report._id)
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(`❌ Error in updateFollowUp for ID ${req.params.id}:`, error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ 
+      message: error.message || "Internal server error",
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
