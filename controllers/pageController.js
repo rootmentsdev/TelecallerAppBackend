@@ -750,7 +750,14 @@ export const updateLossOfSaleLead = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    
+    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    if (follow_up_date !== undefined && follow_up_date !== null) {
+      updateData.followUpDate = follow_up_date;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    }
+    
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -841,13 +848,19 @@ export const updateReturnLead = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_flag !== undefined) {
+    
+    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    // Use the date from frontend (not today's date)
+    if (follow_up_date !== undefined && follow_up_date !== null) {
+      updateData.followUpDate = follow_up_date;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag !== undefined) {
+      // Only set flag if explicitly provided (without date)
       updateData.followUpFlag = follow_up_flag;
-      if (follow_up_flag && !lead.followUpDate) {
-        updateData.followUpDate = new Date();
-      }
+      // DO NOT auto-set today's date - frontend must provide the date
     }
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
@@ -937,13 +950,19 @@ export const updateBookingConfirmationLead = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_flag !== undefined) {
+    
+    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    // Use the date from frontend (not today's date)
+    if (follow_up_date !== undefined && follow_up_date !== null) {
+      updateData.followUpDate = follow_up_date;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag !== undefined) {
+      // Only set flag if explicitly provided (without date)
       updateData.followUpFlag = follow_up_flag;
-      if (follow_up_flag && !lead.followUpDate) {
-        updateData.followUpDate = new Date();
-      }
+      // DO NOT auto-set today's date - frontend must provide the date
     }
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -1031,13 +1050,19 @@ export const updateJustDialLead = async (req, res) => {
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     if (closing_status !== undefined) updateData.closingStatus = closing_status;
     if (reason !== undefined) updateData.reason = reason;
-    if (follow_up_flag !== undefined) {
+    
+    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    // Use the date from frontend (not today's date)
+    if (follow_up_date !== undefined && follow_up_date !== null) {
+      updateData.followUpDate = follow_up_date;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag !== undefined) {
+      // Only set flag if explicitly provided (without date)
       updateData.followUpFlag = follow_up_flag;
-      if (follow_up_flag && !lead.followUpDate) {
-        updateData.followUpDate = new Date();
-      }
+      // DO NOT auto-set today's date - frontend must provide the date
     }
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -1167,13 +1192,19 @@ export const updateGenericLead = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_flag !== undefined) {
+    
+    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    // Use the date from frontend (not today's date)
+    if (follow_up_date !== undefined && follow_up_date !== null) {
+      updateData.followUpDate = follow_up_date;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag !== undefined) {
+      // Only set flag if explicitly provided (without date)
       updateData.followUpFlag = follow_up_flag;
-      if (follow_up_flag && !lead.followUpDate) {
-        updateData.followUpDate = new Date();
-      }
+      // DO NOT auto-set today's date - frontend must provide the date
     }
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    
     if (call_date !== undefined) updateData.callDate = call_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
     if (remarks !== undefined) updateData.remarks = remarks;
@@ -1285,13 +1316,19 @@ export const updateGeneralLead = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_flag !== undefined) {
+    
+    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    // Use the date from frontend (not today's date)
+    if (follow_up_date !== undefined && follow_up_date !== null) {
+      updateData.followUpDate = follow_up_date;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag !== undefined) {
+      // Only set flag if explicitly provided (without date)
       updateData.followUpFlag = follow_up_flag;
-      if (follow_up_flag && !lead.followUpDate) {
-        updateData.followUpDate = new Date();
-      }
+      // DO NOT auto-set today's date - frontend must provide the date
     }
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    
     if (call_date !== undefined) updateData.callDate = call_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
