@@ -123,18 +123,23 @@ const run = async () => {
     console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
 
     // Use GetBookingReport API (POST) with locationID
-    // Note: API prefers months parameter over dateFrom/dateTo
     // Simplified request body: Only send what is absolutely necessary
     // API often fails if too many empty strings are sent
-    // PERFORMANCE OPTIMIZATION: Reduced from 12 to 2 months to reduce payload size (~75k → ~12k records)
-    // This is safe because:
-    // 1. Incremental sync (lastSyncAt) ensures we don't miss new records
-    // 2. Duplicate prevention (unique indexes) prevents re-insertion of old records
-    // 3. Manual/full sync can still fetch older data if needed via environment variables
-    const requestBody = {
+    // INCREMENTAL SYNC FIX: Use dateFrom/dateTo for incremental syncs, months only for first sync
+    let requestBody = {
       locationID: String(locationId),
-      months: lastSyncAt ? "1" : "12",
     };
+
+    if (lastSyncAt) {
+      // Incremental sync — use date range only (fetch only recent records)
+      requestBody.dateFrom = dateFrom || "";
+      requestBody.dateTo = dateTo || "";
+      console.log(`   📅 Using incremental date range: ${dateFrom} to ${dateTo}`);
+    } else {
+      // First sync — bulk load (use months parameter)
+      requestBody.months = "2";
+      console.log(`   📅 Using bulk load: last 2 months`);
+    }
 
     console.log(`📡 Calling API: ${fallbackUrl}`);
     console.log(`   📤 Request:`, JSON.stringify(requestBody));
