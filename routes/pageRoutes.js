@@ -1643,15 +1643,21 @@ router.get(
  *     description: |
  *       Updates a FollowUp lead with new call status, lead status, remarks, and call duration. After updating, the FollowUp lead is moved to the Reports collection (final state).
  *       
- *       **3-Stage Lifecycle:**
- *       1. **Leads** → Edited with `followUpFlag=true` → **FollowUps**
- *       2. **FollowUps** → Edited (this endpoint) → **Reports** (final state)
+ *       **CRITICAL: This endpoint ONLY works with FollowUp model, NOT Lead model.**
+ *       - Fetches lead ONLY from FollowUps collection
+ *       - If lead is not found in FollowUps, returns 404 error
+ *       - Does NOT touch the Leads collection
+ *       
+ *       **3-Stage Lifecycle (Strict Enforcement):**
+ *       1. **Leads** → Edited with `followUpFlag=true` → **FollowUps** (NO Report created)
+ *       2. **FollowUps** → Edited (this endpoint) → **Reports** (final state, category="followup")
  *       
  *       **Important Notes:**
  *       - FollowUp leads can only be moved to Reports (final state)
  *       - All fields (callStatus, leadStatus, callDuration, remarks, leadType, store) are preserved
  *       - The FollowUp lead is removed from FollowUps collection after update
- *       - A Report entry is created with the final state
+ *       - A Report entry is created with `category: "followup"` to identify reports from FollowUps
+ *       - Reports are created ONLY in this endpoint, NEVER when moving Leads → FollowUps
  *       
  *       **Access Control:**
  *       - Admin: Can update all FollowUp leads
@@ -1663,7 +1669,7 @@ router.get(
  *         required: true
  *         schema:
  *           type: string
- *         description: FollowUp lead ID to update
+ *         description: FollowUp lead ID to update (must exist in FollowUps collection, not Leads)
  *     requestBody:
  *       required: true
  *       content:
@@ -1709,10 +1715,14 @@ router.get(
  *                   example: "Follow-up lead updated and moved to reports"
  *                 report:
  *                   type: object
- *                   description: Created Report entry with final state
+ *                   description: Created Report entry with final state and category="followup"
  *                   properties:
  *                     _id:
  *                       type: string
+ *                     category:
+ *                       type: string
+ *                       description: Report category - always "followup" for reports created from FollowUps
+ *                       example: "followup"
  *                     lead_name:
  *                       type: string
  *                     phone_number:
@@ -1741,6 +1751,7 @@ router.get(
  *                   message: "Follow-up lead updated and moved to reports"
  *                   report:
  *                     _id: "507f1f77bcf86cd799439011"
+ *                     category: "followup"
  *                     lead_name: "John Doe"
  *                     phone_number: "9876543210"
  *                     store: "Suitor Guy - Edappally"
@@ -1766,7 +1777,15 @@ router.get(
  *       403:
  *         description: Access denied. User doesn't have permission to update this FollowUp lead.
  *       404:
- *         description: FollowUp lead not found.
+ *         description: FollowUp lead not found in FollowUps collection.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Follow-up lead not found. This endpoint only works with leads in the FollowUps collection."
  *       500:
  *         description: Internal server error.
  */
