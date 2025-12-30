@@ -238,9 +238,11 @@ const run = async () => {
   }
 
   // If all locations returned no data, try fetching all data with empty locationID
-  if (allDataArray.length === 0 && locationsWithNoData === locationIds.length) {
+  // CRITICAL: Only allow fallback on first sync (when lastSyncAt is null)
+  // For incremental syncs, skip fallback to prevent fetching all records
+  if (!lastSyncAt && allDataArray.length === 0 && locationsWithNoData === locationIds.length) {
     console.log(`\n⚠️  No data received from individual location IDs`);
-    console.log(`📡 Trying to fetch all booking data with empty locationID...`);
+    console.log(`📡 Trying to fetch all booking data with empty locationID (first sync only)...`);
 
     const requestBody = {
       bookingNo: "",
@@ -316,6 +318,10 @@ const run = async () => {
         console.log(`   Response status: ${allData.status}, errorDescription: ${allData.errorDescription || 'none'}`);
       }
     }
+  } else if (lastSyncAt && allDataArray.length === 0 && locationsWithNoData === locationIds.length) {
+    // Incremental sync: Skip global fetch to prevent performance issues
+    console.log(`\n⚠️  Skipping global booking fetch (incremental sync active)`);
+    console.log(`   ℹ️  No new records found in incremental window. This is expected if no bookings were created recently.`);
   }
 
   if (allDataArray.length === 0) {
