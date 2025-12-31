@@ -112,6 +112,43 @@ const buildListSnapshot = (lead) => {
   };
 };
 
+// Helper function to validate and convert follow-up date
+const validateAndConvertFollowUpDate = (followUpDate) => {
+  if (!followUpDate) return null;
+  
+  // If already a Date object, validate it
+  if (followUpDate instanceof Date) {
+    if (isNaN(followUpDate.getTime())) {
+      console.error(`❌ Invalid followUpDate (Date object): ${followUpDate}`);
+      return null;
+    }
+    return followUpDate;
+  }
+  
+  // If string, convert to Date
+  if (typeof followUpDate === 'string') {
+    const dateObj = new Date(followUpDate);
+    if (isNaN(dateObj.getTime())) {
+      console.error(`❌ Invalid followUpDate format (string): ${followUpDate}`);
+      return null;
+    }
+    return dateObj;
+  }
+  
+  // If number (timestamp), convert to Date
+  if (typeof followUpDate === 'number') {
+    const dateObj = new Date(followUpDate);
+    if (isNaN(dateObj.getTime())) {
+      console.error(`❌ Invalid followUpDate (timestamp): ${followUpDate}`);
+      return null;
+    }
+    return dateObj;
+  }
+  
+  console.warn(`⚠️  Unexpected followUpDate type: ${typeof followUpDate}`);
+  return null;
+};
+
 // Helper function to validate and normalize remarks input
 const validateAndNormalizeRemarks = (remarks) => {
   // If remarks is null or undefined, return null
@@ -146,6 +183,10 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
   // Normalize lead object
   const lead = (leadDoc && typeof leadDoc.toObject === 'function') ? leadDoc.toObject() : (leadDoc || {});
   
+  // CRITICAL: Preserve followUpDate from the lead (set during first update)
+  // This is the date selected by telecaller from frontend
+  const preservedFollowUpDate = validateAndConvertFollowUpDate(lead.followUpDate || lead.follow_up_date || null);
+  
   // Remove _id and __v to allow MongoDB to create new _id
   delete lead._id;
   delete lead.__v;
@@ -153,6 +194,15 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
   // Add FollowUp-specific fields
   lead.movedToFollowUpAt = new Date();
   lead.movedToFollowUpBy = userId;
+  
+  // CRITICAL: Explicitly preserve followUpDate (from frontend, not auto-generated)
+  // This ensures the date selected by telecaller is never lost
+  if (preservedFollowUpDate) {
+    lead.followUpDate = preservedFollowUpDate;
+    console.log(`✅ Preserved followUpDate: ${preservedFollowUpDate.toISOString()}`);
+  } else {
+    console.warn(`⚠️  No followUpDate found in lead when moving to FollowUps. Lead ID: ${leadDoc._id || 'unknown'}`);
+  }
   
   // Ensure callDuration is set
   if (callDuration !== undefined && callDuration !== null) {
@@ -163,6 +213,11 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
   
   // Create FollowUp document
   const followUp = await FollowUp.create(lead);
+  
+  // Verify followUpDate was saved
+  if (preservedFollowUpDate && !followUp.followUpDate) {
+    console.error(`❌ CRITICAL: followUpDate was not saved to FollowUp! Lead ID: ${leadDoc._id || 'unknown'}`);
+  }
   
   return followUp;
 };
@@ -756,16 +811,42 @@ export const updateLossOfSaleLead = async (req, res) => {
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     
-    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // CRITICAL: Follow-up date validation and flag handling
+    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
+    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
     // Use the date from frontend (not today's date)
-    if (follow_up_date !== undefined && follow_up_date !== null) {
-      updateData.followUpDate = follow_up_date;
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null) {
+        return res.status(400).json({ 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+        });
+      }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Loss of Sale lead ID: ${id} (checkbox was checked)`);
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Loss of Sale lead ID: ${id} (date provided)`);
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag
+      updateData.followUpFlag = false;
+      // Clear follow-up date if flag is false
+      updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // Only set flag if explicitly provided (without date)
+      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
@@ -861,16 +942,42 @@ export const updateReturnLead = async (req, res) => {
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     
-    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // CRITICAL: Follow-up date validation and flag handling
+    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
+    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
     // Use the date from frontend (not today's date)
-    if (follow_up_date !== undefined && follow_up_date !== null) {
-      updateData.followUpDate = follow_up_date;
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null) {
+        return res.status(400).json({ 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+        });
+      }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Return lead ID: ${id} (checkbox was checked)`);
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Return lead ID: ${id} (date provided)`);
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag
+      updateData.followUpFlag = false;
+      // Clear follow-up date if flag is false
+      updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // Only set flag if explicitly provided (without date)
+      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
@@ -965,16 +1072,42 @@ export const updateBookingConfirmationLead = async (req, res) => {
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     
-    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // CRITICAL: Follow-up date validation and flag handling
+    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
+    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
     // Use the date from frontend (not today's date)
-    if (follow_up_date !== undefined && follow_up_date !== null) {
-      updateData.followUpDate = follow_up_date;
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null) {
+        return res.status(400).json({ 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+        });
+      }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Booking Confirmation lead ID: ${id} (checkbox was checked)`);
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Booking Confirmation lead ID: ${id} (date provided)`);
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag
+      updateData.followUpFlag = false;
+      // Clear follow-up date if flag is false
+      updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // Only set flag if explicitly provided (without date)
+      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (call_date !== undefined) updateData.callDate = call_date;
@@ -1067,20 +1200,53 @@ export const updateJustDialLead = async (req, res) => {
     if (closing_status !== undefined) updateData.closingStatus = closing_status;
     if (reason !== undefined) updateData.reason = reason;
     
-    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // CRITICAL: Follow-up date validation and flag handling
+    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
+    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
     // Use the date from frontend (not today's date)
-    if (follow_up_date !== undefined && follow_up_date !== null) {
-      updateData.followUpDate = follow_up_date;
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null) {
+        return res.status(400).json({ 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+        });
+      }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Just Dial lead ID: ${id} (checkbox was checked)`);
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Just Dial lead ID: ${id} (date provided)`);
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag
+      updateData.followUpFlag = false;
+      // Clear follow-up date if flag is false
+      updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // Only set flag if explicitly provided (without date)
+      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (call_date !== undefined) updateData.callDate = call_date;
-    if (remarks !== undefined) updateData.remarks = remarks;
+    // Validate and normalize remarks - converts empty strings to null
+    if (remarks !== undefined) {
+      const remarksValidation = validateAndNormalizeRemarks(remarks);
+      if (!remarksValidation.isValid) {
+        return res.status(400).json({ message: remarksValidation.error });
+      }
+      updateData.remarks = remarksValidation.normalizedRemarks; // Will be null if empty/whitespace
+    }
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     if (!lead.leadType || lead.leadType === "general") {
@@ -1211,21 +1377,54 @@ export const updateGenericLead = async (req, res) => {
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     
-    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // CRITICAL: Follow-up date validation and flag handling
+    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
+    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
     // Use the date from frontend (not today's date)
-    if (follow_up_date !== undefined && follow_up_date !== null) {
-      updateData.followUpDate = follow_up_date;
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null) {
+        return res.status(400).json({ 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+        });
+      }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Generic lead ID: ${id} (checkbox was checked)`);
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Generic lead ID: ${id} (date provided)`);
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag
+      updateData.followUpFlag = false;
+      // Clear follow-up date if flag is false
+      updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // Only set flag if explicitly provided (without date)
+      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (call_date !== undefined) updateData.callDate = call_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
-    if (remarks !== undefined) updateData.remarks = remarks;
+    // Validate and normalize remarks - converts empty strings to null
+    if (remarks !== undefined) {
+      const remarksValidation = validateAndNormalizeRemarks(remarks);
+      if (!remarksValidation.isValid) {
+        return res.status(400).json({ message: remarksValidation.error });
+      }
+      updateData.remarks = remarksValidation.normalizedRemarks; // Will be null if empty/whitespace
+    }
     if (closing_status !== undefined) updateData.closingStatus = closing_status;
     if (rating !== undefined) updateData.rating = rating;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -1337,16 +1536,42 @@ export const updateGeneralLead = async (req, res) => {
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
     
-    // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
+    // CRITICAL: Follow-up date validation and flag handling
+    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
+    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
     // Use the date from frontend (not today's date)
-    if (follow_up_date !== undefined && follow_up_date !== null) {
-      updateData.followUpDate = follow_up_date;
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null) {
+        return res.status(400).json({ 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+        });
+      }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for General lead ID: ${id} (checkbox was checked)`);
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for General lead ID: ${id} (date provided)`);
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag
+      updateData.followUpFlag = false;
+      // Clear follow-up date if flag is false
+      updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // Only set flag if explicitly provided (without date)
+      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (call_date !== undefined) updateData.callDate = call_date;
