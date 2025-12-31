@@ -735,7 +735,7 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_date, reason_collected_from_store, remarks, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -758,9 +758,14 @@ export const updateLossOfSaleLead = async (req, res) => {
     
     // CRITICAL: If follow_up_date is provided, automatically set followUpFlag = true
     // This ensures leads with follow-up dates move to FollowUps collection, not Reports
+    // Use the date from frontend (not today's date)
     if (follow_up_date !== undefined && follow_up_date !== null) {
       updateData.followUpDate = follow_up_date;
       updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag !== undefined) {
+      // Only set flag if explicitly provided (without date)
+      updateData.followUpFlag = follow_up_flag;
+      // DO NOT auto-set today's date - frontend must provide the date
     }
     
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
