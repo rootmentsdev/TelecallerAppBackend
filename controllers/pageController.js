@@ -183,6 +183,15 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
   // Normalize lead object
   const lead = (leadDoc && typeof leadDoc.toObject === 'function') ? leadDoc.toObject() : (leadDoc || {});
   
+  // CRITICAL: Validate required fields before proceeding
+  if (!lead.name || !lead.phone || !lead.store) {
+    const missingFields = [];
+    if (!lead.name) missingFields.push('name');
+    if (!lead.phone) missingFields.push('phone');
+    if (!lead.store) missingFields.push('store');
+    throw new Error(`Missing required fields for FollowUp creation: ${missingFields.join(', ')}`);
+  }
+  
   // CRITICAL: Preserve followUpDate from the lead (set during first update)
   // This is the date selected by telecaller from frontend
   const preservedFollowUpDate = validateAndConvertFollowUpDate(lead.followUpDate || lead.follow_up_date || null);
@@ -212,11 +221,36 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
   }
   
   // Create FollowUp document
-  const followUp = await FollowUp.create(lead);
-  
-  // Verify followUpDate was saved
-  if (preservedFollowUpDate && !followUp.followUpDate) {
-    console.error(`❌ CRITICAL: followUpDate was not saved to FollowUp! Lead ID: ${leadDoc._id || 'unknown'}`);
+  // Wrap in try-catch to handle validation errors
+  let followUp;
+  try {
+    followUp = await FollowUp.create(lead);
+    
+    // Verify followUpDate was saved
+    if (preservedFollowUpDate && !followUp.followUpDate) {
+      console.error(`❌ CRITICAL: followUpDate was not saved to FollowUp! Lead ID: ${leadDoc._id || 'unknown'}`);
+    }
+    
+    console.log(`✅ FollowUp document created successfully. ID: ${followUp._id}, Name: ${followUp.name}, Phone: ${followUp.phone}`);
+  } catch (createError) {
+    console.error(`❌ Failed to create FollowUp document:`, createError);
+    console.error(`   Lead data:`, {
+      name: lead.name,
+      phone: lead.phone,
+      store: lead.store,
+      leadType: lead.leadType,
+      followUpDate: lead.followUpDate
+    });
+    
+    // Re-throw with more context
+    if (createError.name === 'ValidationError') {
+      const validationErrors = Object.values(createError.errors || {}).map(e => e.message).join(', ');
+      throw new Error(`FollowUp validation failed: ${validationErrors}`);
+    } else if (createError.code === 11000) {
+      throw new Error(`FollowUp duplicate key error: ${createError.message}`);
+    } else {
+      throw new Error(`Failed to create FollowUp: ${createError.message}`);
+    }
   }
   
   return followUp;
@@ -873,8 +907,50 @@ export const updateLossOfSaleLead = async (req, res) => {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
       // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
+      let followUp;
+      try {
+        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        
+        // Verify FollowUp was created successfully
+        if (!followUp || !followUp._id) {
+          throw new Error("FollowUp creation returned null or invalid FollowUp");
+        }
+        
+        // Verify FollowUp exists in database
+        const verifiedFollowUp = await FollowUp.findById(followUp._id);
+        if (!verifiedFollowUp) {
+          throw new Error("FollowUp was created but not found in database");
+        }
+        
+        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+        followUp = verifiedFollowUp;
+      } catch (followUpError) {
+        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+        console.error(`   Error details:`, followUpError.message);
+        console.error(`   Stack:`, followUpError.stack);
+        // DO NOT delete Lead if FollowUp creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER FollowUp is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // FollowUp was created, so return success but log the error
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
@@ -1003,8 +1079,50 @@ export const updateReturnLead = async (req, res) => {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
       // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
+      let followUp;
+      try {
+        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        
+        // Verify FollowUp was created successfully
+        if (!followUp || !followUp._id) {
+          throw new Error("FollowUp creation returned null or invalid FollowUp");
+        }
+        
+        // Verify FollowUp exists in database
+        const verifiedFollowUp = await FollowUp.findById(followUp._id);
+        if (!verifiedFollowUp) {
+          throw new Error("FollowUp was created but not found in database");
+        }
+        
+        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+        followUp = verifiedFollowUp;
+      } catch (followUpError) {
+        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+        console.error(`   Error details:`, followUpError.message);
+        console.error(`   Stack:`, followUpError.stack);
+        // DO NOT delete Lead if FollowUp creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER FollowUp is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // FollowUp was created, so return success but log the error
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Return lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
@@ -1137,8 +1255,50 @@ export const updateBookingConfirmationLead = async (req, res) => {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
       // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
+      let followUp;
+      try {
+        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        
+        // Verify FollowUp was created successfully
+        if (!followUp || !followUp._id) {
+          throw new Error("FollowUp creation returned null or invalid FollowUp");
+        }
+        
+        // Verify FollowUp exists in database
+        const verifiedFollowUp = await FollowUp.findById(followUp._id);
+        if (!verifiedFollowUp) {
+          throw new Error("FollowUp was created but not found in database");
+        }
+        
+        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+        followUp = verifiedFollowUp;
+      } catch (followUpError) {
+        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+        console.error(`   Error details:`, followUpError.message);
+        console.error(`   Stack:`, followUpError.stack);
+        // DO NOT delete Lead if FollowUp creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER FollowUp is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // FollowUp was created, so return success but log the error
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
@@ -1272,8 +1432,50 @@ export const updateJustDialLead = async (req, res) => {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
       // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
+      let followUp;
+      try {
+        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        
+        // Verify FollowUp was created successfully
+        if (!followUp || !followUp._id) {
+          throw new Error("FollowUp creation returned null or invalid FollowUp");
+        }
+        
+        // Verify FollowUp exists in database
+        const verifiedFollowUp = await FollowUp.findById(followUp._id);
+        if (!verifiedFollowUp) {
+          throw new Error("FollowUp was created but not found in database");
+        }
+        
+        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+        followUp = verifiedFollowUp;
+      } catch (followUpError) {
+        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+        console.error(`   Error details:`, followUpError.message);
+        console.error(`   Stack:`, followUpError.stack);
+        // DO NOT delete Lead if FollowUp creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER FollowUp is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // FollowUp was created, so return success but log the error
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
@@ -1450,8 +1652,50 @@ export const updateGenericLead = async (req, res) => {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
       // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
+      let followUp;
+      try {
+        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        
+        // Verify FollowUp was created successfully
+        if (!followUp || !followUp._id) {
+          throw new Error("FollowUp creation returned null or invalid FollowUp");
+        }
+        
+        // Verify FollowUp exists in database
+        const verifiedFollowUp = await FollowUp.findById(followUp._id);
+        if (!verifiedFollowUp) {
+          throw new Error("FollowUp was created but not found in database");
+        }
+        
+        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+        followUp = verifiedFollowUp;
+      } catch (followUpError) {
+        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+        console.error(`   Error details:`, followUpError.message);
+        console.error(`   Stack:`, followUpError.stack);
+        // DO NOT delete Lead if FollowUp creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER FollowUp is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // FollowUp was created, so return success but log the error
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: 'Lead updated and moved to follow-ups', followUp });
     } else {
       // Move to Reports collection (existing behavior)
@@ -1602,8 +1846,50 @@ export const updateGeneralLead = async (req, res) => {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
       // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      const followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
+      let followUp;
+      try {
+        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        
+        // Verify FollowUp was created successfully
+        if (!followUp || !followUp._id) {
+          throw new Error("FollowUp creation returned null or invalid FollowUp");
+        }
+        
+        // Verify FollowUp exists in database
+        const verifiedFollowUp = await FollowUp.findById(followUp._id);
+        if (!verifiedFollowUp) {
+          throw new Error("FollowUp was created but not found in database");
+        }
+        
+        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+        followUp = verifiedFollowUp;
+      } catch (followUpError) {
+        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+        console.error(`   Error details:`, followUpError.message);
+        console.error(`   Stack:`, followUpError.stack);
+        // DO NOT delete Lead if FollowUp creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER FollowUp is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // FollowUp was created, so return success but log the error
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "General lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
