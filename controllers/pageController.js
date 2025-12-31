@@ -108,6 +108,7 @@ const buildListSnapshot = (lead) => {
     booking_number: lead.bookingNo || null,
     visit_date: lead.visitDate || null,
     return_date: lead.returnDate || null,
+    follow_up_date: lead.followUpDate || null,
     security_amount: lead.securityAmount || null
   };
 };
