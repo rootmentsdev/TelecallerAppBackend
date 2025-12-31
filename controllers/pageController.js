@@ -180,8 +180,10 @@ const validateAndNormalizeRemarks = (remarks) => {
 
 // Helper to move a Lead to FollowUp collection
 const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
-  // Normalize lead object
-  const lead = (leadDoc && typeof leadDoc.toObject === 'function') ? leadDoc.toObject() : (leadDoc || {});
+  // Normalize lead object - use toObject() to get plain JavaScript object
+  const lead = (leadDoc && typeof leadDoc.toObject === 'function') 
+    ? leadDoc.toObject({ virtuals: false, getters: false }) 
+    : (leadDoc || {});
   
   // CRITICAL: Validate required fields before proceeding
   if (!lead.name || !lead.phone || !lead.store) {
@@ -196,35 +198,79 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
   // This is the date selected by telecaller from frontend
   const preservedFollowUpDate = validateAndConvertFollowUpDate(lead.followUpDate || lead.follow_up_date || null);
   
-  // Remove _id and __v to allow MongoDB to create new _id
-  delete lead._id;
-  delete lead.__v;
+  // CRITICAL: Create a clean object with ONLY the fields that FollowUp schema expects
+  // This prevents "Cannot remove from an unmodifiable list" errors from Mongoose internals
+  const followUpData = {
+    // Basic Information (Required)
+    name: lead.name,
+    phone: lead.phone,
+    store: lead.store,
+    
+    // Source and Type
+    source: lead.source || undefined,
+    leadType: lead.leadType || lead.lead_type || "general",
+    brand: lead.brand || undefined,
+    
+    // Dates
+    enquiryDate: lead.enquiryDate || lead.enquiry_date || undefined,
+    visitDate: lead.visitDate || lead.visit_date || undefined,
+    functionDate: lead.functionDate || lead.function_date || undefined,
+    returnDate: lead.returnDate || lead.return_date || undefined,
+    callDate: lead.callDate || lead.call_date || undefined,
+    followUpDate: preservedFollowUpDate || undefined,
+    
+    // Booking/Rent-Out Information
+    bookingNo: lead.bookingNo || lead.booking_number || undefined,
+    securityAmount: lead.securityAmount || lead.security_amount || undefined,
+    
+    // Status Fields
+    callStatus: lead.callStatus || lead.call_status || "Not Called",
+    leadStatus: lead.leadStatus || lead.lead_status || "No Status",
+    closingStatus: lead.closingStatus || lead.closing_status || undefined,
+    
+    // Follow-up
+    followUpFlag: lead.followUpFlag || lead.follow_up_flag || false,
+    
+    // Additional Information
+    reason: lead.reason || undefined,
+    reasonCollectedFromStore: lead.reasonCollectedFromStore || lead.reason_collected_from_store || undefined,
+    rating: lead.rating || undefined,
+    attendedBy: lead.attendedBy || lead.attended_by || undefined,
+    remarks: lead.remarks || "",
+    
+    // Call Duration
+    callDuration: (callDuration !== undefined && callDuration !== null) ? callDuration : (lead.callDuration || lead.call_duration || 0),
+    
+    // User Tracking
+    createdBy: lead.createdBy || lead.created_by || undefined,
+    assignedTo: lead.assignedTo || lead.assigned_to || null,
+    assignedAt: lead.assignedAt || lead.assigned_at || undefined,
+    
+    // FollowUp-specific fields
+    movedToFollowUpAt: new Date(),
+    movedToFollowUpBy: userId,
+  };
   
-  // Add FollowUp-specific fields
-  lead.movedToFollowUpAt = new Date();
-  lead.movedToFollowUpBy = userId;
+  // Remove undefined values to avoid Mongoose issues
+  Object.keys(followUpData).forEach(key => {
+    if (followUpData[key] === undefined) {
+      delete followUpData[key];
+    }
+  });
   
-  // CRITICAL: Explicitly preserve followUpDate (from frontend, not auto-generated)
-  // This ensures the date selected by telecaller is never lost
+  // Log preserved followUpDate
   if (preservedFollowUpDate) {
-    lead.followUpDate = preservedFollowUpDate;
     console.log(`✅ Preserved followUpDate: ${preservedFollowUpDate.toISOString()}`);
   } else {
     console.warn(`⚠️  No followUpDate found in lead when moving to FollowUps. Lead ID: ${leadDoc._id || 'unknown'}`);
-  }
-  
-  // Ensure callDuration is set
-  if (callDuration !== undefined && callDuration !== null) {
-    lead.callDuration = callDuration;
-  } else {
-    lead.callDuration = lead.callDuration || 0;
   }
   
   // Create FollowUp document
   // Wrap in try-catch to handle validation errors
   let followUp;
   try {
-    followUp = await FollowUp.create(lead);
+    console.log(`📝 Creating FollowUp with clean data. Name: ${followUpData.name}, Phone: ${followUpData.phone}, Store: ${followUpData.store}`);
+    followUp = await FollowUp.create(followUpData);
     
     // Verify followUpDate was saved
     if (preservedFollowUpDate && !followUp.followUpDate) {
@@ -234,12 +280,13 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
     console.log(`✅ FollowUp document created successfully. ID: ${followUp._id}, Name: ${followUp.name}, Phone: ${followUp.phone}`);
   } catch (createError) {
     console.error(`❌ Failed to create FollowUp document:`, createError);
+    console.error(`   Error name: ${createError.name}, Error code: ${createError.code}`);
     console.error(`   Lead data:`, {
-      name: lead.name,
-      phone: lead.phone,
-      store: lead.store,
-      leadType: lead.leadType,
-      followUpDate: lead.followUpDate
+      name: followUpData.name,
+      phone: followUpData.phone,
+      store: followUpData.store,
+      leadType: followUpData.leadType,
+      followUpDate: followUpData.followUpDate
     });
     
     // Re-throw with more context
@@ -249,7 +296,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
     } else if (createError.code === 11000) {
       throw new Error(`FollowUp duplicate key error: ${createError.message}`);
     } else {
-      throw new Error(`Failed to create FollowUp: ${createError.message}`);
+      throw new Error(`Failed to create FollowUp: ${createError.message || createError.toString()}`);
     }
   }
   
@@ -852,9 +899,13 @@ export const updateLossOfSaleLead = async (req, res) => {
     // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
       // When checkbox is checked, date is REQUIRED
-      if (follow_up_date === undefined || follow_up_date === null) {
+      // Check for undefined, null, or empty string
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({ 
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
         });
       }
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
@@ -954,8 +1005,50 @@ export const updateLossOfSaleLead = async (req, res) => {
       res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
-      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
+      let report;
+      try {
+        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+        
+        // Verify report was created successfully
+        if (!report || !report._id) {
+          throw new Error("Report creation returned null or invalid report");
+        }
+        
+        // Verify report exists in database
+        const verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database");
+        }
+        
+        console.log(`✅ Report created successfully with ID: ${report._id}`);
+        report = verifiedReport;
+      } catch (reportError) {
+        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+        console.error(`   Error details:`, reportError.message);
+        console.error(`   Stack:`, reportError.stack);
+        // DO NOT delete Lead if Report creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER Report is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // Report was created, so return success but log the error
+        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Loss of Sale lead updated and moved to reports", report });
     }
   } catch (error) {
@@ -1025,9 +1118,13 @@ export const updateReturnLead = async (req, res) => {
     // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
       // When checkbox is checked, date is REQUIRED
-      if (follow_up_date === undefined || follow_up_date === null) {
+      // Check for undefined, null, or empty string
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({ 
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
         });
       }
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
@@ -1126,8 +1223,50 @@ export const updateReturnLead = async (req, res) => {
       res.json({ message: "Return lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
-      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
+      let report;
+      try {
+        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+        
+        // Verify report was created successfully
+        if (!report || !report._id) {
+          throw new Error("Report creation returned null or invalid report");
+        }
+        
+        // Verify report exists in database
+        const verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database");
+        }
+        
+        console.log(`✅ Report created successfully with ID: ${report._id}`);
+        report = verifiedReport;
+      } catch (reportError) {
+        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+        console.error(`   Error details:`, reportError.message);
+        console.error(`   Stack:`, reportError.stack);
+        // DO NOT delete Lead if Report creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER Report is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // Report was created, so return success but log the error
+        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Return lead updated and moved to reports", report });
     }
   } catch (error) {
@@ -1197,9 +1336,13 @@ export const updateBookingConfirmationLead = async (req, res) => {
     // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
       // When checkbox is checked, date is REQUIRED
-      if (follow_up_date === undefined || follow_up_date === null) {
+      // Check for undefined, null, or empty string
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({ 
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
         });
       }
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
@@ -1302,8 +1445,50 @@ export const updateBookingConfirmationLead = async (req, res) => {
       res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
-      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
+      let report;
+      try {
+        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+        
+        // Verify report was created successfully
+        if (!report || !report._id) {
+          throw new Error("Report creation returned null or invalid report");
+        }
+        
+        // Verify report exists in database
+        const verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database");
+        }
+        
+        console.log(`✅ Report created successfully with ID: ${report._id}`);
+        report = verifiedReport;
+      } catch (reportError) {
+        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+        console.error(`   Error details:`, reportError.message);
+        console.error(`   Stack:`, reportError.stack);
+        // DO NOT delete Lead if Report creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER Report is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // Report was created, so return success but log the error
+        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
     }
   } catch (error) {
@@ -1367,9 +1552,13 @@ export const updateJustDialLead = async (req, res) => {
     // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
       // When checkbox is checked, date is REQUIRED
-      if (follow_up_date === undefined || follow_up_date === null) {
+      // Check for undefined, null, or empty string
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({ 
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
         });
       }
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
@@ -1479,8 +1668,50 @@ export const updateJustDialLead = async (req, res) => {
       res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
-      const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
+      let report;
+      try {
+        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+        
+        // Verify report was created successfully
+        if (!report || !report._id) {
+          throw new Error("Report creation returned null or invalid report");
+        }
+        
+        // Verify report exists in database
+        const verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database");
+        }
+        
+        console.log(`✅ Report created successfully with ID: ${report._id}`);
+        report = verifiedReport;
+      } catch (reportError) {
+        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+        console.error(`   Error details:`, reportError.message);
+        console.error(`   Stack:`, reportError.stack);
+        // DO NOT delete Lead if Report creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER Report is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // Report was created, so return success but log the error
+        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "Just Dial lead updated and moved to reports", report });
     }
   } catch (error) {
@@ -1586,9 +1817,13 @@ export const updateGenericLead = async (req, res) => {
     // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
       // When checkbox is checked, date is REQUIRED
-      if (follow_up_date === undefined || follow_up_date === null) {
+      // Check for undefined, null, or empty string
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({ 
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
         });
       }
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
@@ -1699,8 +1934,50 @@ export const updateGenericLead = async (req, res) => {
       res.json({ message: 'Lead updated and moved to follow-ups', followUp });
     } else {
       // Move to Reports collection (existing behavior)
-      const report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
+      let report;
+      try {
+        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+        
+        // Verify report was created successfully
+        if (!report || !report._id) {
+          throw new Error("Report creation returned null or invalid report");
+        }
+        
+        // Verify report exists in database
+        const verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database");
+        }
+        
+        console.log(`✅ Report created successfully with ID: ${report._id}`);
+        report = verifiedReport;
+      } catch (reportError) {
+        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+        console.error(`   Error details:`, reportError.message);
+        console.error(`   Stack:`, reportError.stack);
+        // DO NOT delete Lead if Report creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER Report is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // Report was created, so return success but log the error
+        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: 'Lead updated and moved to reports', report });
     }
   } catch (error) {
@@ -1787,9 +2064,13 @@ export const updateGeneralLead = async (req, res) => {
     // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
       // When checkbox is checked, date is REQUIRED
-      if (follow_up_date === undefined || follow_up_date === null) {
+      // Check for undefined, null, or empty string
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({ 
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend." 
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
         });
       }
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
@@ -1893,8 +2174,50 @@ export const updateGeneralLead = async (req, res) => {
       res.json({ message: "General lead updated and moved to follow-ups", followUp });
     } else {
       // Move to Reports collection (existing behavior)
-      const report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-      await Lead.findByIdAndDelete(id);
+      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
+      let report;
+      try {
+        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+        
+        // Verify report was created successfully
+        if (!report || !report._id) {
+          throw new Error("Report creation returned null or invalid report");
+        }
+        
+        // Verify report exists in database
+        const verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database");
+        }
+        
+        console.log(`✅ Report created successfully with ID: ${report._id}`);
+        report = verifiedReport;
+      } catch (reportError) {
+        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+        console.error(`   Error details:`, reportError.message);
+        console.error(`   Stack:`, reportError.stack);
+        // DO NOT delete Lead if Report creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER Report is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // Report was created, so return success but log the error
+        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
       res.json({ message: "General lead updated and moved to reports", report });
     }
   } catch (error) {
