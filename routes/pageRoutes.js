@@ -1650,13 +1650,14 @@ router.get(
  *       
  *       **3-Stage Lifecycle (Strict Enforcement):**
  *       1. **Leads** → Edited with `followUpFlag=true` → **FollowUps** (NO Report created)
- *       2. **FollowUps** → Edited (this endpoint) → **Reports** (final state, category="followup")
+ *       2. **FollowUps** → Edited (this endpoint) → **Reports** (final state)
  *       
  *       **Important Notes:**
  *       - FollowUp leads can only be moved to Reports (final state)
  *       - All fields (callStatus, leadStatus, callDuration, remarks, leadType, store) are preserved
  *       - The FollowUp lead is removed from FollowUps collection after update
- *       - A Report entry is created with `category: "followup"` to identify reports from FollowUps
+ *       - Reports are sorted by `lead_type` (general, lossOfSale, bookingConfirmation, return, justDial)
+ *       - The `lead_type` from FollowUp is explicitly preserved in the Report for proper sorting
  *       - Reports are created ONLY in this endpoint, NEVER when moving Leads → FollowUps
  *       
  *       **Access Control:**
@@ -1688,12 +1689,14 @@ router.get(
  *               follow_up_date:
  *                 type: string
  *                 format: date-time
- *                 description: Follow-up date (optional, preserves existing if not provided)
+ *                 nullable: true
+ *                 description: Follow-up date (optional, preserves existing if not provided). Can be updated if needed.
  *                 example: "2024-03-15T10:00:00Z"
  *               remarks:
  *                 type: string
- *                 description: Updated remarks (max 1000 characters)
- *                 example: "Customer confirmed booking for March 2024"
+ *                 nullable: true
+ *                 description: Updated remarks. **Only include if user provides input.** If no input, use `null` or omit the field. Max 1000 characters if provided.
+ *                 example: null
  *               call_duration:
  *                 type: number
  *                 description: Call duration in seconds
@@ -1704,7 +1707,7 @@ router.get(
  *             - lead_status
  *     responses:
  *       200:
- *         description: FollowUp lead updated and moved to Reports successfully
+ *         description: FollowUp lead updated and moved to Reports successfully. The report will be sorted by `lead_type` in the Reports collection.
  *         content:
  *           application/json:
  *             schema:
@@ -1715,14 +1718,20 @@ router.get(
  *                   example: "Follow-up lead updated and moved to reports"
  *                 report:
  *                   type: object
- *                   description: Created Report entry with final state and category="followup"
+ *                   description: |
+ *                     Created Report entry with final state. 
+ *                     
+ *                     **Sorting:** Reports are sorted by `lead_type` field:
+ *                     - `"general"` → General/New Leads section
+ *                     - `"lossOfSale"` → Loss of Sale section
+ *                     - `"bookingConfirmation"` → Booking section
+ *                     - `"return"` → Return section
+ *                     - `"justDial"` → Just Dial section
+ *                     
+ *                     The `lead_type` from the FollowUp is explicitly preserved to ensure proper sorting.
  *                   properties:
  *                     _id:
  *                       type: string
- *                     category:
- *                       type: string
- *                       description: Report category - always "followup" for reports created from FollowUps
- *                       example: "followup"
  *                     lead_name:
  *                       type: string
  *                     phone_number:
@@ -1731,6 +1740,8 @@ router.get(
  *                       type: string
  *                     lead_type:
  *                       type: string
+ *                       description: Lead type preserved from FollowUp. Used for sorting reports (general, lossOfSale, bookingConfirmation, return, justDial).
+ *                       example: "general"
  *                     call_status:
  *                       type: string
  *                     lead_status:
@@ -1739,6 +1750,8 @@ router.get(
  *                       type: number
  *                     remarks:
  *                       type: string
+ *                       nullable: true
+ *                       description: Remarks (null if user provided no input)
  *                     editedBy:
  *                       type: string
  *                     editedAt:
@@ -1751,7 +1764,6 @@ router.get(
  *                   message: "Follow-up lead updated and moved to reports"
  *                   report:
  *                     _id: "507f1f77bcf86cd799439011"
- *                     category: "followup"
  *                     lead_name: "John Doe"
  *                     phone_number: "9876543210"
  *                     store: "Suitor Guy - Edappally"
@@ -1759,7 +1771,8 @@ router.get(
  *                     call_status: "Called"
  *                     lead_status: "Interested"
  *                     call_duration: 300
- *                     remarks: "Customer confirmed booking for March 2024"
+ *                     remarks: null
+ *                     follow_up_date: "2025-01-15T10:00:00.000Z"
  *                     editedBy: "507f1f77bcf86cd799439012"
  *                     editedAt: "2024-12-29T10:30:00.000Z"
  *       400:

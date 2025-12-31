@@ -243,7 +243,9 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.lead_name = lead.name ?? "";
   payload.phone_number = lead.phone ?? "";
   payload.store = lead.store ?? "";
-  payload.lead_type = lead.leadType ?? lead.lead_type ?? "";
+  // CRITICAL: Ensure lead_type is always set (never empty string)
+  // This is essential for proper sorting in reports
+  payload.lead_type = lead.leadType ?? lead.lead_type ?? "general";
   payload.call_status = lead.callStatus ?? lead.call_status ?? "";
   payload.lead_status = lead.leadStatus ?? lead.lead_status ?? "";
   payload.function_date = lead.functionDate ?? lead.function_date ?? null;
@@ -296,10 +298,8 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.editedAt = new Date();
   payload.note = remarksValidation.normalizedRemarks;
   
-  // Set category if provided (e.g., "followup" for reports created from FollowUps)
-  if (category) {
-    payload.category = category;
-  }
+  // Category field is no longer used - sorting is based on lead_type only
+  // Removed category assignment to avoid confusion
 
   // Create the report document (schema allows dynamic fields via strict:false)
   const report = await Report.create({
@@ -1830,14 +1830,24 @@ export const updateFollowUp = async (req, res) => {
       changedFields[key] = { before: beforeFollowUp[key], after: updatedFollowUp[key] };
     });
 
-    // Create Report entry with category = "followup"
+    // Create Report entry from FollowUp
     // This is the ONLY place where Reports are created from FollowUps
+    // Reports are sorted by lead_type (general, lossOfSale, bookingConfirmation, return, justDial)
+    // CRITICAL: Report must be created BEFORE deleting FollowUp to ensure data integrity
     let report;
+    let reportCreated = false;
+    
     try {
       console.log(`📝 Creating report for FollowUp ID: ${id}`);
       console.log(`   FollowUp leadType: ${updatedFollowUp.leadType}`);
       console.log(`   FollowUp name: ${updatedFollowUp.name}`);
       console.log(`   FollowUp phone: ${updatedFollowUp.phone}`);
+      
+      // CRITICAL: Ensure leadType is preserved from FollowUp
+      // Reports are sorted by lead_type (general, lossOfSale, bookingConfirmation, return, justDial)
+      // No need for category field - sorting is based on lead_type only
+      const followUpLeadType = updatedFollowUp.leadType || updatedFollowUp.lead_type || "general";
+      console.log(`   Preserving leadType: ${followUpLeadType} for report`);
       
       report = await createReportFromLead(
         updatedFollowUp, 
@@ -1845,37 +1855,75 @@ export const updateFollowUp = async (req, res) => {
         remarksValidation.normalizedRemarks, 
         changedFields, 
         call_duration || updatedFollowUp.callDuration || 0,
-        "followup" // Category to identify reports created from FollowUps
+        null // No category needed - sorting is by lead_type only
       );
+      
+      // CRITICAL: Explicitly ensure lead_type is set correctly in the report
+      // This ensures proper sorting in reports by lead type
+      if (report && report._id) {
+        await Report.findByIdAndUpdate(report._id, { 
+          $set: { 
+            lead_type: followUpLeadType 
+          } 
+        });
+        // Re-fetch to get updated report
+        report = await Report.findById(report._id);
+      }
       
       // Verify report was created
       if (!report || !report._id) {
         throw new Error("Report creation returned null or invalid report");
       }
       
-      // Verify report exists in database
-      const verifiedReport = await Report.findById(report._id);
+      // Verify report exists in database (double-check with retry)
+      let verifiedReport = await Report.findById(report._id);
       if (!verifiedReport) {
-        throw new Error("Report was created but not found in database");
+        // Retry once after a short delay (in case of replication lag)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        verifiedReport = await Report.findById(report._id);
+        if (!verifiedReport) {
+          throw new Error("Report was created but not found in database after verification");
+        }
       }
       
-      console.log(`✅ Report created successfully with ID: ${report._id}`);
-      console.log(`   Report category: ${verifiedReport.category || "followup"}`);
-      console.log(`   Report lead_type: ${verifiedReport.lead_type || updatedFollowUp.leadType || "general"}`);
-      console.log(`   Report lead_name: ${verifiedReport.lead_name || updatedFollowUp.name}`);
-      console.log(`   Report phone_number: ${verifiedReport.phone_number || updatedFollowUp.phone}`);
+      // Final verification: Ensure report has all required fields
+      if (!verifiedReport.lead_name && !verifiedReport.phone_number) {
+        throw new Error("Report was created but missing required fields (lead_name, phone_number)");
+      }
       
-      // Use verified report for response
+      // Mark report as successfully created
+      reportCreated = true;
       report = verifiedReport;
+      
+      console.log(`✅ Report created successfully with ID: ${report._id}`);
+      console.log(`   Report lead_type: ${report.lead_type || updatedFollowUp.leadType || "general"}`);
+      console.log(`   Report lead_name: ${report.lead_name || updatedFollowUp.name}`);
+      console.log(`   Report phone_number: ${report.phone_number || updatedFollowUp.phone}`);
+      console.log(`   Report will be sorted by lead_type: ${report.lead_type}`);
+      
     } catch (reportError) {
-      console.error(`❌ Failed to create report for FollowUp ID: ${id}`, reportError);
+      console.error(`❌ CRITICAL: Failed to create report for FollowUp ID: ${id}`);
       console.error(`   Error details:`, reportError.message);
       console.error(`   Stack:`, reportError.stack);
-      throw new Error(`Failed to create report: ${reportError.message}`);
+      console.error(`   FollowUp will NOT be deleted to prevent data loss`);
+      // DO NOT delete FollowUp if report creation failed
+      return res.status(500).json({ 
+        message: `Failed to create report: ${reportError.message}. FollowUp lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+      });
+    }
+
+    // CRITICAL: Only delete FollowUp if report was successfully created
+    // This ensures data integrity - we never lose data
+    if (!reportCreated || !report || !report._id) {
+      console.error(`❌ CRITICAL: Report creation verification failed. FollowUp will NOT be deleted.`);
+      return res.status(500).json({ 
+        message: "Report creation verification failed. FollowUp lead was not deleted to prevent data loss."
+      });
     }
 
     // Remove from FollowUps collection (lifecycle complete: FollowUps → Reports)
-    // Only delete if report creation succeeded
+    // Only delete AFTER confirming report was successfully created
     try {
       // Verify FollowUp still exists before deletion
       const followUpToDelete = await FollowUp.findById(id);
@@ -1886,28 +1934,33 @@ export const updateFollowUp = async (req, res) => {
         const deleteResult = await FollowUp.findByIdAndDelete(id);
         if (deleteResult) {
           console.log(`✅ FollowUp ID ${id} removed from FollowUps collection`);
+          console.log(`   Report ID ${report._id} is now the final state`);
         } else {
           console.warn(`⚠️  FollowUp ID ${id} deletion returned null`);
+          console.warn(`   Report ID ${report._id} exists, but FollowUp deletion failed`);
         }
       }
     } catch (deleteError) {
       console.error(`❌ Failed to delete FollowUp ID: ${id}`, deleteError);
       // Report was already created, so we should still return success
       // But log the error for investigation
-      console.error(`⚠️  WARNING: Report created but FollowUp deletion failed. Manual cleanup may be needed.`);
+      console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but FollowUp deletion failed. Manual cleanup may be needed.`);
+      // Still return success since report was created
     }
 
     // DEFENSIVE: Ensure we never touch the Leads collection from this endpoint
     // This endpoint ONLY works with FollowUps → Reports transition
 
     // Build response with all necessary fields
+    // CRITICAL: lead_type is the only field needed for sorting (not category)
     const reportObj = report.toObject ? report.toObject() : report;
+    const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "general";
+    
     res.json({ 
       message: "Follow-up lead updated and moved to reports", 
       report: {
         ...reportObj,
-        category: reportObj.category || "followup",
-        lead_type: reportObj.lead_type || updatedFollowUp.leadType || "general",
+        lead_type: finalLeadType, // Explicitly set lead_type for proper sorting
         report_id: reportObj.report_id || String(report._id)
       }
     });

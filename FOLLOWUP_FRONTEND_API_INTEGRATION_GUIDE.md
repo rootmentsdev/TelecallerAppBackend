@@ -79,7 +79,7 @@ Content-Type: application/json
        │
        ▼
 ┌─────────────┐
-│   REPORTS   │  (Final state - category="followup")
+│   REPORTS   │  (Final state - sorted by lead_type)
 └─────────────┘
 ```
 
@@ -510,7 +510,6 @@ const response = await fetch(`https://telecallerappbackend.onrender.com/api/page
   "message": "Follow-up lead updated and moved to reports",
   "report": {
     "_id": "6954ec119fcf2358f8ea164d",
-    "category": "followup",
     "lead_name": "John Doe",
     "phone_number": "9876543210",
     "store": "Suitor Guy - Edappally",
@@ -527,11 +526,23 @@ const response = await fetch(`https://telecallerappbackend.onrender.com/api/page
 }
 ```
 
+**Report Sorting:**
+- Reports are sorted by `lead_type` field:
+  - `"general"` → General/New Leads section
+  - `"lossOfSale"` → Loss of Sale section
+  - `"bookingConfirmation"` → Booking section
+  - `"return"` → Return section
+  - `"justDial"` → Just Dial section
+- The `lead_type` from FollowUp is explicitly preserved in the Report
+- No `category` field is used - sorting is based solely on `lead_type`
+
 **Key Points:**
-- `category: "followup"` identifies reports created from FollowUps
+- Reports are sorted by `lead_type` (general, lossOfSale, bookingConfirmation, return, justDial)
+- The `lead_type` from FollowUp is explicitly preserved in the Report for proper sorting
 - All fields (callStatus, leadStatus, callDuration, remarks, leadType, store) are preserved
 - FollowUp lead is **removed** from FollowUps collection
 - Report entry is **created** in Reports collection
+- Reports appear in the correct section based on `lead_type` (General, Loss of Sale, Booking, Return, All Calls)
 
 **Error Response (404) - Not in FollowUps:**
 ```json
@@ -796,7 +807,7 @@ const completeFollowUp = async (followUpId, callDetails, token) => {
 2. **Move to FollowUps:** `PATCH https://telecallerappbackend.onrender.com/api/pages/leads/:id` with `follow_up_flag=true` + `follow_up_date`
 3. **Fetch FollowUps:** `GET https://telecallerappbackend.onrender.com/api/pages/follow-ups`
 4. **Complete Follow-Up:** `POST https://telecallerappbackend.onrender.com/api/pages/follow-ups/:id` with call details
-5. **Result:** Lead is now in Reports collection with `category="followup"`
+5. **Result:** Lead is now in Reports collection, sorted by `lead_type` (general, lossOfSale, bookingConfirmation, return, justDial)
 
 ### **Key Rules:**
 
@@ -804,7 +815,7 @@ const completeFollowUp = async (followUpId, callDetails, token) => {
 ✅ `follow_up_date` must be in ISO 8601 format  
 ✅ `follow_up_date` should come from frontend (user-selected), not auto-generated  
 ✅ FollowUps endpoint only works with leads in FollowUps collection  
-✅ Reports created from FollowUps have `category="followup"`  
+✅ Reports created from FollowUps are sorted by `lead_type` (general, lossOfSale, bookingConfirmation, return, justDial)  
 
 ---
 
