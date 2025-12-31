@@ -1486,7 +1486,7 @@ export const getFollowUps = async (req, res) => {
     }
 
     // Apply role-based filtering
-    const query = buildLeadQuery(filters, req.user);
+    const query = buildLeadQuery(req.user, filters);
 
     // Sorting
     const sortOptions = {};
