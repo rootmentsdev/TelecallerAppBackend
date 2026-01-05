@@ -27,6 +27,7 @@ export const LEAD_API_ID_MAP = {
     '19': 'Suitor Guy - Palakkad', // Was Palakkad
     '20': 'Suitor Guy - Kalpetta', // Was KALPETTA
     '21': 'Suitor Guy - Kannur', // Was KANNUR
+    '23': 'Suitor Guy - MG Road', // MG Road location ID
 
     // --- New IDs from LocationList API (to ensure coverage) ---
     '100': 'Zorucci - Edappal',
