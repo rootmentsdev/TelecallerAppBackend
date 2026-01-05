@@ -817,7 +817,6 @@ const completeFollowUp = async (followUpId, callDetails, token) => {
 ✅ FollowUps endpoint only works with leads in FollowUps collection  
 ✅ Reports created from FollowUps are sorted by `lead_type` (general, lossOfSale, bookingConfirmation, return, justDial)  
 
----
 
 ## Support
 
