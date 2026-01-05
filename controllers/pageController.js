@@ -607,64 +607,8 @@ export const getLeads = async (req, res) => {
     }
     if (source) filters.source = source;
 
-    // Date filtering logic
-    // Date filtering logic
-    // Priority: specific date fields > generic date range
-    if (enquiryDateFrom || enquiryDateTo) {
-      filters.enquiryDate = {};
-      if (enquiryDateFrom) {
-        const parsed = parseQueryDate(enquiryDateFrom);
-        if (parsed) filters.enquiryDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else filters.enquiryDate.$gte = new Date(enquiryDateFrom);
-      }
-      if (enquiryDateTo) {
-        const parsed = parseQueryDate(enquiryDateTo);
-        let endDate;
-        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else endDate = new Date(enquiryDateTo);
-
-        endDate.setHours(23, 59, 59, 999);
-        filters.enquiryDate.$lte = endDate;
-      }
-    }
-
-    if (functionDateFrom || functionDateTo) {
-      filters.functionDate = {};
-      if (functionDateFrom) {
-        const parsed = parseQueryDate(functionDateFrom);
-        if (parsed) filters.functionDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else filters.functionDate.$gte = new Date(functionDateFrom);
-      }
-      if (functionDateTo) {
-        const parsed = parseQueryDate(functionDateTo);
-        let endDate;
-        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else endDate = new Date(functionDateTo);
-
-        endDate.setHours(23, 59, 59, 999);
-        filters.functionDate.$lte = endDate;
-      }
-    }
-
-    if (visitDateFrom || visitDateTo) {
-      filters.visitDate = {};
-      if (visitDateFrom) {
-        const parsed = parseQueryDate(visitDateFrom);
-        if (parsed) filters.visitDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else filters.visitDate.$gte = new Date(visitDateFrom);
-      }
-      if (visitDateTo) {
-        const parsed = parseQueryDate(visitDateTo);
-        let endDate;
-        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else endDate = new Date(visitDateTo);
-
-        endDate.setHours(23, 59, 59, 999);
-        filters.visitDate.$lte = endDate;
-      }
-    }
-
     // Helper to robustly parse date strings (YYYY-MM-DD or DD-MM-YYYY)
+    // MUST be defined BEFORE it's used in date filtering logic
     const parseQueryDate = (dateStr) => {
       if (!dateStr) return null;
 
@@ -699,6 +643,71 @@ export const getLeads = async (req, res) => {
       return null;
     };
 
+    // Date filtering logic
+    // Priority: specific date fields > generic date range
+    if (enquiryDateFrom || enquiryDateTo) {
+      filters.enquiryDate = {};
+      if (enquiryDateFrom) {
+        const parsed = parseQueryDate(enquiryDateFrom);
+        if (parsed) filters.enquiryDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.enquiryDate.$gte = new Date(enquiryDateFrom);
+      }
+      if (enquiryDateTo) {
+        const parsed = parseQueryDate(enquiryDateTo);
+        let endDate;
+        if (parsed) {
+          // Use UTC to avoid timezone issues - set end of day in UTC
+          endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        } else {
+          endDate = new Date(enquiryDateTo);
+          endDate.setUTCHours(23, 59, 59, 999); // Use UTC hours to avoid timezone issues
+        }
+        filters.enquiryDate.$lte = endDate;
+      }
+    }
+
+    if (functionDateFrom || functionDateTo) {
+      filters.functionDate = {};
+      if (functionDateFrom) {
+        const parsed = parseQueryDate(functionDateFrom);
+        if (parsed) filters.functionDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.functionDate.$gte = new Date(functionDateFrom);
+      }
+      if (functionDateTo) {
+        const parsed = parseQueryDate(functionDateTo);
+        let endDate;
+        if (parsed) {
+          // Use UTC to avoid timezone issues - set end of day in UTC
+          endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        } else {
+          endDate = new Date(functionDateTo);
+          endDate.setUTCHours(23, 59, 59, 999); // Use UTC hours to avoid timezone issues
+        }
+        filters.functionDate.$lte = endDate;
+      }
+    }
+
+    if (visitDateFrom || visitDateTo) {
+      filters.visitDate = {};
+      if (visitDateFrom) {
+        const parsed = parseQueryDate(visitDateFrom);
+        if (parsed) filters.visitDate.$gte = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
+        else filters.visitDate.$gte = new Date(visitDateFrom);
+      }
+      if (visitDateTo) {
+        const parsed = parseQueryDate(visitDateTo);
+        let endDate;
+        if (parsed) {
+          // Use UTC to avoid timezone issues - set end of day in UTC
+          endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        } else {
+          endDate = new Date(visitDateTo);
+          endDate.setUTCHours(23, 59, 59, 999); // Use UTC hours to avoid timezone issues
+        }
+        filters.visitDate.$lte = endDate;
+      }
+    }
+
     // Single date filter for createdAt (takes priority over range)
     if (createdAt) {
       const parsed = parseQueryDate(createdAt);
@@ -722,10 +731,13 @@ export const getLeads = async (req, res) => {
       if (createdAtTo) {
         const parsed = parseQueryDate(createdAtTo);
         let endDate;
-        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else endDate = new Date(createdAtTo);
-
-        endDate.setHours(23, 59, 59, 999);
+        if (parsed) {
+          // Use UTC to avoid timezone issues - set end of day in UTC
+          endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        } else {
+          endDate = new Date(createdAtTo);
+          endDate.setUTCHours(23, 59, 59, 999); // Use UTC hours to avoid timezone issues
+        }
         filters.createdAt.$lte = endDate;
       }
     }
@@ -746,10 +758,13 @@ export const getLeads = async (req, res) => {
       if (dateTo) {
         const parsed = parseQueryDate(dateTo);
         let endDate;
-        if (parsed) endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day));
-        else endDate = new Date(dateTo);
-
-        endDate.setHours(23, 59, 59, 999);
+        if (parsed) {
+          // Use UTC to avoid timezone issues - set end of day in UTC
+          endDate = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        } else {
+          endDate = new Date(dateTo);
+          endDate.setUTCHours(23, 59, 59, 999); // Use UTC hours to avoid timezone issues
+        }
         filters[dateFieldName].$lte = endDate;
       }
     }
