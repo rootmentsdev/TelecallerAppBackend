@@ -1,7 +1,6 @@
 // API-Only sync script
 // Runs ONLY external API syncs (no CSV imports)
 // Used by automatic scheduler every 20 minutes
-// IMPORTANT: Assumes MongoDB is ALREADY connected by server.js
 // ATOMIC: Uses global lock to ensure only one sync cycle runs at a time
 
 import dotenv from "dotenv";
@@ -9,6 +8,21 @@ import mongoose from "mongoose";
 import SyncLock from "../models/SyncLock.js";
 
 dotenv.config();
+
+// Connect to MongoDB if not already connected
+const ensureDBConnection = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return; // Already connected
+  }
+  
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ MongoDB Connected for API sync");
+  } catch (error) {
+    console.error("❌ MongoDB connection error:", error.message);
+    throw error;
+  }
+};
 
 // Global lock name
 const GLOBAL_LOCK_NAME = "GLOBAL_API_SYNC";
@@ -71,6 +85,9 @@ const runApiOnlySync = async () => {
   const startTime = Date.now();
   const trigger = process.env.SYNC_TRIGGER || "auto";
 
+  // Ensure MongoDB is connected (required for SyncLock operations)
+  await ensureDBConnection();
+
   console.log("=".repeat(60));
   console.log("🚀 Starting Automatic API Sync (20-minute interval)");
   console.log("=".repeat(60));
@@ -115,10 +132,10 @@ const runApiOnlySync = async () => {
     // Step 1: Sync Stores (must complete before booking/return)
     try {
       console.log("📦 Step 1/3: Starting Stores sync...");
-      const { run: syncStores } = await import("./api/sync_storelist.js");
-      await syncStores();
+          const { run: syncStores } = await import("./api/sync_storelist.js");
+          await syncStores();
       storeSuccess = true;
-      console.log("✅ Stores sync completed");
+          console.log("✅ Stores sync completed");
       console.log();
     } catch (error) {
       console.error("❌ Stores sync failed:", error.message);
@@ -129,10 +146,10 @@ const runApiOnlySync = async () => {
     // Step 2: Sync Booking Confirmation (awaits store sync completion)
     try {
       console.log("📦 Step 2/3: Starting Booking Confirmation sync...");
-      const { run: syncBooking } = await import("./api/sync_booking.js");
-      await syncBooking();
+          const { run: syncBooking } = await import("./api/sync_booking.js");
+          await syncBooking();
       bookingSuccess = true;
-      console.log("✅ Booking Confirmation sync completed");
+          console.log("✅ Booking Confirmation sync completed");
       console.log();
     } catch (error) {
       console.error("❌ Booking Confirmation sync failed:", error.message);
@@ -143,10 +160,10 @@ const runApiOnlySync = async () => {
     // Step 3: Sync Returns (awaits booking sync completion)
     try {
       console.log("📦 Step 3/3: Starting Returns sync...");
-      const { run: syncReturn } = await import("./api/sync_return.js");
-      await syncReturn();
+          const { run: syncReturn } = await import("./api/sync_return.js");
+          await syncReturn();
       returnSuccess = true;
-      console.log("✅ Returns sync completed");
+          console.log("✅ Returns sync completed");
       console.log();
     } catch (error) {
       console.error("❌ Returns sync failed:", error.message);

@@ -1011,7 +1011,7 @@ export const updateLossOfSaleLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-        
+
         // Verify report was created successfully
         if (!report || !report._id) {
           throw new Error("Report creation returned null or invalid report");
@@ -1049,8 +1049,8 @@ export const updateLossOfSaleLead = async (req, res) => {
         // Report was created, so return success but log the error
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
-      
-      res.json({ message: "Loss of Sale lead updated and moved to reports", report });
+
+    res.json({ message: "Loss of Sale lead updated and moved to reports", report });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1152,7 +1152,7 @@ export const updateReturnLead = async (req, res) => {
     } else if (follow_up_flag !== undefined) {
       // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-    }
+      }
     
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
@@ -1229,7 +1229,7 @@ export const updateReturnLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-        
+
         // Verify report was created successfully
         if (!report || !report._id) {
           throw new Error("Report creation returned null or invalid report");
@@ -1267,8 +1267,8 @@ export const updateReturnLead = async (req, res) => {
         // Report was created, so return success but log the error
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
-      
-      res.json({ message: "Return lead updated and moved to reports", report });
+
+    res.json({ message: "Return lead updated and moved to reports", report });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1370,7 +1370,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
     } else if (follow_up_flag !== undefined) {
       // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-    }
+      }
     
     if (call_date !== undefined) updateData.callDate = call_date;
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
@@ -1451,7 +1451,7 @@ export const updateBookingConfirmationLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-        
+
         // Verify report was created successfully
         if (!report || !report._id) {
           throw new Error("Report creation returned null or invalid report");
@@ -1489,8 +1489,8 @@ export const updateBookingConfirmationLead = async (req, res) => {
         // Report was created, so return success but log the error
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
-      
-      res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
+
+    res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1586,7 +1586,7 @@ export const updateJustDialLead = async (req, res) => {
     } else if (follow_up_flag !== undefined) {
       // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
-    }
+      }
     
     if (call_date !== undefined) updateData.callDate = call_date;
     // Validate and normalize remarks - converts empty strings to null
@@ -1674,7 +1674,7 @@ export const updateJustDialLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
-        
+
         // Verify report was created successfully
         if (!report || !report._id) {
           throw new Error("Report creation returned null or invalid report");
@@ -1712,8 +1712,8 @@ export const updateJustDialLead = async (req, res) => {
         // Report was created, so return success but log the error
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
-      
-      res.json({ message: "Just Dial lead updated and moved to reports", report });
+
+    res.json({ message: "Just Dial lead updated and moved to reports", report });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1940,7 +1940,7 @@ export const updateGenericLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
-        
+
         // Verify report was created successfully
         if (!report || !report._id) {
           throw new Error("Report creation returned null or invalid report");
@@ -1978,8 +1978,8 @@ export const updateGenericLead = async (req, res) => {
         // Report was created, so return success but log the error
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
-      
-      res.json({ message: 'Lead updated and moved to reports', report });
+
+    res.json({ message: 'Lead updated and moved to reports', report });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -2180,7 +2180,7 @@ export const updateGeneralLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-        
+
         // Verify report was created successfully
         if (!report || !report._id) {
           throw new Error("Report creation returned null or invalid report");
@@ -2218,8 +2218,8 @@ export const updateGeneralLead = async (req, res) => {
         // Report was created, so return success but log the error
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
-      
-      res.json({ message: "General lead updated and moved to reports", report });
+
+    res.json({ message: "General lead updated and moved to reports", report });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -2427,7 +2427,18 @@ export const updateFollowUp = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_date !== undefined) updateData.followUpDate = follow_up_date;
+    if (follow_up_date !== undefined) {
+      // Validate follow_up_date if provided
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (validatedDate) {
+        updateData.followUpDate = validatedDate;
+      } else if (follow_up_date !== null) {
+        // Only error if it's not explicitly null (which means clear the date)
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format) or null." });
+      } else {
+        updateData.followUpDate = null;
+      }
+    }
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
@@ -2534,28 +2545,53 @@ export const updateFollowUp = async (req, res) => {
 
     // Remove from FollowUps collection (lifecycle complete: FollowUps → Reports)
     // Only delete AFTER confirming report was successfully created
+    // CRITICAL: This deletion MUST happen for the lifecycle to complete
+    let followUpDeleted = false;
     try {
       // Verify FollowUp still exists before deletion
       const followUpToDelete = await FollowUp.findById(id);
       if (!followUpToDelete) {
         console.warn(`⚠️  FollowUp ID ${id} not found for deletion (may have been already deleted)`);
-        // Report was created, so continue even if deletion fails (idempotency)
+        followUpDeleted = true; // Consider it deleted if it doesn't exist
       } else {
         const deleteResult = await FollowUp.findByIdAndDelete(id);
         if (deleteResult) {
+          followUpDeleted = true;
           console.log(`✅ FollowUp ID ${id} removed from FollowUps collection`);
           console.log(`   Report ID ${report._id} is now the final state`);
         } else {
-          console.warn(`⚠️  FollowUp ID ${id} deletion returned null`);
-          console.warn(`   Report ID ${report._id} exists, but FollowUp deletion failed`);
+          console.error(`❌ CRITICAL: FollowUp ID ${id} deletion returned null`);
+          console.error(`   Report ID ${report._id} exists, but FollowUp deletion failed`);
+          // Try one more time with direct delete
+          try {
+            await FollowUp.deleteOne({ _id: id });
+            const verifyDelete = await FollowUp.findById(id);
+            if (!verifyDelete) {
+              followUpDeleted = true;
+              console.log(`✅ FollowUp ID ${id} deleted on retry`);
+            }
+          } catch (retryError) {
+            console.error(`❌ Retry deletion also failed:`, retryError);
+          }
         }
       }
     } catch (deleteError) {
       console.error(`❌ Failed to delete FollowUp ID: ${id}`, deleteError);
+      console.error(`   Error details:`, deleteError.message);
+      console.error(`   Stack:`, deleteError.stack);
       // Report was already created, so we should still return success
       // But log the error for investigation
       console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but FollowUp deletion failed. Manual cleanup may be needed.`);
-      // Still return success since report was created
+    }
+    
+    // Final verification: Check if FollowUp still exists
+    if (!followUpDeleted) {
+      const stillExists = await FollowUp.findById(id);
+      if (stillExists) {
+        console.error(`❌ CRITICAL: FollowUp ID ${id} still exists after deletion attempt!`);
+        console.error(`   Report ID ${report._id} was created, but FollowUp was not deleted.`);
+        console.error(`   This is a data integrity issue - manual cleanup required.`);
+      }
     }
 
     // DEFENSIVE: Ensure we never touch the Leads collection from this endpoint

@@ -231,10 +231,10 @@ export const saveToMongo = async (leadData) => {
       // This matches the database unique index to prevent E11000 errors
       const duplicateQuery = {
         name: leadData.name,
-        phone: leadData.phone,
-        leadType: leadData.leadType,
-        store: leadData.store,
-      };
+          phone: leadData.phone,
+          leadType: leadData.leadType,
+          store: leadData.store,
+        };
 
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
@@ -326,8 +326,8 @@ export const saveToMongo = async (leadData) => {
     // For other lead types (justDial) or new records: create new lead
     // Use try-catch to handle duplicate key errors gracefully
     try {
-      const lead = await Lead.create(leadData);
-      return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
+    const lead = await Lead.create(leadData);
+    return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
     } catch (createError) {
       // Handle duplicate key errors (E11000) - treat as skipped, not error
       if (createError.code === 11000 || createError.name === 'MongoServerError' && createError.code === 11000) {

@@ -36,7 +36,7 @@ const runApiSync = async () => {
       console.log('⏭️  Sync skipped - global lock is active');
       console.log('   Another sync cycle is already running');
     } else if (result && result.success) {
-      console.log('✅ Automatic API sync completed successfully');
+    console.log('✅ Automatic API sync completed successfully');
     } else if (result && !result.success) {
       console.log(`⚠️  Automatic API sync completed with ${result.failures || 0} error(s)`);
     } else {
