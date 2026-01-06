@@ -30,6 +30,22 @@ const GLOBAL_LOCK_NAME = "GLOBAL_API_SYNC";
 // Acquire global sync lock
 const acquireLock = async (lockedBy = "scheduler") => {
   try {
+    // First, check for and remove any stale locks (older than 1.5 hours)
+    const existingLock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
+    if (existingLock) {
+      const lockAge = Date.now() - existingLock.lockedAt.getTime();
+      const oneAndHalfHours = 1.5 * 60 * 60 * 1000; // 90 minutes
+      
+      if (lockAge > oneAndHalfHours) {
+        // Stale lock - remove it
+        await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+        console.log(`⚠️  Removed stale lock (age: ${Math.round(lockAge / 60000)} minutes)`);
+      } else {
+        // Lock is still valid (not stale)
+        return { acquired: false, reason: "Lock already exists (active sync running)" };
+      }
+    }
+    
     // Try to create lock document (will fail if already exists due to unique constraint)
     const lock = await SyncLock.create({
       lockName: GLOBAL_LOCK_NAME,
@@ -39,28 +55,9 @@ const acquireLock = async (lockedBy = "scheduler") => {
     });
     return { acquired: true, lock };
   } catch (error) {
-    // Lock already exists
+    // Lock already exists (race condition - another process created it)
     if (error.code === 11000 || error.name === 'MongoServerError') {
-      // Check if lock is stale (older than 2 hours)
-      const existingLock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
-      if (existingLock) {
-        const lockAge = Date.now() - existingLock.lockedAt.getTime();
-        const twoHours = 2 * 60 * 60 * 1000;
-        
-        if (lockAge > twoHours) {
-          // Stale lock - remove it and create new one
-          await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
-          const newLock = await SyncLock.create({
-            lockName: GLOBAL_LOCK_NAME,
-            lockedAt: new Date(),
-            lockedBy: lockedBy,
-            status: "active",
-          });
-          console.log(`⚠️  Removed stale lock (age: ${Math.round(lockAge / 60000)} minutes)`);
-          return { acquired: true, lock: newLock };
-        }
-      }
-      return { acquired: false, reason: "Lock already exists" };
+      return { acquired: false, reason: "Lock already exists (race condition)" };
     }
     throw error;
   }
