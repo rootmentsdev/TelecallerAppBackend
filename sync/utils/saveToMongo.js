@@ -84,32 +84,38 @@ export const bulkSaveToMongo = async (leadsData) => {
         continue;
       }
 
-      // Prepare duplicate check query
-      let duplicateQuery = null;
+      // DUPLICATE CHECK: For ALL lead types, check: name, phone, leadType, store, bookingNo (if exists)
+      // This ensures no duplicates are created during bulk sync
+      const duplicateQuery = {
+        name: leadData.name,
+        phone: leadData.phone,
+        leadType: leadData.leadType,
+        store: leadData.store,
+      };
+      
+      // Add bookingNo (id) if it exists - this is critical for booking/return leads
+      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+        duplicateQuery.bookingNo = leadData.bookingNo.trim();
+      }
+
+      // Check for existing lead with same: name + phone + leadType + store + bookingNo (if exists)
+      const existing = await Lead.findOne(duplicateQuery);
+      if (existing) {
+        // Record already exists - skip it to prevent duplicates
+        results.skipped++;
+        const checkFields = leadData.bookingNo 
+          ? `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}", bookingNo="${leadData.bookingNo}"`
+          : `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}"`;
+        skipReasons.push({ 
+          phone: leadData.phone, 
+          name: leadData.name,
+          reason: `Duplicate detected: matching ${checkFields}` 
+        });
+        continue;
+      }
+
+      // For booking/return: add to bulk insert (don't update to preserve user edits)
       if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
-        if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-          duplicateQuery = {
-            bookingNo: leadData.bookingNo.trim(),
-            phone: leadData.phone,
-            leadType: leadData.leadType,
-          };
-        } else {
-          duplicateQuery = {
-            phone: leadData.phone,
-            name: leadData.name,
-            leadType: leadData.leadType,
-            store: leadData.store,
-          };
-        }
-
-        // For booking/return, skip if exists (don't update)
-        const existing = await Lead.findOne(duplicateQuery);
-        if (existing) {
-          results.skipped++;
-          skipReasons.push({ phone: leadData.phone, reason: "Already exists" });
-          continue;
-        }
-
         // Add to bulk insert
         bulkOps.push({
           insertOne: {
@@ -224,40 +230,56 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Lead exists in follow-ups (moved after edit)" };
     }
 
-    // For booking confirmation and return: check for duplicates and skip (don't update to preserve user edits)
+    // DUPLICATE CHECK FOR BOOKING/RETURN: Skip if duplicate (don't update to preserve user edits)
     // These come from API and should only add new records (incremental sync)
+    // ALWAYS check: name, phone, leadType, store, bookingNo (if exists)
     if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
-      // Check using the unique index key: name + phone + leadType + store
-      // This matches the database unique index to prevent E11000 errors
+      // Build comprehensive duplicate check query
       const duplicateQuery = {
         name: leadData.name,
-          phone: leadData.phone,
-          leadType: leadData.leadType,
-          store: leadData.store,
-        };
+        phone: leadData.phone,
+        leadType: leadData.leadType,
+        store: leadData.store,
+      };
+      
+      // Add bookingNo (id) if it exists - this is critical for booking/return leads
+      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
+        duplicateQuery.bookingNo = leadData.bookingNo.trim();
+      }
 
       const existing = await Lead.findOne(duplicateQuery);
       if (existing) {
-        // Record already exists - skip it (don't update to preserve user edits and avoid unnecessary updates)
-        return { skipped: true, leadId: existing._id, name: existing.name, phone: existing.phone, bookingNo: existing.bookingNo, reason: "Already exists" };
+        // Record already exists - skip it to prevent duplicates
+        const checkFields = leadData.bookingNo 
+          ? `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}", bookingNo="${leadData.bookingNo}"`
+          : `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}"`;
+        console.log(`   ⏭️  Duplicate detected (booking/return) - skipped: ${checkFields}`);
+        return { 
+          skipped: true, 
+          leadId: existing._id, 
+          name: existing.name, 
+          phone: existing.phone, 
+          bookingNo: existing.bookingNo, 
+          reason: "Duplicate detected: matching name, phone, leadType, store" + (leadData.bookingNo ? ", bookingNo" : "")
+        };
       }
     }
 
-    // For loss of sale and general (walk-in): check for duplicates and UPDATE existing records
+    // DUPLICATE CHECK FOR LOSS OF SALE/GENERAL: Update if duplicate (upsert)
     // These come from CSV files and should update existing records when re-imported
+    // ALWAYS check: name, phone, leadType, store (same base criteria as booking/return)
     if (leadData.leadType === "lossOfSale" || leadData.leadType === "general") {
-      let duplicateQuery = null;
+      // Build comprehensive duplicate check query (same base criteria as booking/return)
+      const duplicateQuery = {
+        name: leadData.name,
+        phone: leadData.phone,
+        leadType: leadData.leadType,
+        store: leadData.store,
+      };
 
       if (leadData.leadType === "lossOfSale") {
-        // For loss of sale: Check phone + name + store + leadType + enquiryDate (if available)
-        duplicateQuery = {
-          phone: leadData.phone,
-          name: leadData.name,
-          leadType: leadData.leadType,
-          store: leadData.store,
-        };
-
-        // If enquiryDate is available, include it in the duplicate check for more accuracy
+        // For loss of sale: Also check enquiryDate/visitDate/functionDate if available for more accuracy
+        // But base duplicate check is still: name + phone + leadType + store
         if (leadData.enquiryDate) {
           duplicateQuery.enquiryDate = leadData.enquiryDate;
         }
@@ -270,16 +292,7 @@ export const saveToMongo = async (leadData) => {
           duplicateQuery.functionDate = leadData.functionDate;
         }
       } else if (leadData.leadType === "general") {
-        // For general (walk-in): Check phone + name + store + leadType + enquiryDate (if available)
-        // This allows same person to have multiple visits, but updates if same date/store
-        duplicateQuery = {
-          phone: leadData.phone,
-          name: leadData.name,
-          leadType: leadData.leadType,
-          store: leadData.store,
-        };
-
-        // If enquiryDate is available, include it to update same-day visits
+        // For general (walk-in): Also check enquiryDate/functionDate if available
         if (leadData.enquiryDate) {
           duplicateQuery.enquiryDate = leadData.enquiryDate;
         }
