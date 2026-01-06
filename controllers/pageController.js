@@ -340,13 +340,14 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.attended_by = lead.attendedBy ?? lead.attended_by ?? "";
   payload.booking_number = lead.bookingNo ?? lead.booking_number ?? null;
   payload.security_amount = lead.securityAmount ?? lead.security_amount ?? null;
+  payload.rating = lead.rating ?? lead.rating ?? null; // Star rating (1-5) for return leads
   payload.remarks = lead.remarks ?? "";
   payload.reason_collected_from_store = lead.reasonCollectedFromStore ?? lead.reason_collected_from_store ?? "";
   payload.call_duration = lead.callDuration ?? callDuration ?? 0;
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -1018,7 +1019,9 @@ export const updateLossOfSaleLead = async (req, res) => {
         console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
       
-      res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+      res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp: followUpObj });
     } else {
       // Move to Reports collection (existing behavior)
       // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
@@ -1065,7 +1068,9 @@ export const updateLossOfSaleLead = async (req, res) => {
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
 
-    res.json({ message: "Loss of Sale lead updated and moved to reports", report });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const reportObj = report.toObject ? report.toObject() : report;
+      res.json({ message: "Loss of Sale lead updated and moved to reports", report: reportObj });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1106,7 +1111,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1126,6 +1131,16 @@ export const updateReturnLead = async (req, res) => {
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
+    
+    // Handle rating field (1-5 stars for return leads)
+    if (rating !== undefined && rating !== null) {
+      // Validate rating is between 1 and 5
+      const ratingNum = parseInt(rating);
+      if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+        return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
+      }
+      updateData.rating = ratingNum;
+    }
     
     // CRITICAL: Follow-up date validation and flag handling
     // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
@@ -1236,7 +1251,9 @@ export const updateReturnLead = async (req, res) => {
         console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
       
-      res.json({ message: "Return lead updated and moved to follow-ups", followUp });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+      res.json({ message: "Return lead updated and moved to follow-ups", followUp: followUpObj });
     } else {
       // Move to Reports collection (existing behavior)
       // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
@@ -1283,7 +1300,9 @@ export const updateReturnLead = async (req, res) => {
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
 
-    res.json({ message: "Return lead updated and moved to reports", report });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const reportObj = report.toObject ? report.toObject() : report;
+      res.json({ message: "Return lead updated and moved to reports", report: reportObj });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1458,7 +1477,9 @@ export const updateBookingConfirmationLead = async (req, res) => {
         console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
       
-      res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+      res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp: followUpObj });
     } else {
       // Move to Reports collection (existing behavior)
       // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
@@ -1505,7 +1526,9 @@ export const updateBookingConfirmationLead = async (req, res) => {
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
 
-    res.json({ message: "Booking Confirmation lead updated and moved to reports", report });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const reportObj = report.toObject ? report.toObject() : report;
+      res.json({ message: "Booking Confirmation lead updated and moved to reports", report: reportObj });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1681,7 +1704,9 @@ export const updateJustDialLead = async (req, res) => {
         console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
       
-      res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+      res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp: followUpObj });
     } else {
       // Move to Reports collection (existing behavior)
       // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
@@ -1728,7 +1753,9 @@ export const updateJustDialLead = async (req, res) => {
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
 
-    res.json({ message: "Just Dial lead updated and moved to reports", report });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const reportObj = report.toObject ? report.toObject() : report;
+      res.json({ message: "Just Dial lead updated and moved to reports", report: reportObj });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1947,7 +1974,9 @@ export const updateGenericLead = async (req, res) => {
         console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
       
-      res.json({ message: 'Lead updated and moved to follow-ups', followUp });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+      res.json({ message: 'Lead updated and moved to follow-ups', followUp: followUpObj });
     } else {
       // Move to Reports collection (existing behavior)
       // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
@@ -2187,7 +2216,9 @@ export const updateGeneralLead = async (req, res) => {
         console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
       
-      res.json({ message: "General lead updated and moved to follow-ups", followUp });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+      res.json({ message: "General lead updated and moved to follow-ups", followUp: followUpObj });
     } else {
       // Move to Reports collection (existing behavior)
       // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
@@ -2234,7 +2265,9 @@ export const updateGeneralLead = async (req, res) => {
         console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
       }
 
-    res.json({ message: "General lead updated and moved to reports", report });
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const reportObj = report.toObject ? report.toObject() : report;
+      res.json({ message: "General lead updated and moved to reports", report: reportObj });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
