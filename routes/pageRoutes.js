@@ -631,6 +631,12 @@
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 description: "Star rating (1-5) for return leads. Optional."
+ *                 example: 4
  *     responses:
  *       200:
  *         description: Return lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
