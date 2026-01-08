@@ -9,6 +9,35 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Helper function to normalize fields for duplicate checking
+// CRITICAL: This ensures consistent duplicate detection across all lead types
+const normalizeForDuplicateCheck = (leadData) => {
+  return {
+    name: (leadData.name || "").trim(),
+    phone: (leadData.phone || "").trim(),
+    store: (leadData.store || "").trim(),
+    bookingNo: leadData.bookingNo ? leadData.bookingNo.trim() : "",
+  };
+};
+
+// Helper function to build case-insensitive query for name and store
+const buildCaseInsensitiveQuery = (normalized, leadType, bookingNo = "") => {
+  const escapeRegex = (s) => (s || "").replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  const query = {
+    name: { $regex: new RegExp(`^${escapeRegex(normalized.name)}$`, 'i') },
+    phone: normalized.phone,
+    leadType: leadType,
+    store: { $regex: new RegExp(`^${escapeRegex(normalized.store)}$`, 'i') },
+  };
+  
+  if (bookingNo !== "") {
+    query.bookingNo = bookingNo;
+  }
+  
+  return query;
+};
+
 // Connect to MongoDB if not already connected
 const connectDB = async () => {
   if (mongoose.connection.readyState === 1) {
@@ -46,41 +75,47 @@ export const bulkSaveToMongo = async (leadsData) => {
         continue;
       }
 
+      // Normalize fields for consistent checking
+      const normalized = normalizeForDuplicateCheck(leadData);
+      
       // Check if lead exists in reports or follow-ups (skip if moved)
       const reportOrClauses = [];
-      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        const bookingNo = leadData.bookingNo.trim();
+      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
         reportOrClauses.push(
-          { "beforeSnapshot.phone": leadData.phone, "beforeSnapshot.bookingNo": bookingNo },
-          { "leadSnapshot.phone": leadData.phone, "leadSnapshot.bookingNo": bookingNo },
-          { "leadData.phone": leadData.phone, "leadData.booking_number": bookingNo },
-          { "leadData.phone": leadData.phone, "leadData.bookingNo": bookingNo }
+          { "beforeSnapshot.phone": normalized.phone, "beforeSnapshot.bookingNo": normalized.bookingNo },
+          { "leadSnapshot.phone": normalized.phone, "leadSnapshot.bookingNo": normalized.bookingNo },
+          { "leadData.phone": normalized.phone, "leadData.booking_number": normalized.bookingNo },
+          { "leadData.phone": normalized.phone, "leadData.bookingNo": normalized.bookingNo }
         );
       }
       reportOrClauses.push(
-        { "beforeSnapshot.phone": leadData.phone },
-        { "leadSnapshot.phone": leadData.phone },
-        { "leadData.phone": leadData.phone },
-        { "leadData.phone_number": leadData.phone }
+        { "beforeSnapshot.phone": normalized.phone },
+        { "leadSnapshot.phone": normalized.phone },
+        { "leadData.phone": normalized.phone },
+        { "leadData.phone_number": normalized.phone }
       );
 
       const existingReport = await Report.findOne({ $or: reportOrClauses });
       if (existingReport) {
         results.skipped++;
-        skipReasons.push({ phone: leadData.phone, reason: "Lead exists in reports" });
+        skipReasons.push({ phone: normalized.phone, reason: "Lead exists in reports" });
         continue;
       }
 
-      // Also check FollowUps collection
-      const followUpQuery = { phone: leadData.phone };
-      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        followUpQuery.bookingNo = leadData.bookingNo.trim();
+      // Also check FollowUps collection - use normalized fields
+      const followUpQuery = { phone: normalized.phone };
+      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+        followUpQuery.bookingNo = normalized.bookingNo;
         followUpQuery.leadType = leadData.leadType;
+      } else {
+        followUpQuery.name = normalized.name;
+        followUpQuery.leadType = leadData.leadType;
+        followUpQuery.store = normalized.store;
       }
       const existingFollowUp = await FollowUp.findOne(followUpQuery);
       if (existingFollowUp) {
         results.skipped++;
-        skipReasons.push({ phone: leadData.phone, reason: "Lead exists in follow-ups" });
+        skipReasons.push({ phone: normalized.phone, reason: "Lead exists in follow-ups" });
         continue;
       }
 
@@ -156,23 +191,18 @@ export const bulkSaveToMongo = async (leadsData) => {
         });
       } else {
         // For loss of sale and general, use upsert (update if exists, insert if new)
+        // CRITICAL: Use normalized fields for consistent duplicate detection
+        const normalized = normalizeForDuplicateCheck(leadData);
+        
+        // Build duplicate query with normalized fields and case-insensitive matching
+        const duplicateQuery = buildCaseInsensitiveQuery(normalized, leadData.leadType);
+        
+        // Add date fields if available (for more precise matching)
         if (leadData.leadType === "lossOfSale") {
-          duplicateQuery = {
-            phone: leadData.phone,
-            name: leadData.name,
-            leadType: leadData.leadType,
-            store: leadData.store,
-          };
           if (leadData.enquiryDate) duplicateQuery.enquiryDate = leadData.enquiryDate;
           else if (leadData.visitDate) duplicateQuery.visitDate = leadData.visitDate;
           else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
         } else if (leadData.leadType === "general") {
-          duplicateQuery = {
-            phone: leadData.phone,
-            name: leadData.name,
-            leadType: leadData.leadType,
-            store: leadData.store,
-          };
           if (leadData.enquiryDate) duplicateQuery.enquiryDate = leadData.enquiryDate;
           else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
         }
@@ -221,27 +251,29 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Missing required fields" };
     }
 
+    // Normalize fields for consistent checking
+    const normalized = normalizeForDuplicateCheck(leadData);
+    
     // IMPORTANT: Check if lead already exists in Report or FollowUp collection (moved after edit)
     // New Report schema stores flattened lead in `leadData`. Support both old snapshot fields and new leadData fields.
     const reportOrClauses = [];
 
     // For booking/return, match by phone + bookingNo for accuracy
-    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-      const bookingNo = leadData.bookingNo.trim();
+    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
       reportOrClauses.push(
-        { "beforeSnapshot.phone": leadData.phone, "beforeSnapshot.bookingNo": bookingNo },
-        { "leadSnapshot.phone": leadData.phone, "leadSnapshot.bookingNo": bookingNo },
-        { "leadData.phone": leadData.phone, "leadData.booking_number": bookingNo },
-        { "leadData.phone": leadData.phone, "leadData.bookingNo": bookingNo }
+        { "beforeSnapshot.phone": normalized.phone, "beforeSnapshot.bookingNo": normalized.bookingNo },
+        { "leadSnapshot.phone": normalized.phone, "leadSnapshot.bookingNo": normalized.bookingNo },
+        { "leadData.phone": normalized.phone, "leadData.booking_number": normalized.bookingNo },
+        { "leadData.phone": normalized.phone, "leadData.bookingNo": normalized.bookingNo }
       );
     }
 
     // For all lead types, also check by phone (fallback if bookingNo not available)
     reportOrClauses.push(
-      { "beforeSnapshot.phone": leadData.phone },
-      { "leadSnapshot.phone": leadData.phone },
-      { "leadData.phone": leadData.phone },
-      { "leadData.phone_number": leadData.phone }
+      { "beforeSnapshot.phone": normalized.phone },
+      { "leadSnapshot.phone": normalized.phone },
+      { "leadData.phone": normalized.phone },
+      { "leadData.phone_number": normalized.phone }
     );
 
     const existingReport = await Report.findOne({ $or: reportOrClauses });
@@ -250,15 +282,15 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Lead exists in reports (moved after edit)" };
     }
 
-    // Also check FollowUps collection
-    const followUpQuery = { phone: leadData.phone };
-    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-      followUpQuery.bookingNo = leadData.bookingNo.trim();
+    // Also check FollowUps collection - use normalized fields
+    const followUpQuery = { phone: normalized.phone };
+    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+      followUpQuery.bookingNo = normalized.bookingNo;
       followUpQuery.leadType = leadData.leadType;
     } else {
-      followUpQuery.name = leadData.name;
+      followUpQuery.name = normalized.name;
       followUpQuery.leadType = leadData.leadType;
-      followUpQuery.store = leadData.store;
+      followUpQuery.store = normalized.store;
     }
     const existingFollowUp = await FollowUp.findOne(followUpQuery);
     if (existingFollowUp) {
@@ -337,15 +369,15 @@ export const saveToMongo = async (leadData) => {
     // DUPLICATE CHECK FOR LOSS OF SALE/GENERAL: Update if duplicate (upsert)
     // These come from CSV files and should update existing records when re-imported
     // ALWAYS check: name, phone, leadType, store (same base criteria as booking/return)
+    // CRITICAL: Normalize and use case-insensitive matching for consistent duplicate detection
     if (leadData.leadType === "lossOfSale" || leadData.leadType === "general") {
-      // Build comprehensive duplicate check query (same base criteria as booking/return)
-      const duplicateQuery = {
-        name: leadData.name,
-        phone: leadData.phone,
-        leadType: leadData.leadType,
-        store: leadData.store,
-      };
+      // Normalize fields: trim and ensure consistent format (same as booking/return)
+      const normalized = normalizeForDuplicateCheck(leadData);
+      
+      // Build duplicate check query with normalized fields and case-insensitive matching
+      const duplicateQuery = buildCaseInsensitiveQuery(normalized, leadData.leadType);
 
+      // Add date fields if available (for more precise matching)
       if (leadData.leadType === "lossOfSale") {
         // For loss of sale: Also check enquiryDate/visitDate/functionDate if available for more accuracy
         // But base duplicate check is still: name + phone + leadType + store
@@ -372,13 +404,13 @@ export const saveToMongo = async (leadData) => {
       }
 
       // Check if lead exists in reports first (before checking Lead collection)
-      // Use phone as primary match and support both old and new report shapes
+      // Use normalized phone for consistent matching
       const reportCheckQuery = {
         $or: [
-          { "beforeSnapshot.phone": leadData.phone },
-          { "leadSnapshot.phone": leadData.phone },
-          { "leadData.phone": leadData.phone },
-          { "leadData.phone_number": leadData.phone }
+          { "beforeSnapshot.phone": normalized.phone },
+          { "leadSnapshot.phone": normalized.phone },
+          { "leadData.phone": normalized.phone },
+          { "leadData.phone_number": normalized.phone }
         ]
       };
 
@@ -388,7 +420,27 @@ export const saveToMongo = async (leadData) => {
         return { skipped: true, reason: "Lead exists in reports (moved after edit)" };
       }
 
-      const existing = await Lead.findOne(duplicateQuery);
+      // Try exact match first (faster)
+      let existing = await Lead.findOne({
+        name: normalized.name,
+        phone: normalized.phone,
+        leadType: leadData.leadType,
+        store: normalized.store,
+        ...(duplicateQuery.enquiryDate && { enquiryDate: duplicateQuery.enquiryDate }),
+        ...(duplicateQuery.visitDate && { visitDate: duplicateQuery.visitDate }),
+        ...(duplicateQuery.functionDate && { functionDate: duplicateQuery.functionDate }),
+      });
+      
+      // If not found, try case-insensitive match (catches case differences)
+      if (!existing && normalized.name && normalized.store) {
+        existing = await Lead.findOne(duplicateQuery);
+        if (existing) {
+          console.log(`   ⚠️  Case-insensitive duplicate detected in Leads (${leadData.leadType}):`);
+          console.log(`      Existing: name="${existing.name}", store="${existing.store}", phone="${existing.phone}"`);
+          console.log(`      Incoming: name="${normalized.name}", store="${normalized.store}", phone="${normalized.phone}"`);
+        }
+      }
+      
       if (existing) {
         // Record already exists - UPDATE it with new data (preserves _id and createdAt)
         // Remove _id and createdAt from update data to preserve original values
