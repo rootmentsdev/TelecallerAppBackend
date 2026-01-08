@@ -1,4 +1,5 @@
 import { importLeadsFromCsvBuffer } from "../sync/utils/csvImportService.js";
+import { extractStoreNameFromFilename } from "../sync/utils/storeNameExtractor.js";
 
 /**
  * Upload CSV and import leads
@@ -24,8 +25,24 @@ export const uploadCSV = async (req, res) => {
       });
     }
 
-    // Get store name from user or request (optional override)
-    const storeName = req.body.storeName || req.user?.store || null;
+    // Extract store name from filename (same logic as CLI import scripts)
+    // Priority: filename extraction > request body > user store > null
+    let storeName = null;
+    
+    // Try to extract from filename first (e.g., "lossofsale_sg_kannur.xlsx" → "Suitor Guy - Kannur")
+    const extractedStoreName = extractStoreNameFromFilename(req.file.originalname);
+    if (extractedStoreName) {
+      storeName = extractedStoreName;
+      console.log(`📁 Extracted store name from filename "${req.file.originalname}": "${storeName}"`);
+    }
+    
+    // Fallback to request body or user store if filename extraction failed
+    if (!storeName) {
+      storeName = req.body.storeName || req.user?.store || null;
+      if (storeName) {
+        console.log(`📁 Using store name from request/user: "${storeName}"`);
+      }
+    }
 
     // Import using the same service function that reuses existing logic
     const result = await importLeadsFromCsvBuffer({

@@ -236,11 +236,12 @@ export const mapWalkin = (row) => {
 
   if (!name) return null; // Name is required
 
-  // Store is required - use from row or default
+  // Store is required - use from row (which may have been set by import script from filename)
+  // If row.store is provided (from filename extraction), use it; otherwise default
   const store = (
     row.store || row.Store || row.STORE ||
     row.StoreName || row.storeName
-  )?.trim() || "Default Store"; // Default if not provided
+  )?.trim() || "Default Store"; // Default if not provided (should be set by import script from filename)
 
   // Date field mapping (enquiryDate)
   const date = row.Date || row.date || row.DATE || row["Date"] ||
@@ -337,7 +338,8 @@ export const mapWalkin = (row) => {
     }
   }
 
-  const remarks = remarksValue || "";
+  // Set remarks to null if empty (not empty string) - matches user requirement
+  const remarks = remarksValue && remarksValue.trim() !== "" ? remarksValue.trim() : null;
 
   // Parse dates
   // Handle Excel date numbers
@@ -388,7 +390,7 @@ export const mapWalkin = (row) => {
     attendedBy: staff || undefined,
 
     // Additional information
-    remarks: remarks || undefined,
+    remarks: remarks !== null ? remarks : null, // Explicitly set null if empty (not undefined)
     reasonCollectedFromStore: isLoss ? (category || subCategory || remarks) : undefined,
   };
 
@@ -428,11 +430,12 @@ export const mapLossOfSale = (row) => {
 
   if (!name) return null; // Name is required
 
-  // Store is required - use from row or default (should be set by import script)
+  // Store is required - use from row (which may have been set by import script from filename)
+  // If row.store is provided (from filename extraction), use it; otherwise default
   const store = (
     row.store || row.Store || row.STORE ||
     row.StoreName || row.storeName
-  )?.trim() || "Default Store"; // Default if not provided
+  )?.trim() || "Default Store"; // Default if not provided (should be set by import script from filename)
 
   // Source - use from CSV or default to "Loss of Sale"
   const source = (
@@ -501,7 +504,8 @@ export const mapLossOfSale = (row) => {
     }
   }
 
-  const remarks = remarksValue || "";
+  // Set remarks to null if empty (not empty string) - matches user requirement
+  const remarks = remarksValue && remarksValue.trim() !== "" ? remarksValue.trim() : null;
 
   // Attended By (Staff Name)
   const attendedBy = (
@@ -583,7 +587,7 @@ export const mapLossOfSale = (row) => {
     visitDate: visitDate,
 
     // Additional information
-    remarks: remarks || undefined,
+    remarks: remarks !== null ? remarks : null, // Explicitly set null if empty (not undefined)
   };
 
   // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
