@@ -86,29 +86,57 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // DUPLICATE CHECK: For ALL lead types, check: name, phone, leadType, store, bookingNo (if exists)
       // This ensures no duplicates are created during bulk sync
+      // CRITICAL: Normalize and trim all fields for accurate comparison
+      const normalizedName = (leadData.name || "").trim();
+      const normalizedPhone = (leadData.phone || "").trim();
+      const normalizedStore = (leadData.store || "").trim();
+      const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
+      
+      // Build duplicate check query with normalized fields
       const duplicateQuery = {
-        name: leadData.name,
-        phone: leadData.phone,
+        name: normalizedName,
+        phone: normalizedPhone,
         leadType: leadData.leadType,
-        store: leadData.store,
+        store: normalizedStore,
       };
       
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
-      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        duplicateQuery.bookingNo = leadData.bookingNo.trim();
+      if (normalizedBookingNo !== "") {
+        duplicateQuery.bookingNo = normalizedBookingNo;
       }
 
-      // Check for existing lead with same: name + phone + leadType + store + bookingNo (if exists)
-      const existing = await Lead.findOne(duplicateQuery);
+      // Use case-insensitive comparison for name and store to catch case differences
+      const caseInsensitiveQuery = {
+        name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        phone: normalizedPhone,
+        leadType: leadData.leadType,
+        store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      };
+      
+      if (normalizedBookingNo !== "") {
+        caseInsensitiveQuery.bookingNo = normalizedBookingNo;
+      }
+
+      // Try exact match first (faster)
+      let existing = await Lead.findOne(duplicateQuery);
+      
+      // If not found, try case-insensitive match (catches case differences)
+      // CRITICAL: This catches duplicates with different casing (e.g., "SHEHIR" vs "shehir")
+      if (!existing && normalizedName && normalizedStore) {
+        existing = await Lead.findOne(caseInsensitiveQuery);
+        if (existing) {
+          console.log(`   ⚠️  Case-insensitive duplicate detected: name="${existing.name}" vs "${normalizedName}", store="${existing.store}" vs "${normalizedStore}"`);
+        }
+      }
       if (existing) {
         // Record already exists - skip it to prevent duplicates
         results.skipped++;
-        const checkFields = leadData.bookingNo 
-          ? `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}", bookingNo="${leadData.bookingNo}"`
-          : `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}"`;
+        const checkFields = normalizedBookingNo !== ""
+          ? `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}", bookingNo="${normalizedBookingNo}"`
+          : `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
         skipReasons.push({ 
-          phone: leadData.phone, 
-          name: leadData.name,
+          phone: normalizedPhone, 
+          name: normalizedName,
           reason: `Duplicate detected: matching ${checkFields}` 
         });
         continue;
@@ -233,34 +261,67 @@ export const saveToMongo = async (leadData) => {
     // DUPLICATE CHECK FOR BOOKING/RETURN: Skip if duplicate (don't update to preserve user edits)
     // These come from API and should only add new records (incremental sync)
     // ALWAYS check: name, phone, leadType, store, bookingNo (if exists)
+    // CRITICAL: Normalize and trim all fields for accurate comparison
     if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
-      // Build comprehensive duplicate check query
+      // Normalize fields: trim and ensure consistent format
+      const normalizedName = (leadData.name || "").trim();
+      const normalizedPhone = (leadData.phone || "").trim();
+      const normalizedStore = (leadData.store || "").trim();
+      const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
+      
+      // Build comprehensive duplicate check query with normalized fields
       const duplicateQuery = {
-        name: leadData.name,
-        phone: leadData.phone,
+        name: normalizedName,
+        phone: normalizedPhone,
         leadType: leadData.leadType,
-        store: leadData.store,
+        store: normalizedStore,
       };
       
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
-      if (leadData.bookingNo && leadData.bookingNo.trim() !== "") {
-        duplicateQuery.bookingNo = leadData.bookingNo.trim();
+      if (normalizedBookingNo !== "") {
+        duplicateQuery.bookingNo = normalizedBookingNo;
       }
 
-      const existing = await Lead.findOne(duplicateQuery);
+      // Use case-insensitive comparison for name and store to catch case differences
+      const caseInsensitiveQuery = {
+        name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+        phone: normalizedPhone,
+        leadType: leadData.leadType,
+        store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      };
+      
+      if (normalizedBookingNo !== "") {
+        caseInsensitiveQuery.bookingNo = normalizedBookingNo;
+      }
+
+      // Try exact match first (faster)
+      let existing = await Lead.findOne(duplicateQuery);
+      
+      // If not found, try case-insensitive match (catches case differences)
+      // CRITICAL: This catches duplicates with different casing (e.g., "SHEHIR" vs "shehir")
+      if (!existing && normalizedName && normalizedStore) {
+        existing = await Lead.findOne(caseInsensitiveQuery);
+        if (existing) {
+          console.log(`   ⚠️  Case-insensitive duplicate detected in Leads:`);
+          console.log(`      Existing: name="${existing.name}", store="${existing.store}", bookingNo="${existing.bookingNo || 'N/A'}"`);
+          console.log(`      Incoming: name="${normalizedName}", store="${normalizedStore}", bookingNo="${normalizedBookingNo || 'N/A'}"`);
+        }
+      }
+      
       if (existing) {
-        // Record already exists - skip it to prevent duplicates
-        const checkFields = leadData.bookingNo 
-          ? `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}", bookingNo="${leadData.bookingNo}"`
-          : `name="${leadData.name}", phone="${leadData.phone}", leadType="${leadData.leadType}", store="${leadData.store}"`;
-        console.log(`   ⏭️  Duplicate detected (booking/return) - skipped: ${checkFields}`);
+        // Record already exists in Leads - skip it to prevent duplicates
+        const checkFields = normalizedBookingNo !== ""
+          ? `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}", bookingNo="${normalizedBookingNo}"`
+          : `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
+        console.log(`   ⏭️  Duplicate detected in Leads - skipped: ${checkFields}`);
+        console.log(`      Existing lead ID: ${existing._id}`);
         return { 
           skipped: true, 
           leadId: existing._id, 
           name: existing.name, 
           phone: existing.phone, 
           bookingNo: existing.bookingNo, 
-          reason: "Duplicate detected: matching name, phone, leadType, store" + (leadData.bookingNo ? ", bookingNo" : "")
+          reason: "Duplicate detected in Leads collection: matching " + (normalizedBookingNo ? "name, phone, leadType, store, bookingNo" : "name, phone, leadType, store")
         };
       }
     }

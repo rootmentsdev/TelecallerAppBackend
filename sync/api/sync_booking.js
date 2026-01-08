@@ -390,43 +390,49 @@ const run = async () => {
   console.log(`   Processing records...`);
   console.log(`   This may take a few minutes for large datasets...`);
 
-  // Process all collected data with progress indicator in batches
+  // Process all collected data sequentially (prevents race conditions)
+  // CRITICAL: Process sequentially (not in parallel) to prevent duplicate creation
+  // When processing in parallel with Promise.all, multiple duplicate leads can pass duplicate check
+  // simultaneously before any are saved, causing duplicates to be created
   let totalSaved = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
   const totalRecords = allDataArray.length;
-  const progressInterval = Math.max(1, Math.floor(totalRecords / 20)); // Show progress every 5%
+  const progressInterval = Math.max(100, Math.floor(totalRecords / 20)); // Show progress every 5%
 
-  const BATCH_SIZE = 100;
+  console.log(`   Processing ${totalRecords} records sequentially (prevents race conditions)...`);
 
-  for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
-    const batch = allDataArray.slice(i, i + BATCH_SIZE);
-
-    await Promise.all(batch.map(async (row) => {
-      const mapped = mapBooking(row);
-      if (mapped) {
-        const result = await saveToMongo(mapped);
-        if (result.saved) {
-          totalSaved++;
-        } else if (result.skipped) {
-          totalSkipped++;
-        } else if (result.error) {
-          totalErrors++;
-        } else {
-          // Unknown result type - treat as skipped
-          totalSkipped++;
-        }
+  // Process each lead sequentially (one at a time) to prevent race conditions
+  for (let i = 0; i < totalRecords; i++) {
+    const row = allDataArray[i];
+    const mapped = mapBooking(row);
+    
+    if (mapped) {
+      const result = await saveToMongo(mapped);
+      if (result.saved) {
+        totalSaved++;
+      } else if (result.skipped) {
+        totalSkipped++;
+      } else if (result.error) {
+        totalErrors++;
       } else {
+        // Unknown result type - treat as skipped
         totalSkipped++;
       }
-    }));
-
-    // Show progress
-    if (totalRecords > 500) {
-      const currentCount = Math.min(i + BATCH_SIZE, totalRecords);
-      const progress = (currentCount / totalRecords * 100).toFixed(1);
-      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${currentCount}/${totalRecords}) | Saved: ${totalSaved}, Skipped: ${totalSkipped}, Err: ${totalErrors}`);
+    } else {
+      totalSkipped++;
     }
+
+    // Show progress periodically
+    if (totalRecords > 500 && (i + 1) % progressInterval === 0) {
+      const progress = ((i + 1) / totalRecords * 100).toFixed(1);
+      process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${totalRecords}) | Saved: ${totalSaved}, Skipped: ${totalSkipped}, Err: ${totalErrors}`);
+    }
+  }
+
+  // Clear progress line and show final summary
+  if (totalRecords > 500) {
+    process.stdout.write('\r' + ' '.repeat(100) + '\r'); // Clear line
   }
 
   // Update sync log with latest sync time (create new entry for history)
