@@ -63,4 +63,34 @@ leadSchema.index({ assignedTo: 1 });
 leadSchema.index({ phone: 1, name: 1, leadType: 1, store: 1 });
 leadSchema.index({ bookingNo: 1, phone: 1, leadType: 1 });
 
+// CRITICAL: Unique partial index for bookingConfirmation and return leads
+// Prevents duplicates at database level, even under concurrent syncs
+// Only applies to bookingConfirmation and return leads with bookingNo
+leadSchema.index(
+  { bookingNo: 1, phone: 1, leadType: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      leadType: { $in: ["bookingConfirmation", "return"] },
+      bookingNo: { $exists: true, $ne: "" }
+    },
+    name: "unique_booking_return_index"
+  }
+);
+
+// CRITICAL: Unique partial index for lossOfSale and general leads
+// Prevents duplicates at database level, even under concurrent syncs/CSV imports
+// Only applies to lossOfSale and general leads
+// Index on: name, phone, leadType, store (base duplicate criteria)
+leadSchema.index(
+  { name: 1, phone: 1, leadType: 1, store: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      leadType: { $in: ["lossOfSale", "general"] }
+    },
+    name: "unique_lossOfSale_general_index"
+  }
+);
+
 export default mongoose.model("Lead", leadSchema);

@@ -228,13 +228,46 @@ export const bulkSaveToMongo = async (leadsData) => {
 
     // Execute bulk operations if any
     if (bulkOps.length > 0) {
-      const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
-      results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
-      results.errors = bulkResult.writeErrors ? bulkResult.writeErrors.length : 0;
+      try {
+        const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
+        results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
+        
+        // Handle write errors (including duplicate key errors E11000)
+        if (bulkResult.writeErrors && bulkResult.writeErrors.length > 0) {
+          let duplicateKeyErrors = 0;
+          for (const writeError of bulkResult.writeErrors) {
+            // E11000 is duplicate key error from unique index
+            if (writeError.code === 11000) {
+              duplicateKeyErrors++;
+              console.log(`   ⚠️  Duplicate detected by unique index: ${writeError.errmsg || 'duplicate key'}`);
+            } else {
+              results.errors++;
+              console.error(`   ❌ Bulk write error: ${writeError.errmsg || 'unknown error'}`);
+            }
+          }
+          // Treat duplicate key errors as skipped, not errors
+          results.skipped += duplicateKeyErrors;
+        }
+      } catch (bulkError) {
+        // Handle bulk write errors
+        if (bulkError.code === 11000 || (bulkError.name === 'MongoServerError' && bulkError.code === 11000)) {
+          // Duplicate detected by unique index - treat as skipped
+          console.log(`   ⚠️  Duplicate detected by unique index in bulk operation`);
+          results.skipped++;
+        } else {
+          console.error("Error in bulk save:", bulkError.message);
+          results.errors++;
+        }
+      }
     }
 
     return results;
   } catch (error) {
+    // Handle duplicate key errors gracefully (E11000)
+    if (error.code === 11000 || (error.name === 'MongoServerError' && error.code === 11000)) {
+      console.log(`   ⚠️  Duplicate detected by unique index`);
+      return { saved: 0, skipped: 1, errors: 0, errorMessage: "Duplicate detected by unique index" };
+    }
     console.error("Error in bulk save:", error.message);
     return { saved: 0, skipped: 0, errors: 1, errorMessage: error.message };
   }

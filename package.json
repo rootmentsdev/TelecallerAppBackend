@@ -24,6 +24,7 @@
     "check:duplicates": "node scripts/check-duplicates.js",
     "cleanup:duplicates": "node scripts/cleanup-duplicates.js",
     "cleanup:duplicates:live": "node scripts/cleanup-duplicates.js --live",
+    "index:create": "node scripts/create-unique-index.js",
     "delete:lossofsale-walkin": "node scripts/delete-lossofsale-walkin.js",
     "delete:api-leads": "node scripts/delete-api-leads.js"
   },
