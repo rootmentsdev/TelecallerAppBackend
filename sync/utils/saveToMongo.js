@@ -144,10 +144,14 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // For booking/return: add to bulk insert (don't update to preserve user edits)
       if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
-        // Add to bulk insert
+        // Add to bulk insert - ensure remarks is included
+        const document = { ...leadData };
+        if (leadData.hasOwnProperty('remarks')) {
+          document.remarks = leadData.remarks ?? null;
+        }
         bulkOps.push({
           insertOne: {
-            document: leadData
+            document: document
           }
         });
       } else {
@@ -173,10 +177,14 @@ export const bulkSaveToMongo = async (leadsData) => {
           else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
         }
 
-        // Add to bulk upsert
+        // Add to bulk upsert - ensure remarks is included
         const updateData = { ...leadData };
         delete updateData._id;
         delete updateData.createdAt;
+        // Explicitly include remarks field (string or null)
+        if (leadData.hasOwnProperty('remarks')) {
+          updateData.remarks = leadData.remarks ?? null;
+        }
 
         bulkOps.push({
           updateOne: {
@@ -387,6 +395,10 @@ export const saveToMongo = async (leadData) => {
         const updateData = { ...leadData };
         delete updateData._id;
         delete updateData.createdAt;
+        // Explicitly include remarks field (string or null)
+        if (leadData.hasOwnProperty('remarks')) {
+          updateData.remarks = leadData.remarks ?? null;
+        }
 
         const updated = await Lead.findByIdAndUpdate(
           existing._id,
@@ -400,7 +412,12 @@ export const saveToMongo = async (leadData) => {
     // For other lead types (justDial) or new records: create new lead
     // Use try-catch to handle duplicate key errors gracefully
     try {
-    const lead = await Lead.create(leadData);
+    // Ensure remarks is explicitly included in leadData before create
+    const createData = { ...leadData };
+    if (leadData.hasOwnProperty('remarks')) {
+      createData.remarks = leadData.remarks ?? null;
+    }
+    const lead = await Lead.create(createData);
     return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
     } catch (createError) {
       // Handle duplicate key errors (E11000) - treat as skipped, not error
