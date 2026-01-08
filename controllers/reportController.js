@@ -307,6 +307,10 @@ export const getReports = async (req, res) => {
       // Ensure callDuration is included (default to 0 if not present)
       if (obj.callDuration === undefined) obj.callDuration = 0;
 
+      // Ensure rating is included (for return leads - 1-5 stars)
+      // Rating may be null/undefined if not set, but explicitly preserve it
+      const rating = obj.rating !== undefined ? obj.rating : null;
+
       // Remove internal mongoose fields if present
       delete obj._id;
       delete obj.__v;
@@ -314,6 +318,7 @@ export const getReports = async (req, res) => {
       return {
         report_id: obj.report_id,
         ...obj,
+        rating, // Explicitly include rating in response
         edited_by,
         edited_at,
       };
@@ -349,12 +354,17 @@ export const getReportById = async (req, res) => {
     // Ensure callDuration is included (default to 0 if not present)
     if (obj.callDuration === undefined) obj.callDuration = 0;
     
+    // Ensure rating is included (for return leads - 1-5 stars)
+    // Rating may be null/undefined if not set, but explicitly preserve it
+    const rating = obj.rating !== undefined ? obj.rating : null;
+    
     delete obj._id;
     delete obj.__v;
 
     res.json({
       report_id: obj.report_id,
       ...obj,
+      rating, // Explicitly include rating in response
       edited_by,
       edited_at,
     });
