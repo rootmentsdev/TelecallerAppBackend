@@ -1,6 +1,9 @@
 // API Base URL
 const API_BASE_URL = window.location.origin;
 
+// Token key constant - unified across all files
+const TOKEN_KEY = "token";
+
 // DOM Elements
 const uploadForm = document.getElementById('uploadForm');
 const uploadStatus = document.getElementById('uploadStatus');
@@ -9,7 +12,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 
 // Get token from localStorage (same key as login.js uses)
 function getAuthToken() {
-    return localStorage.getItem('token');
+    return localStorage.getItem(TOKEN_KEY);
 }
 
 // Check authentication on page load
@@ -46,7 +49,7 @@ async function verifyTokenAndLoadUser() {
 
         if (!response.ok) {
             // Token invalid - redirect to login
-            localStorage.removeItem('token');
+            localStorage.removeItem(TOKEN_KEY);
             window.location.href = '/login';
             return;
         }
@@ -64,7 +67,7 @@ async function verifyTokenAndLoadUser() {
     } catch (error) {
         console.error('Error verifying token:', error);
         // On error, redirect to login
-        localStorage.removeItem('token');
+        localStorage.removeItem(TOKEN_KEY);
         window.location.href = '/login';
     }
 }
@@ -166,7 +169,7 @@ uploadForm.addEventListener('submit', async (e) => {
         // Try to parse error response
         if (error.message.includes('401') || error.message.includes('Unauthorized')) {
             errorMessage = 'Authentication failed. Please login again.';
-            localStorage.removeItem('token');
+            localStorage.removeItem(TOKEN_KEY);
             window.location.href = '/login';
             return;
         }
@@ -181,7 +184,7 @@ uploadForm.addEventListener('submit', async (e) => {
 
 // Logout Handler
 logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem(TOKEN_KEY);
     window.location.href = '/login';
 });
 
