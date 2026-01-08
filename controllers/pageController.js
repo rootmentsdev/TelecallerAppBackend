@@ -340,7 +340,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.attended_by = lead.attendedBy ?? lead.attended_by ?? "";
   payload.booking_number = lead.bookingNo ?? lead.booking_number ?? null;
   payload.security_amount = lead.securityAmount ?? lead.security_amount ?? null;
-  payload.rating = lead.rating ?? lead.rating ?? null; // Star rating (1-5) for return leads
+  payload.rating = lead.rating ?? null; // Star rating (1-5) for return leads
   payload.remarks = lead.remarks ?? "";
   payload.reason_collected_from_store = lead.reasonCollectedFromStore ?? lead.reason_collected_from_store ?? "";
   payload.call_duration = lead.callDuration ?? callDuration ?? 0;
@@ -2439,7 +2439,8 @@ export const updateFollowUp = async (req, res) => {
       lead_status,
       follow_up_date,
       remarks,
-      call_duration
+      call_duration,
+      rating
     } = req.body;
 
     // Validate remarks input
@@ -2489,6 +2490,16 @@ export const updateFollowUp = async (req, res) => {
     }
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
+    
+    // Handle rating field (1-5 stars for return leads in FollowUps)
+    if (rating !== undefined && rating !== null) {
+      // Validate rating is between 1 and 5
+      const ratingNum = parseInt(rating);
+      if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+        return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
+      }
+      updateData.rating = ratingNum;
+    }
 
     const beforeFollowUp = followUp.toObject();
     const updatedFollowUp = await FollowUp.findByIdAndUpdate(id, updateData, { new: true });
