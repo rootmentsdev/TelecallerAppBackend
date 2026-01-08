@@ -213,56 +213,56 @@ const run = async () => {
 
       console.log(`   📊 Found ${dataArray.length} total records, ${returnRecords.length} return records for location ID ${locationId}`);
 
-      // Process and save return data in batches
+      // Process and save return data sequentially (prevents race conditions)
+      // CRITICAL: Process sequentially (not in parallel) to prevent duplicate creation
+      // When processing in parallel, multiple duplicate leads can pass duplicate check
+      // simultaneously before any are saved, causing duplicates
       let saved = 0;
       let skipped = 0;
       let errors = 0;
-      const BATCH_SIZE = 50;
+      const progressInterval = Math.max(50, Math.floor(returnRecords.length / 20)); // Show progress every 5%
 
-      for (let i = 0; i < returnRecords.length; i += BATCH_SIZE) {
-        const batch = returnRecords.slice(i, i + BATCH_SIZE);
+      if (returnRecords.length > 100) {
+        console.log(`   Processing ${returnRecords.length} records sequentially (prevents race conditions)...`);
+      }
+
+      // Process each lead sequentially (one at a time) to prevent race conditions
+      for (let i = 0; i < returnRecords.length; i++) {
+        const row = returnRecords[i];
         
-        const batchResults = await Promise.all(batch.map(async (row) => {
-          // Add store name to the row data for mapping
-          const rowWithStore = {
-            ...row,
-            store: storeName, // Use store name from location ID mapping
-          };
+        // Add store name to the row data for mapping
+        const rowWithStore = {
+          ...row,
+          store: storeName, // Use store name from location ID mapping
+        };
 
-          const mapped = mapReturn(rowWithStore);
-          if (mapped) {
-            const result = await saveToMongo(mapped);
-            if (result.saved) {
-              return { saved: 1, skipped: 0, errors: 0 };
-            } else if (result.skipped) {
-              return { saved: 0, skipped: 1, errors: 0 };
-            } else if (result.error) {
-              return { saved: 0, skipped: 0, errors: 1 };
-            } else {
-              // Unknown result type - treat as skipped
-              return { saved: 0, skipped: 1, errors: 0 };
-            }
+        const mapped = mapReturn(rowWithStore);
+        if (mapped) {
+          const result = await saveToMongo(mapped);
+          if (result.saved) {
+            saved++;
+          } else if (result.skipped) {
+            skipped++;
+          } else if (result.error) {
+            errors++;
           } else {
-            return { saved: 0, skipped: 1, errors: 0 };
+            // Unknown result type - treat as skipped
+            skipped++;
           }
-        }));
+        } else {
+          skipped++;
+        }
 
-        // Aggregate batch results
-        batchResults.forEach(result => {
-          saved += result.saved;
-          skipped += result.skipped;
-          errors += result.errors;
-        });
-
-        // Show progress
-        const progress = ((i + batch.length) / returnRecords.length * 100).toFixed(1);
-        if (returnRecords.length > 100) {
-          process.stdout.write(`\r   ⏳ Progress: ${progress}% | Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`);
+        // Show progress periodically
+        if (returnRecords.length > 100 && (i + 1) % progressInterval === 0) {
+          const progress = ((i + 1) / returnRecords.length * 100).toFixed(1);
+          process.stdout.write(`\r   ⏳ Progress: ${progress}% (${i + 1}/${returnRecords.length}) | Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`);
         }
       }
 
+      // Clear progress line
       if (returnRecords.length > 100) {
-        process.stdout.write('\n'); // New line after progress indicator
+        process.stdout.write('\r' + ' '.repeat(100) + '\r'); // Clear line
       }
 
       console.log(`   ✅ New records saved: ${saved}, ⏭️  Skipped (exists): ${skipped}, ❌ Errors: ${errors}`);

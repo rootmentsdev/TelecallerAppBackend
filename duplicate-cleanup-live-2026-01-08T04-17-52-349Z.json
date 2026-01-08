@@ -1,0 +1,16 @@
+[
+  {
+    "type": "return",
+    "group": {
+      "bookingNo": "202512270100007",
+      "phone": "9388222024",
+      "leadType": "return"
+    },
+    "kept": "695f2eb953d9c11aec5b0d35",
+    "deleted": [
+      "695f2eb953d9c11aec5b0d33",
+      "695f2eb953d9c11aec5b0d31"
+    ],
+    "count": 2
+  }
+]
