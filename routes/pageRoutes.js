@@ -550,9 +550,20 @@
  *               reason_collected_from_store: { type: string }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *               follow_up_flag:
+ *                 type: boolean
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
- *         description: Loss of Sale lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
+ *         description: |
+ *           Loss of Sale lead updated successfully. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection
  *       400:
  *         description: Validation error
  *       401:
@@ -637,9 +648,20 @@
  *                 maximum: 5
  *                 description: "Star rating (1-5) for return leads. Optional."
  *                 example: 4
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
- *         description: Return lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
+ *         description: |
+ *           Return lead updated successfully. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection
  *       400:
  *         description: Validation error
  *       401:
@@ -720,9 +742,20 @@
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
- *         description: Booking Confirmation lead updated. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
+ *         description: |
+ *           Booking Confirmation lead updated. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection
  *       400:
  *         description: Validation error
  *       401:
@@ -803,9 +836,20 @@
  *               call_date: { type: string, format: date-time }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *               follow_up_flag: 
+ *                 type: boolean
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
- *         description: Just Dial lead updated. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
+ *         description: |
+ *           Just Dial lead updated. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection
  *       400:
  *         description: Validation error
  *       401:
@@ -872,6 +916,8 @@ import {
   getFollowUps,
   getFollowUpById,
   updateFollowUp,
+  getStarredCalls,
+  getStarredCallById,
 } from "../controllers/pageController.js";
 import {
   lossOfSaleGetValidator,
@@ -1200,9 +1246,20 @@ router.get(
  *               closing_status: { type: string }
  *               rating: { type: integer }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *               follow_up_flag:
+ *                 type: boolean
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
- *         description: General lead updated successfully. If follow_up_date is provided, lead moves to FollowUps collection. Otherwise, moves to Reports collection.
+ *         description: |
+ *           General lead updated successfully. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection
  *       400:
  *         description: Validation error
  *       401:
@@ -1816,6 +1873,186 @@ router.post(
   handleValidation,
   updateFollowUp
 );
+
+// ==================== Starred Calls (Issue Calls) Routes ====================
+
+/**
+ * @swagger
+ * /api/pages/starred-calls:
+ *   get:
+ *     summary: Fetch starred calls (issue calls) with optional filters
+ *     tags:
+ *       - Starred Calls
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Returns starred calls (leads marked as issues) filtered by optional parameters.
+ *       
+ *       **Filtering Options:**
+ *       - **Lead Type**: Filter by leadType (lossOfSale, return, bookingConfirmation, justDial, general)
+ *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
+ *       - **Sorting**: Sort by issueMarkedAt, createdAt, name, or store (asc/desc)
+ *       - **Pagination**: Control page size and navigation
+ *     parameters:
+ *       - in: query
+ *         name: leadType
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [lossOfSale, general, bookingConfirmation, return, justDial]
+ *         description: Type of lead to fetch. If omitted, returns starred calls of all types.
+ *       - in: query
+ *         name: store
+ *         required: false
+ *         schema:
+ *           type: string
+ *           example: "Suitor Guy - Edappally"
+ *         description: Filter by store name using "Brand - Location" format.
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number (1-indexed).
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 100
+ *         description: Number of records per page.
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [issueMarkedAt, createdAt, name, store]
+ *           default: issueMarkedAt
+ *         description: Field to sort results by. Default is issueMarkedAt (most recently marked issues first).
+ *       - in: query
+ *         name: sortOrder
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order: ascending (asc) or descending (desc). Default is desc.
+ *     responses:
+ *       200:
+ *         description: Returns a list of starred calls and pagination info.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 starredCalls:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/StarredCall'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     total:
+ *                       type: integer
+ *                     pages:
+ *                       type: integer
+ *       401:
+ *         description: Unauthorized. Token missing or invalid.
+ *       500:
+ *         description: Internal server error.
+ */
+router.get("/starred-calls", protect, getStarredCalls);
+
+/**
+ * @swagger
+ * /api/pages/starred-calls/{id}:
+ *   get:
+ *     summary: Get a single starred call by ID
+ *     tags:
+ *       - Starred Calls
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Starred call ID
+ *     responses:
+ *       200:
+ *         description: Returns the starred call details.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StarredCall'
+ *       404:
+ *         description: Starred call not found.
+ *       401:
+ *         description: Unauthorized. Token missing or invalid.
+ *       500:
+ *         description: Internal server error.
+ */
+router.get("/starred-calls/:id", protect, getStarredCallById);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     StarredCall:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Starred call ID
+ *         leadSnapshot:
+ *           type: object
+ *           description: Full snapshot of the lead when it was marked as issue
+ *         remarks:
+ *           type: string
+ *           description: Remarks about the issue
+ *         issueMarkedBy:
+ *           type: object
+ *           description: User who marked the lead as issue
+ *           properties:
+ *             _id:
+ *               type: string
+ *             name:
+ *               type: string
+ *             employeeId:
+ *               type: string
+ *         issueMarkedAt:
+ *           type: string
+ *           format: date-time
+ *           description: When the lead was marked as issue
+ *         sourceLeadId:
+ *           type: string
+ *           description: Reference to original lead ID
+ *         name:
+ *           type: string
+ *           description: Lead name (extracted for easier querying)
+ *         phone:
+ *           type: string
+ *           description: Lead phone (extracted for easier querying)
+ *         store:
+ *           type: string
+ *           description: Store name (extracted for easier querying)
+ *         leadType:
+ *           type: string
+ *           enum: [lossOfSale, return, bookingConfirmation, justDial, general]
+ *           description: Lead type (extracted for easier querying)
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ */
 
 // Simple test route (for Swagger sanity check)
 router.get("/test", (req, res) => {

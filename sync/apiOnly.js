@@ -26,24 +26,58 @@ const ensureDBConnection = async () => {
 
 // Global lock name
 const GLOBAL_LOCK_NAME = "GLOBAL_API_SYNC";
+// Maximum sync duration before lock is considered expired (15 minutes)
+const MAX_SYNC_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+
+// Check if lock is expired and auto-release if needed
+const checkAndReleaseExpiredLock = async () => {
+  try {
+    const existingLock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
+    if (!existingLock) {
+      return { expired: false, released: false };
+    }
+
+    const lockAge = Date.now() - existingLock.lockedAt.getTime();
+    const isExpired = lockAge > MAX_SYNC_DURATION;
+
+    if (isExpired) {
+      const lockAgeMinutes = Math.round(lockAge / 60000);
+      console.log(`⚠️  Lock timeout detected - lock is ${lockAgeMinutes} minutes old (max: ${MAX_SYNC_DURATION / 60000} minutes)`);
+      console.log(`   Locked at: ${existingLock.lockedAt.toISOString()}`);
+      console.log(`   Locked by: ${existingLock.lockedBy}`);
+      console.log(`   Status: ${existingLock.status}`);
+      console.log(`   🔓 Auto-releasing expired lock...`);
+      
+      await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+      console.log(`✅ Expired lock released - sync can proceed`);
+      return { expired: true, released: true };
+    }
+
+    return { expired: false, released: false, lock: existingLock };
+  } catch (error) {
+    console.error("⚠️  Error checking lock expiry:", error.message);
+    return { expired: false, released: false, error };
+  }
+};
 
 // Acquire global sync lock
 const acquireLock = async (lockedBy = "scheduler") => {
   try {
-    // First, check for and remove any stale locks (older than 1.5 hours)
-    const existingLock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
-    if (existingLock) {
-      const lockAge = Date.now() - existingLock.lockedAt.getTime();
-      const oneAndHalfHours = 1.5 * 60 * 60 * 1000; // 90 minutes
-      
-      if (lockAge > oneAndHalfHours) {
-        // Stale lock - remove it
-        await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
-        console.log(`⚠️  Removed stale lock (age: ${Math.round(lockAge / 60000)} minutes)`);
-      } else {
-        // Lock is still valid (not stale)
-        return { acquired: false, reason: "Lock already exists (active sync running)" };
-      }
+    // First, check for and auto-release any expired locks
+    const expiryCheck = await checkAndReleaseExpiredLock();
+    
+    if (expiryCheck.released) {
+      // Lock was expired and released, now we can acquire
+      console.log("   Proceeding to acquire lock after auto-release");
+    } else if (expiryCheck.lock) {
+      // Lock exists and is still valid (not expired)
+      const lockAge = Date.now() - expiryCheck.lock.lockedAt.getTime();
+      const lockAgeMinutes = Math.round(lockAge / 60000);
+      return { 
+        acquired: false, 
+        reason: `Lock already exists (active sync running, age: ${lockAgeMinutes} minutes)`,
+        lock: expiryCheck.lock
+      };
     }
     
     // Try to create lock document (will fail if already exists due to unique constraint)
@@ -53,10 +87,28 @@ const acquireLock = async (lockedBy = "scheduler") => {
       lockedBy: lockedBy,
       status: "active",
     });
+    
+    console.log(`🔒 Lock acquired at: ${lock.lockedAt.toISOString()}`);
     return { acquired: true, lock };
   } catch (error) {
     // Lock already exists (race condition - another process created it)
     if (error.code === 11000 || error.name === 'MongoServerError') {
+      // Check if the newly created lock is expired (unlikely but possible)
+      const expiryCheck = await checkAndReleaseExpiredLock();
+      if (expiryCheck.released) {
+        // Retry acquiring lock after releasing expired one
+        try {
+          const lock = await SyncLock.create({
+            lockName: GLOBAL_LOCK_NAME,
+            lockedAt: new Date(),
+            lockedBy: lockedBy,
+            status: "active",
+          });
+          return { acquired: true, lock };
+        } catch (retryError) {
+          return { acquired: false, reason: "Lock already exists (race condition after retry)" };
+        }
+      }
       return { acquired: false, reason: "Lock already exists (race condition)" };
     }
     throw error;
@@ -66,15 +118,35 @@ const acquireLock = async (lockedBy = "scheduler") => {
 // Release global sync lock
 const releaseLock = async (status = "completed") => {
   try {
+    const lock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
+    if (!lock) {
+      console.log("ℹ️  Lock already released or does not exist");
+      return;
+    }
+
+    const lockAge = Date.now() - lock.lockedAt.getTime();
+    const lockAgeMinutes = Math.round(lockAge / 60000);
+    
+    // Update status before deletion (for audit)
     await SyncLock.findOneAndUpdate(
       { lockName: GLOBAL_LOCK_NAME },
       { status: status },
       { new: true }
     );
-    // Optionally delete the lock after completion
+    
+    // Delete the lock
     await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+    
+    console.log(`🔓 Lock released (status: ${status}, duration: ${lockAgeMinutes} minutes)`);
   } catch (error) {
     console.error("⚠️  Error releasing lock:", error.message);
+    // Try direct delete as fallback
+    try {
+      await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+      console.log("✅ Lock force-released via direct delete");
+    } catch (deleteError) {
+      console.error("❌ CRITICAL: Failed to force-release lock:", deleteError.message);
+    }
   }
 };
 
@@ -95,22 +167,42 @@ const runApiOnlySync = async () => {
   // Mark trigger source (used in logs)
   process.env.SYNC_TRIGGER = trigger;
 
-  // Try to acquire global lock
+  // Try to acquire global lock (with auto-expiry check built-in)
   const lockResult = await acquireLock(trigger);
   
   if (!lockResult.acquired) {
-    console.log("⏭️  Skipping sync - global lock is active");
-    console.log("   Another sync cycle is already running");
-    console.log("   This ensures atomic execution and prevents partial syncs");
-    console.log();
-    return {
-      success: false,
-      skipped: true,
-      reason: "Global lock active",
-      duration: 0,
-    };
+    // Lock acquisition failed - check if it's because lock is still active
+    if (lockResult.lock) {
+      // Lock exists and is still valid (not expired)
+      const lockAge = Date.now() - lockResult.lock.lockedAt.getTime();
+      const lockAgeMinutes = Math.round(lockAge / 60000);
+      console.log("⏭️  Skipping sync - global lock is active");
+      console.log(`   Reason: ${lockResult.reason}`);
+      console.log(`   Lock age: ${lockAgeMinutes} minutes (max: ${MAX_SYNC_DURATION / 60000} minutes)`);
+      console.log("   Another sync cycle is already running");
+      console.log("   This ensures atomic execution and prevents partial syncs");
+      console.log();
+      return {
+        success: false,
+        skipped: true,
+        reason: lockResult.reason || "Global lock active",
+        duration: 0,
+      };
+    } else {
+      // Lock acquisition failed for other reason (race condition)
+      console.log("⏭️  Skipping sync - lock acquisition failed");
+      console.log(`   Reason: ${lockResult.reason}`);
+      console.log();
+      return {
+        success: false,
+        skipped: true,
+        reason: lockResult.reason || "Lock acquisition failed",
+        duration: 0,
+      };
+    }
   }
-
+  
+  // Lock successfully acquired
   console.log("🔒 Global sync lock acquired");
   console.log(`   Lock acquired at: ${lockResult.lock.lockedAt.toISOString()}`);
   console.log();
@@ -121,6 +213,7 @@ const runApiOnlySync = async () => {
   const errors = [];
   let lockReleased = false;
 
+  // CRITICAL: Wrap entire sync in try-finally to guarantee lock release
   try {
     console.log("📦 Running all API syncs in SEQUENCE (ordered execution)...");
     console.log("-".repeat(60));
@@ -203,13 +296,34 @@ const runApiOnlySync = async () => {
   } catch (error) {
     console.error("❌ API sync failed:", error.message);
     console.error(error.stack);
+    errors.push({ step: "Sync", error: error.message });
     
-    // Ensure lock is released even on error
+    // Lock will be released in finally block
+  } finally {
+    // CRITICAL: ALWAYS release lock in finally block to guarantee cleanup
     if (!lockReleased) {
-      await releaseLock("failed");
+      console.log("🔓 Releasing lock in finally block (guaranteed cleanup)...");
+      try {
+        await releaseLock("failed");
+        lockReleased = true;
+        console.log("✅ Lock released successfully");
+      } catch (releaseError) {
+        console.error("❌ CRITICAL: Failed to release lock in finally block:", releaseError.message);
+        // Try one more time with direct delete
+        try {
+          await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+          console.log("✅ Lock force-released via direct delete");
+        } catch (deleteError) {
+          console.error("❌ CRITICAL: Failed to force-release lock:", deleteError.message);
+        }
+      }
     }
     
-    throw error;
+    // If there was an error, re-throw it after cleanup
+    if (errors.length > 0 && !lockReleased) {
+      // This shouldn't happen due to finally, but just in case
+      throw new Error(`Sync failed: ${errors.map(e => e.error).join(", ")}`);
+    }
   }
 };
 
