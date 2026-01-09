@@ -23,6 +23,7 @@ import { swaggerUi, swaggerSpec } from './config/swaggerConfig.js';
 
 // API Sync Scheduler (does not affect CSV imports)
 import { startScheduler } from './scheduler/apiSyncScheduler.js';
+import SyncLock from './models/SyncLock.js';
 
 const app = express();  // ❗ Define app BEFORE using it
 
@@ -65,10 +66,54 @@ app.get('/upload', (req, res) => {
 
 const PORT = process.env.PORT || 8800;
 
+// Maximum sync duration before lock is considered expired (15 minutes)
+const MAX_SYNC_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
+const GLOBAL_LOCK_NAME = "GLOBAL_API_SYNC";
+
+// Check and clear expired sync locks on server startup
+const checkStartupLocks = async () => {
+  try {
+    console.log("🔍 Checking for expired sync locks on startup...");
+    const lock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
+    
+    if (!lock) {
+      console.log("✅ No sync lock found - system is clean");
+      return;
+    }
+
+    const lockAge = Date.now() - lock.lockedAt.getTime();
+    const lockAgeMinutes = Math.round(lockAge / 60000);
+    const isExpired = lockAge > MAX_SYNC_DURATION;
+
+    if (isExpired) {
+      console.log(`⚠️  Found expired sync lock (age: ${lockAgeMinutes} minutes)`);
+      console.log(`   Locked at: ${lock.lockedAt.toISOString()}`);
+      console.log(`   Locked by: ${lock.lockedBy}`);
+      console.log(`   Status: ${lock.status}`);
+      console.log(`   🔓 Auto-clearing expired lock...`);
+      
+      await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+      console.log(`✅ Expired lock cleared - syncs can proceed normally`);
+    } else {
+      console.log(`ℹ️  Active sync lock found (age: ${lockAgeMinutes} minutes)`);
+      console.log(`   This is normal if a sync is currently running`);
+      console.log(`   Lock will auto-expire after ${MAX_SYNC_DURATION / 60000} minutes if sync fails`);
+    }
+    console.log();
+  } catch (error) {
+    console.error("⚠️  Error checking startup locks:", error.message);
+    // Don't fail startup if lock check fails
+  }
+};
+
 (async () => {
   try {
     await connectDB();                // ✅ WAIT for DB
     console.log("✅ Database connected");
+    console.log();
+
+    // Check and clear expired locks on startup
+    await checkStartupLocks();
 
     app.listen(PORT, () => {
       console.log(`🚀 Backend running on port ${PORT}`);

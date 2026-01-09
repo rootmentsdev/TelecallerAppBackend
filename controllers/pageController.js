@@ -1,6 +1,7 @@
 import Lead from "../models/Lead.js";
 import FollowUp from "../models/FollowUp.js";
 import Report from "../models/Report.js";
+import StarredCall from "../models/StarredCall.js";
 
 // Helper function to check access permissions
 const checkAccess = (lead, user) => {
@@ -398,6 +399,191 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   }
 
   return await Report.findById(report._id);
+};
+
+// Helper function to handle lead movement with priority: markAsIssue > markForFollowUp > Report
+// Returns { type: 'starredCall'|'followUp'|'report', data: object, message: string }
+const handleLeadMovement = async (updatedLead, req, remarks, changedFields, callDuration) => {
+  const { mark_as_issue } = req.body;
+  const followUpFlag = updatedLead.followUpFlag;
+  const id = updatedLead._id || updatedLead.id;
+
+  // PRIORITY 1: markAsIssue (highest priority)
+  if (mark_as_issue === true) {
+    let starredCall;
+    try {
+      console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
+      starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks);
+      
+      if (!starredCall || !starredCall._id) {
+        throw new Error("StarredCall creation returned null or invalid StarredCall");
+      }
+      
+      const verifiedStarredCall = await StarredCall.findById(starredCall._id);
+      if (!verifiedStarredCall) {
+        throw new Error("StarredCall was created but not found in database");
+      }
+      
+      console.log(`✅ StarredCall created successfully with ID: ${starredCall._id}`);
+      starredCall = verifiedStarredCall;
+    } catch (starredCallError) {
+      console.error(`❌ CRITICAL: Failed to create StarredCall for Lead ID: ${id}`);
+      console.error(`   Error details:`, starredCallError.message);
+      throw starredCallError;
+    }
+    
+    try {
+      const deleteResult = await Lead.findByIdAndDelete(id);
+      if (deleteResult) {
+        console.log(`✅ Lead ID ${id} removed from Leads collection`);
+      }
+    } catch (deleteError) {
+      console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+      console.error(`⚠️  WARNING: StarredCall created (ID: ${starredCall._id}) but Lead deletion failed.`);
+    }
+    
+    const starredCallObj = starredCall.toObject ? starredCall.toObject() : starredCall;
+    return { type: 'starredCall', data: starredCallObj, message: 'Lead updated and moved to starred calls (issue call)' };
+  }
+
+  // PRIORITY 2: markForFollowUp
+  if (followUpFlag === true) {
+    let followUp;
+    try {
+      console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
+      followUp = await moveLeadToFollowUp(updatedLead, req.user._id, callDuration);
+      
+      if (!followUp || !followUp._id) {
+        throw new Error("FollowUp creation returned null or invalid FollowUp");
+      }
+      
+      const verifiedFollowUp = await FollowUp.findById(followUp._id);
+      if (!verifiedFollowUp) {
+        throw new Error("FollowUp was created but not found in database");
+      }
+      
+      console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
+      followUp = verifiedFollowUp;
+    } catch (followUpError) {
+      console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
+      console.error(`   Error details:`, followUpError.message);
+      throw followUpError;
+    }
+    
+    try {
+      const deleteResult = await Lead.findByIdAndDelete(id);
+      if (deleteResult) {
+        console.log(`✅ Lead ID ${id} removed from Leads collection`);
+      }
+    } catch (deleteError) {
+      console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+      console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed.`);
+    }
+    
+    const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
+    return { type: 'followUp', data: followUpObj, message: 'Lead updated and moved to follow-ups' };
+  }
+
+  // PRIORITY 3: Default to Report
+  let report;
+  try {
+    console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
+    report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, callDuration);
+    
+    if (!report || !report._id) {
+      throw new Error("Report creation returned null or invalid report");
+    }
+    
+    const verifiedReport = await Report.findById(report._id);
+    if (!verifiedReport) {
+      throw new Error("Report was created but not found in database");
+    }
+    
+    console.log(`✅ Report created successfully with ID: ${report._id}`);
+    report = verifiedReport;
+  } catch (reportError) {
+    console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
+    console.error(`   Error details:`, reportError.message);
+    throw reportError;
+  }
+  
+  try {
+    const deleteResult = await Lead.findByIdAndDelete(id);
+    if (deleteResult) {
+      console.log(`✅ Lead ID ${id} removed from Leads collection`);
+    }
+  } catch (deleteError) {
+    console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+    console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed.`);
+  }
+  
+  const reportObj = report.toObject ? report.toObject() : report;
+  return { type: 'report', data: reportObj, message: 'Lead updated and moved to reports' };
+};
+
+// Helper to move a lead to StarredCalls collection (Issue Calls)
+const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null) => {
+  // Normalize lead object - use toObject() to get plain JavaScript object
+  const lead = (leadDoc && typeof leadDoc.toObject === 'function') 
+    ? leadDoc.toObject({ virtuals: false, getters: false }) 
+    : (leadDoc || {});
+  
+  // CRITICAL: Validate required fields before proceeding
+  if (!lead.name || !lead.phone || !lead.store) {
+    const missingFields = [];
+    if (!lead.name) missingFields.push('name');
+    if (!lead.phone) missingFields.push('phone');
+    if (!lead.store) missingFields.push('store');
+    throw new Error(`Missing required fields for StarredCall creation: ${missingFields.join(', ')}`);
+  }
+  
+  // Validate and normalize remarks
+  const remarksValidation = validateAndNormalizeRemarks(remarks);
+  if (!remarksValidation.isValid) {
+    throw new Error(remarksValidation.error);
+  }
+  
+  // Create StarredCall document with full lead snapshot
+  const starredCallData = {
+    leadSnapshot: lead, // Full lead object as snapshot
+    remarks: remarksValidation.normalizedRemarks || "",
+    issueMarkedBy: userId,
+    issueMarkedAt: new Date(),
+    sourceLeadId: lead._id || lead.id,
+    // Extract common fields for easier querying
+    name: lead.name,
+    phone: lead.phone,
+    store: lead.store,
+    leadType: lead.leadType || lead.lead_type || "general",
+  };
+  
+  // Remove undefined values
+  Object.keys(starredCallData).forEach(key => {
+    if (starredCallData[key] === undefined) {
+      delete starredCallData[key];
+    }
+  });
+  
+  // Create StarredCall document
+  let starredCall;
+  try {
+    console.log(`⭐ Creating StarredCall (Issue Call). Lead ID: ${lead._id || lead.id}, Name: ${starredCallData.name}, Phone: ${starredCallData.phone}`);
+    starredCall = await StarredCall.create(starredCallData);
+    console.log(`✅ StarredCall document created successfully. ID: ${starredCall._id}`);
+  } catch (createError) {
+    console.error(`❌ Failed to create StarredCall document:`, createError);
+    console.error(`   Error name: ${createError.name}, Error code: ${createError.code}`);
+    
+    // Re-throw with more context
+    if (createError.name === 'ValidationError') {
+      const validationErrors = Object.values(createError.errors || {}).map(e => e.message).join(', ');
+      throw new Error(`StarredCall validation failed: ${validationErrors}`);
+    } else {
+      throw new Error(`Failed to create StarredCall: ${createError.message || createError.toString()}`);
+    }
+  }
+  
+  return starredCall;
 };
 
 // ==================== Leads Listing ====================
@@ -888,7 +1074,7 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_issue } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -903,6 +1089,14 @@ export const updateLossOfSaleLead = async (req, res) => {
 
     if (!checkAccess(lead, req.user)) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (mark_as_issue === true && follow_up_flag === true) {
+      return res.status(400).json({ 
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
     }
 
     const updateData = {};
@@ -968,25 +1162,61 @@ export const updateLossOfSaleLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // Check followUpFlag to determine destination
-    const followUpFlag = updatedLead.followUpFlag;
+    // PRIORITY ORDER: markAsIssue > markForFollowUp > Report
+    // 1. Check markAsIssue first (highest priority)
+    if (mark_as_issue === true) {
+      let starredCall;
+      try {
+        console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
+        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarksValidation.normalizedRemarks);
+        
+        if (!starredCall || !starredCall._id) {
+          throw new Error("StarredCall creation returned null or invalid StarredCall");
+        }
+        
+        const verifiedStarredCall = await StarredCall.findById(starredCall._id);
+        if (!verifiedStarredCall) {
+          throw new Error("StarredCall was created but not found in database");
+        }
+        
+        console.log(`✅ StarredCall created successfully with ID: ${starredCall._id}`);
+        starredCall = verifiedStarredCall;
+      } catch (starredCallError) {
+        console.error(`❌ CRITICAL: Failed to create StarredCall for Lead ID: ${id}`);
+        console.error(`   Error details:`, starredCallError.message);
+        return res.status(500).json({ 
+          message: `Failed to move lead to starred calls: ${starredCallError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? starredCallError.stack : undefined
+        });
+      }
+      
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        console.error(`⚠️  WARNING: StarredCall created (ID: ${starredCall._id}) but Lead deletion failed.`);
+      }
+      
+      const starredCallObj = starredCall.toObject ? starredCall.toObject() : starredCall;
+      res.json({ message: "Loss of Sale lead updated and moved to starred calls (issue call)", starredCall: starredCallObj });
+      return;
+    }
 
+    // 2. Check followUpFlag (second priority)
+    const followUpFlag = updatedLead.followUpFlag;
     if (followUpFlag === true) {
-      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
-      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
-      // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
       let followUp;
       try {
         console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
         followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
         
-        // Verify FollowUp was created successfully
         if (!followUp || !followUp._id) {
           throw new Error("FollowUp creation returned null or invalid FollowUp");
         }
         
-        // Verify FollowUp exists in database
         const verifiedFollowUp = await FollowUp.findById(followUp._id);
         if (!verifiedFollowUp) {
           throw new Error("FollowUp was created but not found in database");
@@ -997,29 +1227,22 @@ export const updateLossOfSaleLead = async (req, res) => {
       } catch (followUpError) {
         console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
         console.error(`   Error details:`, followUpError.message);
-        console.error(`   Stack:`, followUpError.stack);
-        // DO NOT delete Lead if FollowUp creation failed
         return res.status(500).json({ 
           message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
           error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
         });
       }
       
-      // Only delete Lead AFTER FollowUp is successfully created
       try {
         const deleteResult = await Lead.findByIdAndDelete(id);
         if (deleteResult) {
           console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
         }
       } catch (deleteError) {
         console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // FollowUp was created, so return success but log the error
-        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed.`);
       }
       
-      // Convert Mongoose document to plain object to avoid serialization issues
       const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
       res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp: followUpObj });
     } else {
@@ -1111,7 +1334,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_issue } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1126,6 +1349,14 @@ export const updateReturnLead = async (req, res) => {
 
     if (!checkAccess(lead, req.user)) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (mark_as_issue === true && follow_up_flag === true) {
+      return res.status(400).json({ 
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
     }
 
     const updateData = {};
@@ -1200,67 +1431,25 @@ export const updateReturnLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // Check followUpFlag to determine destination
-    const followUpFlag = updatedLead.followUpFlag;
-
-    if (followUpFlag === true) {
-      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
-      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
-      // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
-      let followUp;
-      try {
-        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-        
-        // Verify FollowUp was created successfully
-        if (!followUp || !followUp._id) {
-          throw new Error("FollowUp creation returned null or invalid FollowUp");
-        }
-        
-        // Verify FollowUp exists in database
-        const verifiedFollowUp = await FollowUp.findById(followUp._id);
-        if (!verifiedFollowUp) {
-          throw new Error("FollowUp was created but not found in database");
-        }
-        
-        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
-        followUp = verifiedFollowUp;
-      } catch (followUpError) {
-        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
-        console.error(`   Error details:`, followUpError.message);
-        console.error(`   Stack:`, followUpError.stack);
-        // DO NOT delete Lead if FollowUp creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
-        });
-      }
+    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
+    try {
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
       
-      // Only delete Lead AFTER FollowUp is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // FollowUp was created, so return success but log the error
-        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      if (result.type === 'starredCall') {
+        res.json({ message: "Return lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      } else if (result.type === 'followUp') {
+        res.json({ message: "Return lead updated and moved to follow-ups", followUp: result.data });
+      } else {
+        res.json({ message: "Return lead updated and moved to reports", report: result.data });
       }
-      
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
-      res.json({ message: "Return lead updated and moved to follow-ups", followUp: followUpObj });
-    } else {
-      // Move to Reports collection (existing behavior)
-      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
-      let report;
-      try {
-        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    } catch (movementError) {
+      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
+      console.error(`   Error details:`, movementError.message);
+      return res.status(500).json({ 
+        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
+      });
+    }
 
         // Verify report was created successfully
         if (!report || !report._id) {
@@ -1343,7 +1532,7 @@ export const getBookingConfirmationLead = async (req, res) => {
 export const updateBookingConfirmationLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, remarks, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, remarks, call_duration, mark_as_issue } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1358,6 +1547,14 @@ export const updateBookingConfirmationLead = async (req, res) => {
 
     if (!checkAccess(lead, req.user)) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (mark_as_issue === true && follow_up_flag === true) {
+      return res.status(400).json({ 
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
     }
 
     const updateData = {};
@@ -1426,67 +1623,25 @@ export const updateBookingConfirmationLead = async (req, res) => {
       };
     });
 
-    // Check followUpFlag to determine destination
-    const followUpFlag = updatedLead.followUpFlag;
-
-    if (followUpFlag === true) {
-      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
-      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
-      // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
-      let followUp;
-      try {
-        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-        
-        // Verify FollowUp was created successfully
-        if (!followUp || !followUp._id) {
-          throw new Error("FollowUp creation returned null or invalid FollowUp");
-        }
-        
-        // Verify FollowUp exists in database
-        const verifiedFollowUp = await FollowUp.findById(followUp._id);
-        if (!verifiedFollowUp) {
-          throw new Error("FollowUp was created but not found in database");
-        }
-        
-        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
-        followUp = verifiedFollowUp;
-      } catch (followUpError) {
-        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
-        console.error(`   Error details:`, followUpError.message);
-        console.error(`   Stack:`, followUpError.stack);
-        // DO NOT delete Lead if FollowUp creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
-        });
-      }
+    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
+    try {
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
       
-      // Only delete Lead AFTER FollowUp is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // FollowUp was created, so return success but log the error
-        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      if (result.type === 'starredCall') {
+        res.json({ message: "Booking Confirmation lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      } else if (result.type === 'followUp') {
+        res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp: result.data });
+      } else {
+        res.json({ message: "Booking Confirmation lead updated and moved to reports", report: result.data });
       }
-      
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
-      res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp: followUpObj });
-    } else {
-      // Move to Reports collection (existing behavior)
-      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
-      let report;
-      try {
-        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    } catch (movementError) {
+      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
+      console.error(`   Error details:`, movementError.message);
+      return res.status(500).json({ 
+        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
+      });
+    }
 
         // Verify report was created successfully
         if (!report || !report._id) {
@@ -1567,7 +1722,7 @@ export const getJustDialLead = async (req, res) => {
 export const updateJustDialLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, closing_status, reason, follow_up_flag, follow_up_date, call_date, remarks, call_duration } = req.body;
+    const { call_status, lead_status, closing_status, reason, follow_up_flag, follow_up_date, call_date, remarks, call_duration, mark_as_issue } = req.body;
 
     const lead = await Lead.findById(id);
     if (!lead) {
@@ -1576,6 +1731,14 @@ export const updateJustDialLead = async (req, res) => {
 
     if (!checkAccess(lead, req.user)) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (mark_as_issue === true && follow_up_flag === true) {
+      return res.status(400).json({ 
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
     }
 
     const updateData = {};
@@ -1839,7 +2002,8 @@ export const updateGenericLead = async (req, res) => {
       remarks,
       closing_status,
       rating,
-      call_duration
+      call_duration,
+      mark_as_issue
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1847,6 +2011,14 @@ export const updateGenericLead = async (req, res) => {
 
     if (!checkAccess(lead, req.user)) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (mark_as_issue === true && follow_up_flag === true) {
+      return res.status(400).json({ 
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
     }
 
     const updateData = {};
@@ -1923,9 +2095,62 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // Check followUpFlag to determine destination
-    const followUpFlag = updatedLead.followUpFlag;
+    // PRIORITY ORDER: markAsIssue > markForFollowUp > Report
+    // 1. Check markAsIssue first (highest priority)
+    if (mark_as_issue === true) {
+      // Move to StarredCalls collection (Issue Calls)
+      // CRITICAL: Create StarredCall FIRST, then delete Lead only if StarredCall creation succeeds
+      let starredCall;
+      try {
+        console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
+        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks);
+        
+        // Verify StarredCall was created successfully
+        if (!starredCall || !starredCall._id) {
+          throw new Error("StarredCall creation returned null or invalid StarredCall");
+        }
+        
+        // Verify StarredCall exists in database
+        const verifiedStarredCall = await StarredCall.findById(starredCall._id);
+        if (!verifiedStarredCall) {
+          throw new Error("StarredCall was created but not found in database");
+        }
+        
+        console.log(`✅ StarredCall created successfully with ID: ${starredCall._id}`);
+        starredCall = verifiedStarredCall;
+      } catch (starredCallError) {
+        console.error(`❌ CRITICAL: Failed to create StarredCall for Lead ID: ${id}`);
+        console.error(`   Error details:`, starredCallError.message);
+        console.error(`   Stack:`, starredCallError.stack);
+        // DO NOT delete Lead if StarredCall creation failed
+        return res.status(500).json({ 
+          message: `Failed to move lead to starred calls: ${starredCallError.message}. Lead was not deleted.`,
+          error: process.env.NODE_ENV === 'development' ? starredCallError.stack : undefined
+        });
+      }
+      
+      // Only delete Lead AFTER StarredCall is successfully created
+      try {
+        const deleteResult = await Lead.findByIdAndDelete(id);
+        if (deleteResult) {
+          console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        } else {
+          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        }
+      } catch (deleteError) {
+        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+        // StarredCall was created, so return success but log the error
+        console.error(`⚠️  WARNING: StarredCall created (ID: ${starredCall._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      }
+      
+      // Convert Mongoose document to plain object to avoid serialization issues
+      const starredCallObj = starredCall.toObject ? starredCall.toObject() : starredCall;
+      res.json({ message: 'Lead updated and moved to starred calls (issue call)', starredCall: starredCallObj });
+      return;
+    }
 
+    // 2. Check followUpFlag (second priority)
+    const followUpFlag = updatedLead.followUpFlag;
     if (followUpFlag === true) {
       // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
       // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
@@ -2081,7 +2306,7 @@ export const getGeneralLead = async (req, res) => {
 export const updateGeneralLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating, call_duration } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating, call_duration, mark_as_issue } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -2096,6 +2321,14 @@ export const updateGeneralLead = async (req, res) => {
 
     if (!checkAccess(lead, req.user)) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (mark_as_issue === true && follow_up_flag === true) {
+      return res.status(400).json({ 
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
     }
 
     const updateData = {};
@@ -2165,67 +2398,25 @@ export const updateGeneralLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // Check followUpFlag to determine destination
-    const followUpFlag = updatedLead.followUpFlag;
-
-    if (followUpFlag === true) {
-      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
-      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
-      // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
-      let followUp;
-      try {
-        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-        
-        // Verify FollowUp was created successfully
-        if (!followUp || !followUp._id) {
-          throw new Error("FollowUp creation returned null or invalid FollowUp");
-        }
-        
-        // Verify FollowUp exists in database
-        const verifiedFollowUp = await FollowUp.findById(followUp._id);
-        if (!verifiedFollowUp) {
-          throw new Error("FollowUp was created but not found in database");
-        }
-        
-        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
-        followUp = verifiedFollowUp;
-      } catch (followUpError) {
-        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
-        console.error(`   Error details:`, followUpError.message);
-        console.error(`   Stack:`, followUpError.stack);
-        // DO NOT delete Lead if FollowUp creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
-        });
-      }
+    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
+    try {
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
       
-      // Only delete Lead AFTER FollowUp is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // FollowUp was created, so return success but log the error
-        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      if (result.type === 'starredCall') {
+        res.json({ message: "General lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      } else if (result.type === 'followUp') {
+        res.json({ message: "General lead updated and moved to follow-ups", followUp: result.data });
+      } else {
+        res.json({ message: "General lead updated and moved to reports", report: result.data });
       }
-      
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
-      res.json({ message: "General lead updated and moved to follow-ups", followUp: followUpObj });
-    } else {
-      // Move to Reports collection (existing behavior)
-      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
-      let report;
-      try {
-        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
+    } catch (movementError) {
+      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
+      console.error(`   Error details:`, movementError.message);
+      return res.status(500).json({ 
+        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
+      });
+    }
 
         // Verify report was created successfully
         if (!report || !report._id) {
@@ -2676,5 +2867,91 @@ export const updateFollowUp = async (req, res) => {
       message: error.message || "Internal server error",
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+};
+
+// ==================== Starred Calls (Issue Calls) ====================
+
+// GET - Fetch list of starred calls (issue calls)
+export const getStarredCalls = async (req, res) => {
+  try {
+    const {
+      leadType,
+      store,
+      page = 1,
+      limit = 100,
+      sortBy = 'issueMarkedAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const filters = {};
+    if (leadType) filters.leadType = leadType;
+    if (store) {
+      // Support "Brand - Location" format
+      if (store.includes(" - ")) {
+        const [brand, location] = store.split(" - ").map((s) => s.trim());
+        filters.$or = [
+          { store: { $regex: store, $options: "i" } },
+          { store: { $regex: brand, $options: "i" } },
+          { store: { $regex: location, $options: "i" } },
+        ];
+      } else {
+        filters.store = { $regex: store, $options: "i" };
+      }
+    }
+
+    // Build sort object
+    const sortOptions = {};
+    const validSortFields = ["issueMarkedAt", "createdAt", "name", "store"];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "issueMarkedAt";
+    sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
+
+    // Calculate pagination
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 100;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Fetch starred calls with pagination
+    const [starredCalls, total] = await Promise.all([
+      StarredCall.find(filters)
+        .populate('issueMarkedBy', 'name employeeId')
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+      StarredCall.countDocuments(filters)
+    ]);
+
+    res.json({
+      starredCalls,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching starred calls:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET - Fetch a single starred call by ID
+export const getStarredCallById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const starredCall = await StarredCall.findById(id)
+      .populate('issueMarkedBy', 'name employeeId')
+      .lean();
+
+    if (!starredCall) {
+      return res.status(404).json({ message: 'Starred call not found' });
+    }
+
+    res.json(starredCall);
+  } catch (error) {
+    console.error('Error fetching starred call:', error);
+    res.status(500).json({ message: error.message });
   }
 };
