@@ -1450,49 +1450,6 @@ export const updateReturnLead = async (req, res) => {
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
     }
-
-        // Verify report was created successfully
-        if (!report || !report._id) {
-          throw new Error("Report creation returned null or invalid report");
-        }
-        
-        // Verify report exists in database
-        const verifiedReport = await Report.findById(report._id);
-        if (!verifiedReport) {
-          throw new Error("Report was created but not found in database");
-        }
-        
-        console.log(`✅ Report created successfully with ID: ${report._id}`);
-        report = verifiedReport;
-      } catch (reportError) {
-        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
-        console.error(`   Error details:`, reportError.message);
-        console.error(`   Stack:`, reportError.stack);
-        // DO NOT delete Lead if Report creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
-        });
-      }
-      
-      // Only delete Lead AFTER Report is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // Report was created, so return success but log the error
-        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
-      }
-
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const reportObj = report.toObject ? report.toObject() : report;
-      res.json({ message: "Return lead updated and moved to reports", report: reportObj });
-    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
