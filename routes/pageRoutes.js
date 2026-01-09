@@ -651,9 +651,6 @@
  *               mark_as_issue:
  *                 type: boolean
  *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *               follow_up_flag: 
- *                 type: boolean
- *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
  *         description: |
@@ -745,9 +742,6 @@
  *               mark_as_issue:
  *                 type: boolean
  *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *               follow_up_flag: 
- *                 type: boolean
- *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
  *         description: |
@@ -839,9 +833,6 @@
  *               mark_as_issue:
  *                 type: boolean
  *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *               follow_up_flag: 
- *                 type: boolean
- *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
  *         description: |
@@ -988,9 +979,17 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *               call_duration:
  *                 type: number
  *                 description: "Call duration in seconds"
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
  *     responses:
  *       200:
- *         description: Lead updated and moved to reports. Returns created report object.
+ *         description: |
+ *           Lead updated. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection. Returns created report/starredCall/followUp object.
  *         content:
  *           application/json:
  *             schema:
@@ -1042,9 +1041,17 @@ router.patch(
  *               closing_status: { type: string }
  *               rating: { type: integer }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
  *     responses:
  *       200:
- *         description: Lead updated and moved to reports
+ *         description: |
+ *           Lead updated. 
+ *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
+ *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
+ *           - Otherwise → moves to Reports collection
  */
 router.post(
   "/leads/:id",
@@ -1249,9 +1256,6 @@ router.get(
  *               mark_as_issue:
  *                 type: boolean
  *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *               follow_up_flag:
- *                 type: boolean
- *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
  *     responses:
  *       200:
  *         description: |

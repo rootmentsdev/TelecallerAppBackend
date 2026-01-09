@@ -52,10 +52,103 @@ const handleUploadError = (err, req, res, next) => {
 };
 
 /**
- * POST /api/import/csv
- * Upload CSV file and import leads
- * Requires authentication (JWT token)
- * Accepts: multipart/form-data with 'file' and 'leadType' fields
+ * @swagger
+ * /api/upload/csv:
+ *   post:
+ *     summary: Upload CSV/Excel file and import leads
+ *     tags:
+ *       - CSV Upload
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Uploads a CSV or Excel file and imports leads. Only admin and super_admin can upload files.
+ *       The file can be CSV (.csv) or Excel (.xlsx, .xls) format.
+ *       Store name is automatically extracted from filename if possible, otherwise uses request body or user's store.
+ *       
+ *       **Supported Lead Types:**
+ *       - `walkin` - Walk-in leads
+ *       - `lossofsale` - Loss of Sale leads
+ *       
+ *       **File Requirements:**
+ *       - Format: CSV (.csv) or Excel (.xlsx, .xls)
+ *       - Field name: `file`
+ *       - No file size limit
+ *       
+ *       **Store Name Extraction:**
+ *       - Priority 1: Extracted from filename (e.g., "lossofsale_sg_kannur.xlsx" → "Suitor Guy - Kannur")
+ *       - Priority 2: From request body `storeName` field
+ *       - Priority 3: From authenticated user's store
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *               - leadType
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CSV or Excel file containing lead data
+ *               leadType:
+ *                 type: string
+ *                 enum: [walkin, lossofsale]
+ *                 description: Type of leads in the file
+ *                 example: "lossofsale"
+ *               storeName:
+ *                 type: string
+ *                 description: Optional store name. Used if filename extraction fails.
+ *                 example: "Suitor Guy - Kannur"
+ *     responses:
+ *       200:
+ *         description: CSV upload and import completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "CSV upload and import completed"
+ *                 summary:
+ *                   type: object
+ *                   properties:
+ *                     totalRows:
+ *                       type: integer
+ *                       description: Total number of rows processed
+ *                     inserted:
+ *                       type: integer
+ *                       description: Number of new leads inserted
+ *                     updated:
+ *                       type: integer
+ *                       description: Number of existing leads updated
+ *                     skipped:
+ *                       type: integer
+ *                       description: Number of rows skipped (duplicates or errors)
+ *       400:
+ *         description: Bad request - File missing, invalid leadType, or validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "No CSV file uploaded" or "Invalid leadType. Must be one of: walkin, lossofsale"
+ *       401:
+ *         description: Unauthorized - Missing or invalid JWT token
+ *       403:
+ *         description: Forbidden - Only admin or super_admin can upload CSV files
+ *       500:
+ *         description: Internal server error
  */
 router.post(
   "/csv",
