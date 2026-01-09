@@ -1599,49 +1599,6 @@ export const updateBookingConfirmationLead = async (req, res) => {
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
     }
-
-        // Verify report was created successfully
-        if (!report || !report._id) {
-          throw new Error("Report creation returned null or invalid report");
-        }
-        
-        // Verify report exists in database
-        const verifiedReport = await Report.findById(report._id);
-        if (!verifiedReport) {
-          throw new Error("Report was created but not found in database");
-        }
-        
-        console.log(`✅ Report created successfully with ID: ${report._id}`);
-        report = verifiedReport;
-      } catch (reportError) {
-        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
-        console.error(`   Error details:`, reportError.message);
-        console.error(`   Stack:`, reportError.stack);
-        // DO NOT delete Lead if Report creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
-        });
-      }
-      
-      // Only delete Lead AFTER Report is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // Report was created, so return success but log the error
-        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
-      }
-
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const reportObj = report.toObject ? report.toObject() : report;
-      res.json({ message: "Booking Confirmation lead updated and moved to reports", report: reportObj });
-    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1773,109 +1730,30 @@ export const updateJustDialLead = async (req, res) => {
       };
     });
 
-    // Check followUpFlag to determine destination
-    const followUpFlag = updatedLead.followUpFlag;
+    // Validate remarks for Just Dial (needed for handleLeadMovement)
+    const remarksValidation = validateAndNormalizeRemarks(remarks);
+    if (remarks !== undefined && !remarksValidation.isValid) {
+      return res.status(400).json({ message: remarksValidation.error });
+    }
 
-    if (followUpFlag === true) {
-      // DEFENSIVE CHECK: When followUpFlag is true, move to FollowUps ONLY
-      // Do NOT create Report entry - Reports are created ONLY when FollowUp is saved
-      // Lifecycle: Leads → FollowUps → Reports (no skipping)
-      // CRITICAL: Create FollowUp FIRST, then delete Lead only if FollowUp creation succeeds
-      let followUp;
-      try {
-        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-        
-        // Verify FollowUp was created successfully
-        if (!followUp || !followUp._id) {
-          throw new Error("FollowUp creation returned null or invalid FollowUp");
-        }
-        
-        // Verify FollowUp exists in database
-        const verifiedFollowUp = await FollowUp.findById(followUp._id);
-        if (!verifiedFollowUp) {
-          throw new Error("FollowUp was created but not found in database");
-        }
-        
-        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
-        followUp = verifiedFollowUp;
-      } catch (followUpError) {
-        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
-        console.error(`   Error details:`, followUpError.message);
-        console.error(`   Stack:`, followUpError.stack);
-        // DO NOT delete Lead if FollowUp creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
-        });
-      }
+    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
+    try {
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
       
-      // Only delete Lead AFTER FollowUp is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // FollowUp was created, so return success but log the error
-        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed. Manual cleanup may be needed.`);
+      if (result.type === 'starredCall') {
+        res.json({ message: "Just Dial lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      } else if (result.type === 'followUp') {
+        res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp: result.data });
+      } else {
+        res.json({ message: "Just Dial lead updated and moved to reports", report: result.data });
       }
-      
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
-      res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp: followUpObj });
-    } else {
-      // Move to Reports collection (existing behavior)
-      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
-      let report;
-      try {
-        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
-
-        // Verify report was created successfully
-        if (!report || !report._id) {
-          throw new Error("Report creation returned null or invalid report");
-        }
-        
-        // Verify report exists in database
-        const verifiedReport = await Report.findById(report._id);
-        if (!verifiedReport) {
-          throw new Error("Report was created but not found in database");
-        }
-        
-        console.log(`✅ Report created successfully with ID: ${report._id}`);
-        report = verifiedReport;
-      } catch (reportError) {
-        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
-        console.error(`   Error details:`, reportError.message);
-        console.error(`   Stack:`, reportError.stack);
-        // DO NOT delete Lead if Report creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
-        });
-      }
-      
-      // Only delete Lead AFTER Report is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // Report was created, so return success but log the error
-        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
-      }
-
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const reportObj = report.toObject ? report.toObject() : report;
-      res.json({ message: "Just Dial lead updated and moved to reports", report: reportObj });
+    } catch (movementError) {
+      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
+      console.error(`   Error details:`, movementError.message);
+      return res.status(500).json({ 
+        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
+      });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -2373,49 +2251,6 @@ export const updateGeneralLead = async (req, res) => {
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
-    }
-
-        // Verify report was created successfully
-        if (!report || !report._id) {
-          throw new Error("Report creation returned null or invalid report");
-        }
-        
-        // Verify report exists in database
-        const verifiedReport = await Report.findById(report._id);
-        if (!verifiedReport) {
-          throw new Error("Report was created but not found in database");
-        }
-        
-        console.log(`✅ Report created successfully with ID: ${report._id}`);
-        report = verifiedReport;
-      } catch (reportError) {
-        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
-        console.error(`   Error details:`, reportError.message);
-        console.error(`   Stack:`, reportError.stack);
-        // DO NOT delete Lead if Report creation failed
-        return res.status(500).json({ 
-          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
-        });
-      }
-      
-      // Only delete Lead AFTER Report is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // Report was created, so return success but log the error
-        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
-      }
-
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const reportObj = report.toObject ? report.toObject() : report;
-      res.json({ message: "General lead updated and moved to reports", report: reportObj });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
