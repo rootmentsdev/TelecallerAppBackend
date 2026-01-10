@@ -26,6 +26,7 @@
     "cleanup:duplicates:live": "node scripts/cleanup-duplicates.js --live",
     "index:create": "node scripts/create-unique-index.js",
     "unlock:sync": "node scripts/unlock-sync.js",
+    "test:lock-expiry": "node scripts/test-lock-expiry.js",
     "delete:lossofsale-walkin": "node scripts/delete-lossofsale-walkin.js",
     "delete:api-leads": "node scripts/delete-api-leads.js"
   },

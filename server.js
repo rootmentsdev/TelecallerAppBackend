@@ -74,6 +74,7 @@ const GLOBAL_LOCK_NAME = "GLOBAL_API_SYNC";
 const checkStartupLocks = async () => {
   try {
     console.log("🔍 Checking for expired sync locks on startup...");
+    console.log(`🔍 [DIAG] checkStartupLocks: MAX_SYNC_DURATION=${MAX_SYNC_DURATION}ms (${MAX_SYNC_DURATION / 60000} minutes), PID=${process.pid}`);
     const lock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
     
     if (!lock) {
@@ -82,8 +83,11 @@ const checkStartupLocks = async () => {
     }
 
     const lockAge = Date.now() - lock.lockedAt.getTime();
+    const lockAgeSeconds = Math.round(lockAge / 1000);
     const lockAgeMinutes = Math.round(lockAge / 60000);
     const isExpired = lockAge > MAX_SYNC_DURATION;
+
+    console.log(`🔍 [DIAG] Startup lock check: lockedAt=${lock.lockedAt.toISOString()}, age=${lockAgeSeconds}s (${lockAgeMinutes}m), status=${lock.status}, isExpired=${isExpired}`);
 
     if (isExpired) {
       console.log(`⚠️  Found expired sync lock (age: ${lockAgeMinutes} minutes)`);
@@ -92,8 +96,15 @@ const checkStartupLocks = async () => {
       console.log(`   Status: ${lock.status}`);
       console.log(`   🔓 Auto-clearing expired lock...`);
       
-      await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
-      console.log(`✅ Expired lock cleared - syncs can proceed normally`);
+      const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+      console.log(`🔍 [DIAG] Startup deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
+      
+      if (deleteResult.deletedCount === 0) {
+        console.error(`❌ CRITICAL: Startup lock delete returned deletedCount=0!`);
+        console.error(`   Lock document snapshot:`, JSON.stringify(lock.toObject(), null, 2));
+      } else {
+        console.log(`✅ Expired lock cleared (deletedCount=${deleteResult.deletedCount}) - syncs can proceed normally`);
+      }
     } else {
       console.log(`ℹ️  Active sync lock found (age: ${lockAgeMinutes} minutes)`);
       console.log(`   This is normal if a sync is currently running`);
@@ -102,6 +113,7 @@ const checkStartupLocks = async () => {
     console.log();
   } catch (error) {
     console.error("⚠️  Error checking startup locks:", error.message);
+    console.error("   Stack:", error.stack);
     // Don't fail startup if lock check fails
   }
 };
