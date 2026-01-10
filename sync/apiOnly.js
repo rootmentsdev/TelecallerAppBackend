@@ -32,30 +32,46 @@ const MAX_SYNC_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 // Check if lock is expired and auto-release if needed
 const checkAndReleaseExpiredLock = async () => {
   try {
+    console.log(`🔍 [DIAG] Checking for expired lock... MAX_SYNC_DURATION=${MAX_SYNC_DURATION}ms (${MAX_SYNC_DURATION / 60000} minutes)`);
     const existingLock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
     if (!existingLock) {
+      console.log(`🔍 [DIAG] No existing lock found - system is clean`);
       return { expired: false, released: false };
     }
 
-    const lockAge = Date.now() - existingLock.lockedAt.getTime();
-    const isExpired = lockAge > MAX_SYNC_DURATION;
+    const lockAgeMs = Date.now() - existingLock.lockedAt.getTime();
+    const lockAgeSeconds = Math.round(lockAgeMs / 1000);
+    const lockAgeMinutes = Math.round(lockAgeMs / 60000);
+    const isExpired = lockAgeMs > MAX_SYNC_DURATION;
+
+    console.log(`🔍 [DIAG] Lock found: lockedAt=${existingLock.lockedAt.toISOString()}, age=${lockAgeSeconds}s (${lockAgeMinutes}m), status=${existingLock.status}, isExpired=${isExpired}`);
+    console.log(`🔍 [DIAG] Time comparison: now=${new Date().toISOString()}, lockedAt=${existingLock.lockedAt.toISOString()}, diff=${lockAgeMs}ms, threshold=${MAX_SYNC_DURATION}ms`);
 
     if (isExpired) {
-      const lockAgeMinutes = Math.round(lockAge / 60000);
       console.log(`⚠️  Lock timeout detected - lock is ${lockAgeMinutes} minutes old (max: ${MAX_SYNC_DURATION / 60000} minutes)`);
       console.log(`   Locked at: ${existingLock.lockedAt.toISOString()}`);
       console.log(`   Locked by: ${existingLock.lockedBy}`);
       console.log(`   Status: ${existingLock.status}`);
+      console.log(`   Process PID: ${process.pid}`);
       console.log(`   🔓 Auto-releasing expired lock...`);
       
-      await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
-      console.log(`✅ Expired lock released - sync can proceed`);
-      return { expired: true, released: true };
+      const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+      console.log(`🔍 [DIAG] deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
+      
+      if (deleteResult.deletedCount === 0) {
+        console.error(`❌ CRITICAL: deleteOne returned deletedCount=0! Lock was NOT deleted.`);
+        console.error(`   Lock document snapshot:`, JSON.stringify(existingLock.toObject(), null, 2));
+        return { expired: true, released: false, error: "Delete operation returned deletedCount=0" };
+      }
+      
+      console.log(`✅ Expired lock released (deletedCount=${deleteResult.deletedCount}) - sync can proceed`);
+      return { expired: true, released: true, deletedCount: deleteResult.deletedCount };
     }
 
     return { expired: false, released: false, lock: existingLock };
   } catch (error) {
     console.error("⚠️  Error checking lock expiry:", error.message);
+    console.error("   Stack:", error.stack);
     return { expired: false, released: false, error };
   }
 };
@@ -63,16 +79,18 @@ const checkAndReleaseExpiredLock = async () => {
 // Acquire global sync lock
 const acquireLock = async (lockedBy = "scheduler") => {
   try {
+    console.log(`🔍 [DIAG] acquireLock called: lockedBy=${lockedBy}, PID=${process.pid}`);
     // First, check for and auto-release any expired locks
     const expiryCheck = await checkAndReleaseExpiredLock();
     
     if (expiryCheck.released) {
       // Lock was expired and released, now we can acquire
-      console.log("   Proceeding to acquire lock after auto-release");
+      console.log(`   Proceeding to acquire lock after auto-release (deletedCount=${expiryCheck.deletedCount || 'N/A'})`);
     } else if (expiryCheck.lock) {
       // Lock exists and is still valid (not expired)
       const lockAge = Date.now() - expiryCheck.lock.lockedAt.getTime();
       const lockAgeMinutes = Math.round(lockAge / 60000);
+      console.log(`🔍 [DIAG] Lock acquisition rejected - active lock exists (age: ${lockAgeMinutes}m)`);
       return { 
         acquired: false, 
         reason: `Lock already exists (active sync running, age: ${lockAgeMinutes} minutes)`,
@@ -81,36 +99,46 @@ const acquireLock = async (lockedBy = "scheduler") => {
     }
     
     // Try to create lock document (will fail if already exists due to unique constraint)
+    const now = new Date();
+    console.log(`🔍 [DIAG] Creating new lock: lockName=${GLOBAL_LOCK_NAME}, lockedAt=${now.toISOString()}, lockedBy=${lockedBy}, PID=${process.pid}`);
     const lock = await SyncLock.create({
       lockName: GLOBAL_LOCK_NAME,
-      lockedAt: new Date(),
+      lockedAt: now,
       lockedBy: lockedBy,
       status: "active",
     });
     
+    console.log(`🔒 [DIAG] Lock acquired successfully: _id=${lock._id}, lockedAt=${lock.lockedAt.toISOString()}, lockedBy=${lock.lockedBy}, PID=${process.pid}`);
     console.log(`🔒 Lock acquired at: ${lock.lockedAt.toISOString()}`);
     return { acquired: true, lock };
   } catch (error) {
     // Lock already exists (race condition - another process created it)
     if (error.code === 11000 || error.name === 'MongoServerError') {
+      console.log(`🔍 [DIAG] Unique constraint violation (race condition) - checking for expired lock...`);
       // Check if the newly created lock is expired (unlikely but possible)
       const expiryCheck = await checkAndReleaseExpiredLock();
       if (expiryCheck.released) {
         // Retry acquiring lock after releasing expired one
         try {
+          const now = new Date();
+          console.log(`🔍 [DIAG] Retrying lock creation after expiry release: lockedAt=${now.toISOString()}, PID=${process.pid}`);
           const lock = await SyncLock.create({
             lockName: GLOBAL_LOCK_NAME,
-            lockedAt: new Date(),
+            lockedAt: now,
             lockedBy: lockedBy,
             status: "active",
           });
+          console.log(`🔒 [DIAG] Lock acquired on retry: _id=${lock._id}, lockedAt=${lock.lockedAt.toISOString()}, PID=${process.pid}`);
           return { acquired: true, lock };
         } catch (retryError) {
+          console.error(`🔍 [DIAG] Retry lock creation failed:`, retryError.message);
           return { acquired: false, reason: "Lock already exists (race condition after retry)" };
         }
       }
+      console.log(`🔍 [DIAG] Lock acquisition failed - race condition (lock not expired)`);
       return { acquired: false, reason: "Lock already exists (race condition)" };
     }
+    console.error(`🔍 [DIAG] Unexpected error in acquireLock:`, error.message);
     throw error;
   }
 };
@@ -118,34 +146,61 @@ const acquireLock = async (lockedBy = "scheduler") => {
 // Release global sync lock
 const releaseLock = async (status = "completed") => {
   try {
+    console.log(`🔍 [DIAG] releaseLock called: status=${status}, PID=${process.pid}, query={ lockName: "${GLOBAL_LOCK_NAME}" }`);
     const lock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
     if (!lock) {
+      console.log(`🔍 [DIAG] Lock not found - already released or does not exist`);
       console.log("ℹ️  Lock already released or does not exist");
-      return;
+      return { released: false, reason: "Lock not found" };
     }
 
+    console.log(`🔍 [DIAG] Lock found for release: _id=${lock._id}, status=${lock.status}, lockedAt=${lock.lockedAt.toISOString()}, lockedBy=${lock.lockedBy}, PID=${process.pid}`);
     const lockAge = Date.now() - lock.lockedAt.getTime();
+    const lockAgeSeconds = Math.round(lockAge / 1000);
     const lockAgeMinutes = Math.round(lockAge / 60000);
     
     // Update status before deletion (for audit)
-    await SyncLock.findOneAndUpdate(
+    console.log(`🔍 [DIAG] Updating lock status to "${status}" before deletion...`);
+    const updateResult = await SyncLock.findOneAndUpdate(
       { lockName: GLOBAL_LOCK_NAME },
       { status: status },
       { new: true }
     );
+    console.log(`🔍 [DIAG] Status update result: ${updateResult ? 'success' : 'failed'}`);
     
     // Delete the lock
-    await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+    console.log(`🔍 [DIAG] Deleting lock with deleteOne({ lockName: "${GLOBAL_LOCK_NAME}" })...`);
+    const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+    console.log(`🔍 [DIAG] deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
     
+    if (deleteResult.deletedCount === 0) {
+      console.error(`❌ CRITICAL: deleteOne returned deletedCount=0! Lock was NOT deleted.`);
+      console.error(`   Lock document snapshot:`, JSON.stringify(lock.toObject(), null, 2));
+      throw new Error(`Lock deletion failed - deletedCount=0`);
+    }
+    
+    console.log(`🔓 [DIAG] Lock released successfully: deletedCount=${deleteResult.deletedCount}, status=${status}, duration=${lockAgeSeconds}s (${lockAgeMinutes}m), PID=${process.pid}`);
     console.log(`🔓 Lock released (status: ${status}, duration: ${lockAgeMinutes} minutes)`);
+    return { released: true, deletedCount: deleteResult.deletedCount, duration: lockAgeSeconds };
   } catch (error) {
     console.error("⚠️  Error releasing lock:", error.message);
+    console.error("   Stack:", error.stack);
+    console.error(`🔍 [DIAG] Attempting fallback direct delete...`);
     // Try direct delete as fallback
     try {
-      await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
-      console.log("✅ Lock force-released via direct delete");
+      const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+      console.log(`🔍 [DIAG] Fallback deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
+      if (deleteResult.deletedCount > 0) {
+        console.log("✅ Lock force-released via direct delete");
+        return { released: true, deletedCount: deleteResult.deletedCount, method: "fallback" };
+      } else {
+        console.error("❌ CRITICAL: Fallback delete also returned deletedCount=0!");
+        throw new Error(`Fallback lock deletion failed - deletedCount=0`);
+      }
     } catch (deleteError) {
       console.error("❌ CRITICAL: Failed to force-release lock:", deleteError.message);
+      console.error("   Stack:", deleteError.stack);
+      throw deleteError;
     }
   }
 };
@@ -301,22 +356,33 @@ const runApiOnlySync = async () => {
     // Lock will be released in finally block
   } finally {
     // CRITICAL: ALWAYS release lock in finally block to guarantee cleanup
+    console.log(`🔍 [DIAG] finally block entered: lockReleased=${lockReleased}, PID=${process.pid}`);
     if (!lockReleased) {
       console.log("🔓 Releasing lock in finally block (guaranteed cleanup)...");
       try {
-        await releaseLock("failed");
+        const releaseResult = await releaseLock("failed");
         lockReleased = true;
-        console.log("✅ Lock released successfully");
+        console.log(`✅ Lock released successfully in finally: deletedCount=${releaseResult?.deletedCount || 'N/A'}, PID=${process.pid}`);
       } catch (releaseError) {
         console.error("❌ CRITICAL: Failed to release lock in finally block:", releaseError.message);
+        console.error("   Stack:", releaseError.stack);
         // Try one more time with direct delete
         try {
-          await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
-          console.log("✅ Lock force-released via direct delete");
+          console.log(`🔍 [DIAG] Attempting final fallback delete with deleteOne({ lockName: "${GLOBAL_LOCK_NAME}" })...`);
+          const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
+          console.log(`🔍 [DIAG] Final fallback deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
+          if (deleteResult.deletedCount > 0) {
+            console.log("✅ Lock force-released via direct delete in finally block");
+          } else {
+            console.error("❌ CRITICAL: Final fallback delete returned deletedCount=0 - lock may still exist!");
+          }
         } catch (deleteError) {
-          console.error("❌ CRITICAL: Failed to force-release lock:", deleteError.message);
+          console.error("❌ CRITICAL: Failed to force-release lock in finally:", deleteError.message);
+          console.error("   Stack:", deleteError.stack);
         }
       }
+    } else {
+      console.log(`🔍 [DIAG] Lock already released (lockReleased=true), skipping finally release, PID=${process.pid}`);
     }
     
     // If there was an error, re-throw it after cleanup
