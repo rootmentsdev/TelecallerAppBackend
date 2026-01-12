@@ -409,8 +409,15 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
   const followUpFlag = updatedLead.followUpFlag;
   const id = updatedLead._id || updatedLead.id;
 
+  // CRITICAL: Normalize mark_as_issue to handle string "true", boolean true, or number 1
+  // This ensures checkbox values from frontend are correctly recognized
+  const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+  
+  // Diagnostic logging
+  console.log(`[handleLeadMovement] Lead ID: ${id}, mark_as_issue (raw): ${mark_as_issue} (type: ${typeof mark_as_issue}), normalized: ${isMarkAsIssue}, followUpFlag: ${followUpFlag}`);
+
   // PRIORITY 1: markAsIssue (highest priority)
-  if (mark_as_issue === true) {
+  if (isMarkAsIssue) {
     let starredCall;
     try {
       console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
@@ -1185,9 +1192,13 @@ export const updateLossOfSaleLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
+    // CRITICAL: Normalize mark_as_issue to handle string "true", boolean true, or number 1
+    const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    console.log(`[updateLossOfSaleLead] Lead ID: ${id}, mark_as_issue (raw): ${mark_as_issue} (type: ${typeof mark_as_issue}), normalized: ${isMarkAsIssue}`);
+
     // PRIORITY ORDER: markAsIssue > markForFollowUp > Report
     // 1. Check markAsIssue first (highest priority)
-    if (mark_as_issue === true) {
+    if (isMarkAsIssue) {
       let starredCall;
       try {
         console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
@@ -1953,9 +1964,13 @@ export const updateGenericLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
+    // CRITICAL: Normalize mark_as_issue to handle string "true", boolean true, or number 1
+    const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    console.log(`[updateGenericLead] Lead ID: ${id}, mark_as_issue (raw): ${mark_as_issue} (type: ${typeof mark_as_issue}), normalized: ${isMarkAsIssue}`);
+
     // PRIORITY ORDER: markAsIssue > markForFollowUp > Report
     // 1. Check markAsIssue first (highest priority)
-    if (mark_as_issue === true) {
+    if (isMarkAsIssue) {
       // Move to StarredCalls collection (Issue Calls)
       // CRITICAL: Create StarredCall FIRST, then delete Lead only if StarredCall creation succeeds
       let starredCall;
