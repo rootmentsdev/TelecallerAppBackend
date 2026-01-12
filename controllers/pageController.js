@@ -558,30 +558,56 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDurat
     throw new Error(remarksValidation.error);
   }
   
-  // Ensure callDuration is included in lead snapshot if provided
+  // Ensure callDuration is included if provided
   if (callDuration !== undefined && callDuration !== null && callDuration > 0) {
     lead.callDuration = callDuration;
   } else if (lead.callDuration === undefined || lead.callDuration === null) {
     lead.callDuration = 0;
   }
   
-  // Create StarredCall document with full lead snapshot
+  // Fields to exclude from lead data (internal mongoose fields)
+  const excludeFields = ['_id', '__v', 'createdAt', 'updatedAt'];
+  
+  // Create StarredCall document with all lead fields flattened (no snapshot)
   const starredCallData = {
-    leadSnapshot: lead, // Full lead object as snapshot (includes all updated fields)
-    remarks: remarksValidation.normalizedRemarks || "",
-    issueMarkedBy: userId,
-    issueMarkedAt: new Date(),
-    sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
-    // Extract common fields for easier querying
+    // Copy all lead fields directly (flattened structure)
     name: lead.name,
     phone: lead.phone,
     store: lead.store,
+    source: lead.source,
     leadType: lead.leadType || lead.lead_type || "general",
+    brand: lead.brand,
+    enquiryDate: lead.enquiryDate || lead.enquiry_date,
+    visitDate: lead.visitDate || lead.visit_date,
+    functionDate: lead.functionDate || lead.function_date,
+    returnDate: lead.returnDate || lead.return_date,
+    callDate: lead.callDate || lead.call_date,
+    followUpDate: lead.followUpDate || lead.follow_up_date,
+    bookingNo: lead.bookingNo || lead.booking_number,
+    securityAmount: lead.securityAmount || lead.security_amount,
+    callStatus: lead.callStatus || lead.call_status,
+    leadStatus: lead.leadStatus || lead.lead_status,
+    closingStatus: lead.closingStatus || lead.closing_status,
+    followUpFlag: lead.followUpFlag || lead.follow_up_flag || false,
+    reason: lead.reason,
+    reasonCollectedFromStore: lead.reasonCollectedFromStore || lead.reason_collected_from_store,
+    rating: lead.rating,
+    attendedBy: lead.attendedBy || lead.attended_by,
+    callDuration: lead.callDuration || 0,
+    createdBy: lead.createdBy || lead.created_by,
+    assignedTo: lead.assignedTo || lead.assigned_to,
+    assignedAt: lead.assignedAt || lead.assigned_at,
+    
+    // Issue-specific fields (remarks can override lead.remarks)
+    remarks: remarksValidation.normalizedRemarks || lead.remarks || "",
+    issueMarkedBy: userId,
+    issueMarkedAt: new Date(),
+    sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
   };
   
-  // Remove undefined values
+  // Remove undefined values and excluded fields
   Object.keys(starredCallData).forEach(key => {
-    if (starredCallData[key] === undefined) {
+    if (starredCallData[key] === undefined || excludeFields.includes(key)) {
       delete starredCallData[key];
     }
   });
@@ -1121,8 +1147,11 @@ export const updateLossOfSaleLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    
     // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (mark_as_issue === true && follow_up_flag === true) {
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
       return res.status(400).json({ 
         message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
@@ -1385,8 +1414,11 @@ export const updateReturnLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    
     // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (mark_as_issue === true && follow_up_flag === true) {
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
       return res.status(400).json({ 
         message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
@@ -1540,8 +1572,11 @@ export const updateBookingConfirmationLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    
     // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (mark_as_issue === true && follow_up_flag === true) {
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
       return res.status(400).json({ 
         message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
@@ -1681,8 +1716,11 @@ export const updateJustDialLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    
     // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (mark_as_issue === true && follow_up_flag === true) {
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
       return res.status(400).json({ 
         message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
@@ -1882,8 +1920,11 @@ export const updateGenericLead = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    
     // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (mark_as_issue === true && follow_up_flag === true) {
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
       return res.status(400).json({ 
         message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
@@ -1939,8 +1980,9 @@ export const updateGenericLead = async (req, res) => {
     if (call_date !== undefined) updateData.callDate = call_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
     // Validate and normalize remarks - converts empty strings to null
+    let remarksValidation = null;
     if (remarks !== undefined) {
-      const remarksValidation = validateAndNormalizeRemarks(remarks);
+      remarksValidation = validateAndNormalizeRemarks(remarks);
       if (!remarksValidation.isValid) {
         return res.status(400).json({ message: remarksValidation.error });
       }
@@ -1976,7 +2018,11 @@ export const updateGenericLead = async (req, res) => {
       let starredCall;
       try {
         console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
-        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks, call_duration);
+        // Use normalized remarks if available (remarksValidation was done earlier)
+        const remarksToUse = (remarks !== undefined && remarksValidation && remarksValidation.normalizedRemarks !== undefined) 
+          ? remarksValidation.normalizedRemarks 
+          : remarks;
+        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarksToUse, call_duration);
         
         // Verify StarredCall was created successfully
         if (!starredCall || !starredCall._id) {
@@ -2196,8 +2242,11 @@ export const updateGeneralLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    
     // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (mark_as_issue === true && follow_up_flag === true) {
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
       return res.status(400).json({ 
         message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
