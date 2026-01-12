@@ -77,7 +77,7 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // Normalize fields for consistent checking
       const normalized = normalizeForDuplicateCheck(leadData);
-      
+
       // Check if lead exists in reports or follow-ups (skip if moved)
       const reportOrClauses = [];
       if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
@@ -229,8 +229,8 @@ export const bulkSaveToMongo = async (leadsData) => {
     // Execute bulk operations if any
     if (bulkOps.length > 0) {
       try {
-        const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
-        results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
+      const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
+      results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
         
         // Handle write errors (including duplicate key errors E11000)
         if (bulkResult.writeErrors && bulkResult.writeErrors.length > 0) {
@@ -286,7 +286,7 @@ export const saveToMongo = async (leadData) => {
 
     // Normalize fields for consistent checking
     const normalized = normalizeForDuplicateCheck(leadData);
-    
+
     // IMPORTANT: Check if lead already exists in Report or FollowUp collection (moved after edit)
     // New Report schema stores flattened lead in `leadData`. Support both old snapshot fields and new leadData fields.
     const reportOrClauses = [];

@@ -233,9 +233,9 @@
  *           format: date
  *           example: "2024-01-01"
  *         description: |
- *           Generic date range start (applies to the field specified by `dateField`, default: `enquiryDate`).
- *           Only used if specific date filters (`enquiryDateFrom`, `functionDateFrom`, `visitDateFrom`, `createdAtFrom`) are not provided.
- *           Example: `?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate`
+ *           Generic date range start (applies to the field specified by dateField parameter, default: enquiryDate).
+ *           Only used if specific date filters (enquiryDateFrom, functionDateFrom, visitDateFrom, createdAtFrom) are not provided.
+ *           Example: ?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=enquiryDate
  *           Priority: Specific date fields take precedence over generic date range.
  *       - in: query
  *         name: dateTo
@@ -245,10 +245,10 @@
  *           format: date
  *           example: "2024-12-31"
  *         description: |
- *           Generic date range end (applies to the field specified by `dateField`, default: `enquiryDate`).
- *           Only used if specific date filters (`enquiryDateTo`, `functionDateTo`, `visitDateTo`, `createdAtTo`) are not provided.
+ *           Generic date range end (applies to the field specified by dateField parameter, default: enquiryDate).
+ *           Only used if specific date filters (enquiryDateTo, functionDateTo, visitDateTo, createdAtTo) are not provided.
  *           The date is inclusive (includes the entire day up to 23:59:59).
- *           Example: `?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=functionDate`
+ *           Example: ?dateFrom=2024-01-01&dateTo=2024-12-31&dateField=functionDate
  *           Priority: Specific date fields take precedence over generic date range.
  *       - in: query
  *         name: dateField
@@ -305,10 +305,10 @@
  *           enum: [asc, desc]
  *           default: desc
  *         description: |
- *           Sort order: ascending (`asc`) or descending (`desc`).
- *           Default is `desc` (newest first for dates).
- *           Example: `?sortBy=createdAt&sortOrder=desc` (newest first)
- *           Example: `?sortBy=createdAt&sortOrder=asc` (oldest first)
+ *           Sort order: ascending (asc) or descending (desc).
+ *           Default is desc (newest first for dates).
+ *           Example: ?sortBy=createdAt&sortOrder=desc (newest first)
+ *           Example: ?sortBy=createdAt&sortOrder=asc (oldest first)
  *
  *     responses:
  *       200:
@@ -1435,7 +1435,8 @@ router.post(
  *           type: string
  *           format: date
  *           example: "2024-01-01"
- *         description: Generic date range start (applies to the field specified by `dateField`, default: `enquiryDate`).
+ *         description: |
+ *           Generic date range start (applies to the field specified by dateField parameter, default: enquiryDate).
  *       - in: query
  *         name: dateTo
  *         required: false
@@ -1443,7 +1444,8 @@ router.post(
  *           type: string
  *           format: date
  *           example: "2024-12-31"
- *         description: Generic date range end (applies to the field specified by `dateField`, default: `enquiryDate`).
+ *         description: |
+ *           Generic date range end (applies to the field specified by dateField parameter, default: enquiryDate).
  *       - in: query
  *         name: dateField
  *         required: false
@@ -1481,7 +1483,7 @@ router.post(
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *         description: Sort order: ascending (`asc`) or descending (`desc`).
+ *         description: Sort order: ascending (asc) or descending (desc).
  *     responses:
  *       200:
  *         description: Returns a list of FollowUp leads and pagination info.

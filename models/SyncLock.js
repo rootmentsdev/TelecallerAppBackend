@@ -27,8 +27,7 @@ const syncLockSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster queries
-syncLockSchema.index({ lockName: 1 });
+// Index for faster queries (lockName index is automatically created by unique: true constraint)
 syncLockSchema.index({ status: 1, lockedAt: 1 });
 
 // TTL index to auto-cleanup stale locks (24 hours)

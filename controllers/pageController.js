@@ -1439,13 +1439,13 @@ export const updateReturnLead = async (req, res) => {
         res.json({ message: "Return lead updated and moved to starred calls (issue call)", starredCall: result.data });
       } else if (result.type === 'followUp') {
         res.json({ message: "Return lead updated and moved to follow-ups", followUp: result.data });
-      } else {
+        } else {
         res.json({ message: "Return lead updated and moved to reports", report: result.data });
-      }
+        }
     } catch (movementError) {
       console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
       console.error(`   Error details:`, movementError.message);
-      return res.status(500).json({ 
+        return res.status(500).json({ 
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
@@ -1588,13 +1588,13 @@ export const updateBookingConfirmationLead = async (req, res) => {
         res.json({ message: "Booking Confirmation lead updated and moved to starred calls (issue call)", starredCall: result.data });
       } else if (result.type === 'followUp') {
         res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp: result.data });
-      } else {
+        } else {
         res.json({ message: "Booking Confirmation lead updated and moved to reports", report: result.data });
-      }
+        }
     } catch (movementError) {
       console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
       console.error(`   Error details:`, movementError.message);
-      return res.status(500).json({ 
+        return res.status(500).json({ 
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
@@ -1737,20 +1737,20 @@ export const updateJustDialLead = async (req, res) => {
     }
 
     // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
-    try {
+      try {
       const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
       
       if (result.type === 'starredCall') {
         res.json({ message: "Just Dial lead updated and moved to starred calls (issue call)", starredCall: result.data });
       } else if (result.type === 'followUp') {
         res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp: result.data });
-      } else {
+    } else {
         res.json({ message: "Just Dial lead updated and moved to reports", report: result.data });
       }
     } catch (movementError) {
       console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
       console.error(`   Error details:`, movementError.message);
-      return res.status(500).json({ 
+        return res.status(500).json({ 
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
@@ -2241,13 +2241,13 @@ export const updateGeneralLead = async (req, res) => {
         res.json({ message: "General lead updated and moved to starred calls (issue call)", starredCall: result.data });
       } else if (result.type === 'followUp') {
         res.json({ message: "General lead updated and moved to follow-ups", followUp: result.data });
-      } else {
+        } else {
         res.json({ message: "General lead updated and moved to reports", report: result.data });
-      }
+        }
     } catch (movementError) {
       console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
       console.error(`   Error details:`, movementError.message);
-      return res.status(500).json({ 
+        return res.status(500).json({ 
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });

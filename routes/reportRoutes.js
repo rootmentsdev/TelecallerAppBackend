@@ -7,37 +7,6 @@ import { getCallStatusSummary } from "../controllers/reportController.js";
 const router = express.Router();
 
 /**
- *     Report:
- *       type: object
- *       properties:
- *         _id:
- *           type: string
- *         leadData:
- *           type: object
- *           description: Flattened lead data as returned by the leads list API (lead_name, phone_number, store, lead_type, etc.)
- *         callDuration:
- *           type: number
- *           description: Call duration in seconds (0 if not provided)
- *           example: 120
- *         editedBy:
- *           type: object
- *         editedAt:
- *           type: string
- *           format: date-time
- *         note:
- *           type: string
- *         createdAt:
- *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
- *         updatedAt:
- *           type: string
- *           format: date-time
- */
-
-/**
  * @swagger
  * /api/reports:
  *   get:
@@ -461,7 +430,69 @@ router.get("/call-summary", protect, getCallStatusSummary);
  */
 router.get("/:id", protect, getReportById);
 
-
-
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Report:
+ *       type: object
+ *       description: Report document (edited lead moved to Reports collection)
+ *       properties:
+ *         report_id:
+ *           type: string
+ *           description: Report ID
+ *         lead_name:
+ *           type: string
+ *           description: Lead name
+ *         phone_number:
+ *           type: string
+ *           description: Phone number
+ *         store:
+ *           type: string
+ *           description: Store name
+ *         lead_type:
+ *           type: string
+ *           enum: [lossOfSale, return, bookingConfirmation, justDial, general]
+ *           description: Lead type
+ *         call_status:
+ *           type: string
+ *           description: Call status
+ *         lead_status:
+ *           type: string
+ *           description: Lead status
+ *         callDuration:
+ *           type: number
+ *           description: Call duration in seconds (0 if not provided)
+ *           example: 120
+ *         edited_by:
+ *           type: object
+ *           description: User who edited the lead
+ *           properties:
+ *             id:
+ *               type: string
+ *             name:
+ *               type: string
+ *             employee_id:
+ *               type: string
+ *         edited_at:
+ *           type: string
+ *           format: date-time
+ *           description: When the lead was edited and moved to reports
+ *         note:
+ *           type: string
+ *           description: Optional note
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           description: When the original lead was created
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           description: Last update time
+ *         rating:
+ *           type: number
+ *           nullable: true
+ *           description: Rating (1-5) for return leads
+ */
 
 export default router;

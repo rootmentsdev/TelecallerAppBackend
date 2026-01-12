@@ -231,15 +231,15 @@ const runApiOnlySync = async () => {
       // Lock exists and is still valid (not expired)
       const lockAge = Date.now() - lockResult.lock.lockedAt.getTime();
       const lockAgeMinutes = Math.round(lockAge / 60000);
-      console.log("⏭️  Skipping sync - global lock is active");
+    console.log("⏭️  Skipping sync - global lock is active");
       console.log(`   Reason: ${lockResult.reason}`);
       console.log(`   Lock age: ${lockAgeMinutes} minutes (max: ${MAX_SYNC_DURATION / 60000} minutes)`);
-      console.log("   Another sync cycle is already running");
-      console.log("   This ensures atomic execution and prevents partial syncs");
-      console.log();
-      return {
-        success: false,
-        skipped: true,
+    console.log("   Another sync cycle is already running");
+    console.log("   This ensures atomic execution and prevents partial syncs");
+    console.log();
+    return {
+      success: false,
+      skipped: true,
         reason: lockResult.reason || "Global lock active",
         duration: 0,
       };
@@ -252,11 +252,11 @@ const runApiOnlySync = async () => {
         success: false,
         skipped: true,
         reason: lockResult.reason || "Lock acquisition failed",
-        duration: 0,
-      };
+      duration: 0,
+    };
     }
   }
-  
+
   // Lock successfully acquired
   console.log("🔒 Global sync lock acquired");
   console.log(`   Lock acquired at: ${lockResult.lock.lockedAt.toISOString()}`);
