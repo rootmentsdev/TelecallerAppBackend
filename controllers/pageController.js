@@ -2,6 +2,7 @@ import Lead from "../models/Lead.js";
 import FollowUp from "../models/FollowUp.js";
 import Report from "../models/Report.js";
 import StarredCall from "../models/StarredCall.js";
+import mongoose from "mongoose";
 
 // Helper function to check access permissions
 const checkAccess = (lead, user) => {
@@ -413,12 +414,13 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
     let starredCall;
     try {
       console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
-      starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks);
+      starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks, callDuration);
       
       if (!starredCall || !starredCall._id) {
         throw new Error("StarredCall creation returned null or invalid StarredCall");
       }
       
+      // Final verification that document exists in database
       const verifiedStarredCall = await StarredCall.findById(starredCall._id);
       if (!verifiedStarredCall) {
         throw new Error("StarredCall was created but not found in database");
@@ -432,10 +434,13 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
       throw starredCallError;
     }
     
+    // ONLY delete Lead AFTER StarredCall is successfully created and verified
     try {
       const deleteResult = await Lead.findByIdAndDelete(id);
       if (deleteResult) {
         console.log(`✅ Lead ID ${id} removed from Leads collection`);
+      } else {
+        console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
       }
     } catch (deleteError) {
       console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
@@ -522,7 +527,10 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
 };
 
 // Helper to move a lead to StarredCalls collection (Issue Calls)
-const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null) => {
+const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDuration = 0) => {
+  // Get sourceLeadId from original document BEFORE converting to object
+  const sourceLeadIdValue = leadDoc._id || leadDoc.id;
+  
   // Normalize lead object - use toObject() to get plain JavaScript object
   const lead = (leadDoc && typeof leadDoc.toObject === 'function') 
     ? leadDoc.toObject({ virtuals: false, getters: false }) 
@@ -543,13 +551,20 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null) => {
     throw new Error(remarksValidation.error);
   }
   
+  // Ensure callDuration is included in lead snapshot if provided
+  if (callDuration !== undefined && callDuration !== null && callDuration > 0) {
+    lead.callDuration = callDuration;
+  } else if (lead.callDuration === undefined || lead.callDuration === null) {
+    lead.callDuration = 0;
+  }
+  
   // Create StarredCall document with full lead snapshot
   const starredCallData = {
-    leadSnapshot: lead, // Full lead object as snapshot
+    leadSnapshot: lead, // Full lead object as snapshot (includes all updated fields)
     remarks: remarksValidation.normalizedRemarks || "",
     issueMarkedBy: userId,
     issueMarkedAt: new Date(),
-    sourceLeadId: lead._id || lead.id,
+    sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
     // Extract common fields for easier querying
     name: lead.name,
     phone: lead.phone,
@@ -567,12 +582,20 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null) => {
   // Create StarredCall document
   let starredCall;
   try {
-    console.log(`⭐ Creating StarredCall (Issue Call). Lead ID: ${lead._id || lead.id}, Name: ${starredCallData.name}, Phone: ${starredCallData.phone}`);
+    console.log(`⭐ Creating StarredCall (Issue Call). Lead ID: ${sourceLeadIdValue}, Name: ${starredCallData.name}, Phone: ${starredCallData.phone}`);
     starredCall = await StarredCall.create(starredCallData);
-    console.log(`✅ StarredCall document created successfully. ID: ${starredCall._id}`);
+    console.log(`✅ StarredCall created: ${starredCall._id}`);
+    
+    // Verify the document was actually saved to database
+    const savedDoc = await StarredCall.findById(starredCall._id);
+    if (!savedDoc) {
+      throw new Error(`StarredCall was created but not found in database immediately after creation`);
+    }
   } catch (createError) {
     console.error(`❌ Failed to create StarredCall document:`, createError);
     console.error(`   Error name: ${createError.name}, Error code: ${createError.code}`);
+    console.error(`   StarredCallData keys:`, Object.keys(starredCallData));
+    console.error(`   sourceLeadId type:`, typeof starredCallData.sourceLeadId, `value:`, starredCallData.sourceLeadId);
     
     // Re-throw with more context
     if (createError.name === 'ValidationError') {
@@ -1168,7 +1191,7 @@ export const updateLossOfSaleLead = async (req, res) => {
       let starredCall;
       try {
         console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
-        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarksValidation.normalizedRemarks);
+        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarksValidation.normalizedRemarks, call_duration);
         
         if (!starredCall || !starredCall._id) {
           throw new Error("StarredCall creation returned null or invalid StarredCall");
@@ -1938,7 +1961,7 @@ export const updateGenericLead = async (req, res) => {
       let starredCall;
       try {
         console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
-        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks);
+        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks, call_duration);
         
         // Verify StarredCall was created successfully
         if (!starredCall || !starredCall._id) {
