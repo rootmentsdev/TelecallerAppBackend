@@ -2016,9 +2016,34 @@ router.get("/starred-calls/:id", protect, getStarredCallById);
  *         _id:
  *           type: string
  *           description: Starred call ID
- *         leadSnapshot:
- *           type: object
- *           description: Full snapshot of the lead when it was marked as issue
+ *         name:
+ *           type: string
+ *           description: Lead name
+ *         phone:
+ *           type: string
+ *           description: Lead phone number
+ *         store:
+ *           type: string
+ *           description: Store name
+ *         leadType:
+ *           type: string
+ *           enum: [lossOfSale, return, bookingConfirmation, justDial, general]
+ *           description: Lead type
+ *         source:
+ *           type: string
+ *           description: Lead source
+ *         brand:
+ *           type: string
+ *           description: Brand name
+ *         callStatus:
+ *           type: string
+ *           description: Call status
+ *         leadStatus:
+ *           type: string
+ *           description: Lead status
+ *         callDuration:
+ *           type: number
+ *           description: Call duration in seconds
  *         remarks:
  *           type: string
  *           description: Remarks about the issue
@@ -2039,25 +2064,13 @@ router.get("/starred-calls/:id", protect, getStarredCallById);
  *         sourceLeadId:
  *           type: string
  *           description: Reference to original lead ID
- *         name:
- *           type: string
- *           description: Lead name (extracted for easier querying)
- *         phone:
- *           type: string
- *           description: Lead phone (extracted for easier querying)
- *         store:
- *           type: string
- *           description: Store name (extracted for easier querying)
- *         leadType:
- *           type: string
- *           enum: [lossOfSale, return, bookingConfirmation, justDial, general]
- *           description: Lead type (extracted for easier querying)
  *         createdAt:
  *           type: string
  *           format: date-time
  *         updatedAt:
  *           type: string
  *           format: date-time
+ *         # All other lead fields are also present (enquiryDate, functionDate, visitDate, returnDate, bookingNo, securityAmount, etc.)
  */
 
 // Simple test route (for Swagger sanity check)
