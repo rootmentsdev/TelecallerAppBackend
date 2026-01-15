@@ -22,7 +22,7 @@ const router = express.Router();
  *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
  *       - **Date Filtering**: Filter by original lead creation date OR report edit date
  *       - **Status Filtering**: Filter by callStatus, leadStatus, source
- *       - **Lead Type Filtering**: Filter by leadType (lossOfSale, bookingConfirmation, return, etc.)
+ *       - **Lead Type Filtering**: Filter by leadType (lossOfSale, return, etc.)
  *       - **Editor Filtering**: Filter by who edited the lead
  *       - **Pagination**: Control page size and navigation
  *       
@@ -48,8 +48,8 @@ const router = express.Router();
  *         name: leadType
  *         schema:
  *           type: string
- *           enum: [lossOfSale, bookingConfirmation, return, justDial, general]
- *         description: Filter by lead type (lossOfSale, bookingConfirmation, return, justDial, general, etc.)
+ *           enum: [lossOfSale, return, justDial, general]
+ *         description: Filter by lead type (lossOfSale, return, justDial, general, etc.)
  *       - in: query
  *         name: editedBy
  *         schema:
@@ -281,7 +281,7 @@ const router = express.Router();
  *                      `GET /api/reports?store=Suitor Guy - Kottayam&callStatus=Connected&createdAtFrom=2025-01-01&createdAtTo=2025-12-31`
  *                   
  *                   3. Lead Type + Lead Status + Edited Date:
- *                      `GET /api/reports?leadType=bookingConfirmation&leadStatus=Confirmed&editedAtFrom=2025-12-01`
+ *                      `GET /api/reports?leadType=return&leadStatus=Confirmed&editedAtFrom=2025-12-01`
  *                   
  *                   4. Source + Store + Creation Date:
  *                      `GET /api/reports?source=Walk-in&store=Suitor Guy - Manjeri&createdAtFrom=2025-12-01&createdAtTo=2025-12-31`
@@ -452,7 +452,7 @@ router.get("/:id", protect, getReportById);
  *           description: Store name
  *         lead_type:
  *           type: string
- *           enum: [lossOfSale, return, bookingConfirmation, justDial, general]
+ *           enum: [lossOfSale, return, justDial, general]
  *           description: Lead type
  *         call_status:
  *           type: string

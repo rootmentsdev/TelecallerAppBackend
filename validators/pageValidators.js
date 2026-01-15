@@ -24,16 +24,16 @@ const leadIdValidator = param('id')
     return true;
   });
 
-  export const leadGetValidator = [
-    leadIdValidator
-  ];
+export const leadGetValidator = [
+  leadIdValidator
+];
 
 // Validator for GET /api/pages/leads query parameters
 export const leadsListValidator = [
   query('leadType')
     .optional()
-    .isIn(['lossOfSale', 'return', 'bookingConfirmation', 'justDial', 'general'])
-    .withMessage('leadType must be one of: lossOfSale, return, bookingConfirmation, justDial, general'),
+    .isIn(['lossOfSale', 'return', 'justDial', 'general'])
+    .withMessage('leadType must be one of: lossOfSale, return, justDial, general'),
   query('page')
     .optional()
     .isInt({ min: 1 })
@@ -146,55 +146,7 @@ export const returnPostValidator = [
     .toFloat()
 ];
 
-// Booking Confirmation Page Validators
-export const bookingConfirmationGetValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Lead ID is required')
-    .custom((value) => {
-      if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid lead ID format');
-      }
-      return true;
-    })
-];
 
-export const bookingConfirmationPostValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Lead ID is required')
-    .custom((value) => {
-      if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid lead ID format');
-      }
-      return true;
-    }),
-  body('call_status')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Call status must be a string'),
-  body('lead_status')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Lead status must be a string'),
-  body('follow_up_flag')
-    .optional()
-    .isBoolean()
-    .withMessage('Follow up flag must be a boolean'),
-  dateValidator('call_date'),
-  body('remarks')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Remarks must be a string'),
-  body('call_duration')
-    .optional()
-    .isNumeric()
-    .withMessage('Call duration must be a number (seconds)')
-    .toFloat()
-];
 
 // Just Dial Page Validators
 export const justDialGetValidator = [

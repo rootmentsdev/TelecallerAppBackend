@@ -6,16 +6,16 @@ const leadSchema = new mongoose.Schema(
     name: { type: String, required: true },
     phone: { type: String, required: true },
     store: { type: String, required: true },
-    
+
     // Source and Type
     source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.
-    leadType: { 
-      type: String, 
-      enum: ["lossOfSale", "return", "bookingConfirmation", "justDial", "general"],
-      default: "general" 
+    leadType: {
+      type: String,
+      enum: ["lossOfSale", "return", "justDial", "general"],
+      default: "general"
     },
     brand: { type: String }, // For Add Lead page
-    
+
     // Dates
     enquiryDate: { type: Date },
     visitDate: { type: Date }, // For Loss of Sale page
@@ -23,29 +23,29 @@ const leadSchema = new mongoose.Schema(
     returnDate: { type: Date }, // For Rent-Out page
     callDate: { type: Date }, // Date when call was made
     followUpDate: { type: Date },
-    
+
     // Booking/Rent-Out Information
     bookingNo: { type: String },
     securityAmount: { type: Number },
-    
+
     // Status Fields
     callStatus: { type: String, default: "Not Called" },
     leadStatus: { type: String, default: "No Status" },
     closingStatus: { type: String }, // For Just Dial page
-    
+
     // Follow-up
     followUpFlag: { type: Boolean, default: false },
-    
+
     // Additional Information
     reason: { type: String }, // For Just Dial page
     reasonCollectedFromStore: { type: String }, // For Loss of Sale page
     rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
     attendedBy: { type: String },
     remarks: { type: String, default: "" },
-    
+
     // Call Duration (in seconds)
     callDuration: { type: Number, default: 0 },
-    
+
     // User Tracking
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
@@ -71,7 +71,7 @@ leadSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      leadType: { $in: ["bookingConfirmation", "return"] },
+      leadType: { $in: ["return"] },
       bookingNo: { $exists: true, $ne: "" }
     },
     name: "unique_booking_return_index"
