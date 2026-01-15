@@ -14,7 +14,7 @@ const ensureDBConnection = async () => {
   if (mongoose.connection.readyState === 1) {
     return; // Already connected
   }
-  
+
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB Connected for API sync");
@@ -54,16 +54,16 @@ const checkAndReleaseExpiredLock = async () => {
       console.log(`   Status: ${existingLock.status}`);
       console.log(`   Process PID: ${process.pid}`);
       console.log(`   🔓 Auto-releasing expired lock...`);
-      
+
       const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
       console.log(`🔍 [DIAG] deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
-      
+
       if (deleteResult.deletedCount === 0) {
         console.error(`❌ CRITICAL: deleteOne returned deletedCount=0! Lock was NOT deleted.`);
         console.error(`   Lock document snapshot:`, JSON.stringify(existingLock.toObject(), null, 2));
         return { expired: true, released: false, error: "Delete operation returned deletedCount=0" };
       }
-      
+
       console.log(`✅ Expired lock released (deletedCount=${deleteResult.deletedCount}) - sync can proceed`);
       return { expired: true, released: true, deletedCount: deleteResult.deletedCount };
     }
@@ -82,7 +82,7 @@ const acquireLock = async (lockedBy = "scheduler") => {
     console.log(`🔍 [DIAG] acquireLock called: lockedBy=${lockedBy}, PID=${process.pid}`);
     // First, check for and auto-release any expired locks
     const expiryCheck = await checkAndReleaseExpiredLock();
-    
+
     if (expiryCheck.released) {
       // Lock was expired and released, now we can acquire
       console.log(`   Proceeding to acquire lock after auto-release (deletedCount=${expiryCheck.deletedCount || 'N/A'})`);
@@ -91,13 +91,13 @@ const acquireLock = async (lockedBy = "scheduler") => {
       const lockAge = Date.now() - expiryCheck.lock.lockedAt.getTime();
       const lockAgeMinutes = Math.round(lockAge / 60000);
       console.log(`🔍 [DIAG] Lock acquisition rejected - active lock exists (age: ${lockAgeMinutes}m)`);
-      return { 
-        acquired: false, 
+      return {
+        acquired: false,
         reason: `Lock already exists (active sync running, age: ${lockAgeMinutes} minutes)`,
         lock: expiryCheck.lock
       };
     }
-    
+
     // Try to create lock document (will fail if already exists due to unique constraint)
     const now = new Date();
     console.log(`🔍 [DIAG] Creating new lock: lockName=${GLOBAL_LOCK_NAME}, lockedAt=${now.toISOString()}, lockedBy=${lockedBy}, PID=${process.pid}`);
@@ -107,7 +107,7 @@ const acquireLock = async (lockedBy = "scheduler") => {
       lockedBy: lockedBy,
       status: "active",
     });
-    
+
     console.log(`🔒 [DIAG] Lock acquired successfully: _id=${lock._id}, lockedAt=${lock.lockedAt.toISOString()}, lockedBy=${lock.lockedBy}, PID=${process.pid}`);
     console.log(`🔒 Lock acquired at: ${lock.lockedAt.toISOString()}`);
     return { acquired: true, lock };
@@ -158,7 +158,7 @@ const releaseLock = async (status = "completed") => {
     const lockAge = Date.now() - lock.lockedAt.getTime();
     const lockAgeSeconds = Math.round(lockAge / 1000);
     const lockAgeMinutes = Math.round(lockAge / 60000);
-    
+
     // Update status before deletion (for audit)
     console.log(`🔍 [DIAG] Updating lock status to "${status}" before deletion...`);
     const updateResult = await SyncLock.findOneAndUpdate(
@@ -167,18 +167,18 @@ const releaseLock = async (status = "completed") => {
       { new: true }
     );
     console.log(`🔍 [DIAG] Status update result: ${updateResult ? 'success' : 'failed'}`);
-    
+
     // Delete the lock
     console.log(`🔍 [DIAG] Deleting lock with deleteOne({ lockName: "${GLOBAL_LOCK_NAME}" })...`);
     const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
     console.log(`🔍 [DIAG] deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
-    
+
     if (deleteResult.deletedCount === 0) {
       console.error(`❌ CRITICAL: deleteOne returned deletedCount=0! Lock was NOT deleted.`);
       console.error(`   Lock document snapshot:`, JSON.stringify(lock.toObject(), null, 2));
       throw new Error(`Lock deletion failed - deletedCount=0`);
     }
-    
+
     console.log(`🔓 [DIAG] Lock released successfully: deletedCount=${deleteResult.deletedCount}, status=${status}, duration=${lockAgeSeconds}s (${lockAgeMinutes}m), PID=${process.pid}`);
     console.log(`🔓 Lock released (status: ${status}, duration: ${lockAgeMinutes} minutes)`);
     return { released: true, deletedCount: deleteResult.deletedCount, duration: lockAgeSeconds };
@@ -224,22 +224,22 @@ const runApiOnlySync = async () => {
 
   // Try to acquire global lock (with auto-expiry check built-in)
   const lockResult = await acquireLock(trigger);
-  
+
   if (!lockResult.acquired) {
     // Lock acquisition failed - check if it's because lock is still active
     if (lockResult.lock) {
       // Lock exists and is still valid (not expired)
       const lockAge = Date.now() - lockResult.lock.lockedAt.getTime();
       const lockAgeMinutes = Math.round(lockAge / 60000);
-    console.log("⏭️  Skipping sync - global lock is active");
+      console.log("⏭️  Skipping sync - global lock is active");
       console.log(`   Reason: ${lockResult.reason}`);
       console.log(`   Lock age: ${lockAgeMinutes} minutes (max: ${MAX_SYNC_DURATION / 60000} minutes)`);
-    console.log("   Another sync cycle is already running");
-    console.log("   This ensures atomic execution and prevents partial syncs");
-    console.log();
-    return {
-      success: false,
-      skipped: true,
+      console.log("   Another sync cycle is already running");
+      console.log("   This ensures atomic execution and prevents partial syncs");
+      console.log();
+      return {
+        success: false,
+        skipped: true,
         reason: lockResult.reason || "Global lock active",
         duration: 0,
       };
@@ -252,8 +252,8 @@ const runApiOnlySync = async () => {
         success: false,
         skipped: true,
         reason: lockResult.reason || "Lock acquisition failed",
-      duration: 0,
-    };
+        duration: 0,
+      };
     }
   }
 
@@ -277,10 +277,10 @@ const runApiOnlySync = async () => {
     // Step 1: Sync Stores (must complete before booking/return)
     try {
       console.log("📦 Step 1/3: Starting Stores sync...");
-          const { run: syncStores } = await import("./api/sync_storelist.js");
-          await syncStores();
+      const { run: syncStores } = await import("./api/sync_storelist.js");
+      await syncStores();
       storeSuccess = true;
-          console.log("✅ Stores sync completed");
+      console.log("✅ Stores sync completed");
       console.log();
     } catch (error) {
       console.error("❌ Stores sync failed:", error.message);
@@ -288,27 +288,17 @@ const runApiOnlySync = async () => {
       throw error; // Stop execution if store sync fails (booking/return depend on stores)
     }
 
-    // Step 2: Sync Booking Confirmation (awaits store sync completion)
-    try {
-      console.log("📦 Step 2/3: Starting Booking Confirmation sync...");
-          const { run: syncBooking } = await import("./api/sync_booking.js");
-          await syncBooking();
-      bookingSuccess = true;
-          console.log("✅ Booking Confirmation sync completed");
-      console.log();
-    } catch (error) {
-      console.error("❌ Booking Confirmation sync failed:", error.message);
-      errors.push({ step: "Booking", error: error.message });
-      // Continue to return sync even if booking fails
-    }
+    // Step 2: Sync Booking Confirmation - REMOVED PER USER REQUEST
+    // Booking sync logic removed.
+
 
     // Step 3: Sync Returns (awaits booking sync completion)
     try {
       console.log("📦 Step 3/3: Starting Returns sync...");
-          const { run: syncReturn } = await import("./api/sync_return.js");
-          await syncReturn();
+      const { run: syncReturn } = await import("./api/sync_return.js");
+      await syncReturn();
       returnSuccess = true;
-          console.log("✅ Returns sync completed");
+      console.log("✅ Returns sync completed");
       console.log();
     } catch (error) {
       console.error("❌ Returns sync failed:", error.message);
@@ -329,7 +319,7 @@ const runApiOnlySync = async () => {
     console.log();
     console.log("✅ Summary:");
     console.log(`   • Stores: ${storeSuccess ? "✅ Synced" : "❌ Failed"}`);
-    console.log(`   • Booking Confirmation: ${bookingSuccess ? "✅ Synced" : "❌ Failed"}`);
+
     console.log(`   • Returns: ${returnSuccess ? "✅ Synced" : "❌ Failed"}`);
     console.log("   • CSV imports skipped (manual only)");
     console.log("   • MongoDB connection reused (singleton)");
@@ -352,7 +342,7 @@ const runApiOnlySync = async () => {
     console.error("❌ API sync failed:", error.message);
     console.error(error.stack);
     errors.push({ step: "Sync", error: error.message });
-    
+
     // Lock will be released in finally block
   } finally {
     // CRITICAL: ALWAYS release lock in finally block to guarantee cleanup
@@ -384,7 +374,7 @@ const runApiOnlySync = async () => {
     } else {
       console.log(`🔍 [DIAG] Lock already released (lockReleased=true), skipping finally release, PID=${process.pid}`);
     }
-    
+
     // If there was an error, re-throw it after cleanup
     if (errors.length > 0 && !lockReleased) {
       // This shouldn't happen due to finally, but just in case

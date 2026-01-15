@@ -78,10 +78,8 @@ const buildLeadQuery = (user, filters = {}) => {
       query.store = { $regex: escapeRegex(user.store), $options: 'i' };
     }
   } else if (user.role === "telecaller") {
-    // Telecaller can see only assigned leads, EXCEPT for Bookings which are visible to everyone
-    if (query.leadType !== 'bookingConfirmation') {
-      query.assignedTo = user._id;
-    }
+    // Telecaller can see only assigned leads
+    query.assignedTo = user._id;
   }
 
   return query;
@@ -703,7 +701,7 @@ export const getLeads = async (req, res) => {
     if (leadType) {
       const lowerType = leadType.toLowerCase();
       if (lowerType.includes('return')) dbLeadType = 'return';
-      else if (lowerType.includes('book')) dbLeadType = 'bookingConfirmation';
+
       else if (lowerType.includes('loss')) dbLeadType = 'lossOfSale';
       else if (lowerType.includes('walk')) dbLeadType = 'general';
     }
@@ -1273,157 +1271,7 @@ export const updateReturnLead = async (req, res) => {
   }
 };
 
-// ==================== Booking Confirmation Page ====================
 
-// GET - Fetch Booking Confirmation lead data (GET fields only)
-export const getBookingConfirmationLead = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const lead = await Lead.findById(id);
-
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
-    }
-
-    if (!checkAccess(lead, req.user)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // Return only GET fields
-    res.json({
-      lead_name: lead.name,
-      phone_number: lead.phone,
-      enquiry_date: lead.enquiryDate,
-      function_date: lead.functionDate,
-      booking_number: lead.bookingNo,
-      security_amount: lead.securityAmount,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// POST - Update Booking Confirmation lead data (POST fields only)
-export const updateBookingConfirmationLead = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, remarks, call_duration, mark_as_issue } = req.body;
-
-    // Validate remarks input
-    const remarksValidation = validateAndNormalizeRemarks(remarks);
-    if (!remarksValidation.isValid) {
-      return res.status(400).json({ message: remarksValidation.error });
-    }
-
-    const lead = await Lead.findById(id);
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
-    }
-
-    if (!checkAccess(lead, req.user)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // CRITICAL: Normalize mark_as_issue for validation check
-    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
-
-    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (isMarkAsIssueForValidation && follow_up_flag === true) {
-      return res.status(400).json({
-        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
-        error: "VALIDATION_ERROR"
-      });
-    }
-
-    const updateData = {};
-    if (call_status !== undefined) updateData.callStatus = call_status;
-    if (lead_status !== undefined) updateData.leadStatus = lead_status;
-
-    // CRITICAL: Follow-up date validation and flag handling
-    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
-    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
-    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
-    // Use the date from frontend (not today's date)
-    if (follow_up_flag === true) {
-      // When checkbox is checked, date is REQUIRED
-      // Check for undefined, null, or empty string
-      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
-        return res.status(400).json({
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
-          error: "VALIDATION_ERROR",
-          field: "follow_up_date",
-          required: true
-        });
-      }
-      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-      if (!validatedDate) {
-        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
-      }
-      updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true;
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Booking Confirmation lead ID: ${id} (checkbox was checked)`);
-    } else if (follow_up_date !== undefined && follow_up_date !== null) {
-      // If date is provided without explicit flag, auto-set flag to true
-      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-      if (!validatedDate) {
-        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
-      }
-      updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true; // Auto-set flag when date is provided
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Booking Confirmation lead ID: ${id} (date provided)`);
-    } else if (follow_up_flag === false) {
-      // Explicitly unset follow-up flag
-      updateData.followUpFlag = false;
-      // Clear follow-up date if flag is false
-      updateData.followUpDate = null;
-    } else if (follow_up_flag !== undefined) {
-      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
-      updateData.followUpFlag = follow_up_flag;
-    }
-
-    if (call_date !== undefined) updateData.callDate = call_date;
-    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
-    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
-
-    if (!lead.leadType || lead.leadType === "general") {
-      updateData.leadType = "bookingConfirmation";
-    }
-
-    const beforeLead = lead.toObject();
-
-    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
-
-    const changedFields = {};
-    Object.keys(updateData).forEach((key) => {
-      changedFields[key] = {
-        before: beforeLead[key],
-        after: updatedLead[key],
-      };
-    });
-
-    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
-    try {
-      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
-
-      if (result.type === 'starredCall') {
-        res.json({ message: "Booking Confirmation lead updated and moved to starred calls (issue call)", starredCall: result.data });
-      } else if (result.type === 'followUp') {
-        res.json({ message: "Booking Confirmation lead updated and moved to follow-ups", followUp: result.data });
-      } else {
-        res.json({ message: "Booking Confirmation lead updated and moved to reports", report: result.data });
-      }
-    } catch (movementError) {
-      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
-      console.error(`   Error details:`, movementError.message);
-      return res.status(500).json({
-        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
-        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
 // ==================== Just Dial Page ====================
 

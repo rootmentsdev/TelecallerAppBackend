@@ -606,49 +606,7 @@ export const mapLossOfSale = (row) => {
   return leadData;
 };
 
-// Map Booking API data to Lead model
-export const mapBooking = (row) => {
-  // Phone field: API uses 'phoneNo'
-  const phone = cleanPhone(
-    row.phoneNo || row.phone || row.Phone || row.customerPhone ||
-    row.mobile || row.Mobile || row.contact || row.Contact
-  );
-  if (!phone) return null;
 
-  // Parse dates
-  const bookingDate = parseApiDate(row.bookingDate || row.booking_date);
-  const enquiryDate = parseApiDate(row.enquiryDate || row.enquiry_date || row.date);
-  const functionDate = parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date);
-
-  // Set createdAt from bookingDate or enquiryDate (actual lead creation date, not import date)
-  // IMPORTANT: Use the earliest available date as the creation date
-  const createdAt = bookingDate || enquiryDate || undefined;
-
-  const leadData = {
-    name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
-    phone: phone,
-    store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
-    source: "Booking",
-    leadType: "bookingConfirmation",
-    enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
-    bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),
-    // Security Amount: API uses 'price' field
-    securityAmount: row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit
-      ? parseFloat(row.price || row.securityAmount || row.security || row.SecurityAmount || row.deposit)
-      : undefined,
-    enquiryDate: enquiryDate,
-    // Function Date: API uses 'deliveryDate' or 'trialDate'
-    functionDate: functionDate,
-    remarks: (row.remarks || row.notes || row.Remarks || "").trim(),
-  };
-
-  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
-  if (createdAt) {
-    leadData.createdAt = createdAt;
-  }
-
-  return leadData;
-};
 
 // Map Return API data to Lead model
 export const mapReturn = (row) => {
@@ -692,23 +650,7 @@ export const mapReturn = (row) => {
   return leadData;
 };
 
-// Map Booking Item API data to Lead model
-export const mapBookingItem = (row) => {
-  const phone = cleanPhone(row.phone || row.Phone || row.customerPhone || row.mobile || row.Mobile);
-  if (!phone) return null;
 
-  return {
-    name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
-    phone: phone,
-    store: (row.store || row.Store || row.storeName || row.StoreName || "").trim(),
-    source: "Booking Item",
-    leadType: "bookingConfirmation",
-    enquiryType: (row.enquiryType || row.itemType || row.type || "").trim(),
-    bookingNo: (row.bookingNo || row.bookingNumber || row.itemNo || row.BookingNo || "").trim(),
-    remarks: (row.remarks || row.status || row.notes || row.Remarks || "").trim(),
-    enquiryDate: parseApiDate(row.enquiryDate || row.date || row.bookingDate),
-  };
-};
 
 // Map User API data to User model
 export const mapUser = (row) => {

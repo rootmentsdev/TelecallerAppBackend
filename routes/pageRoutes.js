@@ -19,7 +19,7 @@
  *       
  *       **Store Filter Examples:**
  *       - Get all leads for a store: `/api/pages/leads?store=Suitor Guy - Edappally`
- *       - Get specific lead type: `/api/pages/leads?leadType=bookingConfirmation&store=Zorucci - Kottayam`
+ *       - Get specific lead type: `/api/pages/leads?leadType=return&store=Zorucci - Kottayam`
  *       
  *       **Date Filter Examples:**
  *       - Filter by enquiry date: `/api/pages/leads?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
@@ -39,8 +39,8 @@
  *       
  *       **Combined Filter Examples:**
  *       - Store + Date: `/api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
- *       - Lead Type + Store + Creation Date: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally&createdAt=2024-12-08`
- *       - Lead Type + Store + Date Range: `/api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
+ *       - Lead Type + Store + Creation Date: `/api/pages/leads?leadType=return&store=Suitor Guy - Edappally&createdAt=2024-12-08`
+ *       - Lead Type + Store + Date Range: `/api/pages/leads?leadType=return&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
  *       - Today's General Leads (Newest First): `/api/pages/leads?leadType=general&createdAt=2024-12-10&sortBy=createdAt&sortOrder=desc`
  *       - Sort by Name: `/api/pages/leads?leadType=lossOfSale&sortBy=name&sortOrder=asc`
  *     parameters:
@@ -49,7 +49,7 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, bookingConfirmation, return, justDial]
+ *           enum: [lossOfSale, general, return, justDial]
  *         description: Type of lead to fetch. If omitted, returns leads of all types.
  *       - in: query
  *         name: store
@@ -80,11 +80,11 @@
  *             - Searching `"Suitor Guy - Edappally"` will NOT match stores with `"Edappal"`
  *             - Searching `"Suitor Guy - Edappal"` will NOT match stores with `"Edappally"`
  *           - Case-insensitive matching (e.g., `"kottayam"` matches `"Kottayam"`)
- *           - Works with all lead types (lossOfSale, return, bookingConfirmation, general, justDial)
+ *           - Works with all lead types (lossOfSale, return, general, justDial)
  *           
  *           **Examples:**
  *           - Get all leads for a store: `?store=Suitor Guy - Edappally`
- *           - Get specific lead type: `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *           - Get specific lead type: `?leadType=return&store=Suitor Guy - Edappally`
  *           - Get all leads for location: `?store=Kottayam`
  *           - Get return leads: `?leadType=return&store=Suitor Guy - Kottayam`
  *           - Get loss of sale leads: `?leadType=lossOfSale&store=Suitor Guy - Manjeri`
@@ -94,8 +94,7 @@
  *             - `?leadType=lossOfSale&store=Suitor Guy - Edappally`
  *           - **Return Area**: Filter by store for return leads
  *             - `?leadType=return&store=Suitor Guy - Kottayam`
- *           - **Booking Confirmation Area**: Filter by store for booking confirmation leads
- *             - `?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *             - `?leadType=return&store=Suitor Guy - Edappally`
  *           - **All Leads**: Get all lead types for a store
  *             - `?store=Suitor Guy - Edappally`
  *       - in: query
@@ -305,7 +304,7 @@
  *           enum: [asc, desc]
  *           default: desc
  *         description: |
- *           Sort order: ascending (asc) or descending (desc).
+ *           "Sort order: ascending (asc) or descending (desc)."
  *           Default is desc (newest first for dates).
  *           Example: ?sortBy=createdAt&sortOrder=desc (newest first)
  *           Example: ?sortBy=createdAt&sortOrder=asc (oldest first)
@@ -409,7 +408,7 @@
  *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Kottayam`
  *                   
  *                   4. Get Booking Confirmation leads for a store:
- *                      `GET /api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally`
+ *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Edappally`
  *                   
  *                   5. Get leads for location only:
  *                      `GET /api/pages/leads?store=Kottayam`
@@ -464,7 +463,7 @@
  *                      `GET /api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
  *                   
  *                   2. Lead Type + Store + Creation Date (single day):
- *                      `GET /api/pages/leads?leadType=bookingConfirmation&store=Suitor Guy - Edappally&createdAt=2024-12-08`
+ *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Edappally&createdAt=2024-12-08`
  *                   
  *                   3. Lead Type + Store + Function Date:
  *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
@@ -667,96 +666,7 @@
  *         description: Internal server error
  */
 
-/**
- * @swagger
- * /api/pages/booking-confirmation/{id}:
- *   get:
- *     summary: Get Booking Confirmation lead
- *     tags:
- *       - Booking Confirmation
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Booking confirmation lead details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 lead_name: { type: string }
- *                 phone_number: { type: string }
- *                 enquiry_date: { type: string, format: date-time }
- *                 function_date: { type: string, format: date-time }
- *                 booking_number: { type: string }
- *                 security_amount: { type: string }
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Lead not found
- *       500:
- *         description: Internal server error
- */
-/**
- * @swagger
- * /api/pages/booking-confirmation/{id}:
- *   post:
- *     summary: Update Booking Confirmation lead
- *     tags:
- *       - Booking Confirmation
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               call_status: { type: string }
- *               lead_status: { type: string }
- *               follow_up_flag: 
- *                 type: boolean
- *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
- *               follow_up_date: 
- *                 type: string
- *                 format: date-time
- *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
- *               call_date: { type: string, format: date-time }
- *               remarks: { type: string }
- *               call_duration: { type: number, description: "Call duration in seconds" }
- *               mark_as_issue:
- *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *     responses:
- *       200:
- *         description: |
- *           Booking Confirmation lead updated. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
- *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
- *           - Otherwise → moves to Reports collection
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
+
 
 /**
  * @swagger
@@ -895,8 +805,7 @@ import {
   updateLossOfSaleLead,
   getReturnLead,
   updateReturnLead,
-  getBookingConfirmationLead,
-  updateBookingConfirmationLead,
+
   getJustDialLead,
   updateJustDialLead,
   createAddLead,
@@ -915,8 +824,7 @@ import {
   lossOfSalePostValidator,
   returnGetValidator,
   returnPostValidator,
-  bookingConfirmationGetValidator,
-  bookingConfirmationPostValidator,
+
   justDialGetValidator,
   justDialPostValidator,
   addLeadPostValidator,
@@ -1131,24 +1039,7 @@ router.post(
   updateReturnLead
 );
 
-// ==================== Booking Confirmation Page Routes ====================
-// GET /api/pages/booking-confirmation/:id - Fetch Booking Confirmation lead data
-router.get(
-  "/booking-confirmation/:id",
-  protect,
-  bookingConfirmationGetValidator,
-  handleValidation,
-  getBookingConfirmationLead
-);
 
-// POST /api/pages/booking-confirmation/:id - Update Booking Confirmation lead data
-router.post(
-  "/booking-confirmation/:id",
-  protect,
-  bookingConfirmationPostValidator,
-  handleValidation,
-  updateBookingConfirmationLead
-);
 
 // ==================== Just Dial Page Routes ====================
 // GET /api/pages/just-dial/:id - Fetch Just Dial lead data
@@ -1317,7 +1208,7 @@ router.post(
  *       
  *       **Store Filter Examples:**
  *       - Get all FollowUp leads for a store: `/api/pages/follow-ups?store=Suitor Guy - Edappally`
- *       - Get specific lead type: `/api/pages/follow-ups?leadType=bookingConfirmation&store=Zorucci - Kottayam`
+ *       - Get specific lead type: `/api/pages/follow-ups?leadType=return&store=Zorucci - Kottayam`
  *       
  *       **Date Filter Examples:**
  *       - Filter by enquiry date: `/api/pages/follow-ups?enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
@@ -1329,7 +1220,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, bookingConfirmation, return, justDial]
+ *           enum: [lossOfSale, general, return, justDial]
  *         description: Type of FollowUp lead to fetch. If omitted, returns FollowUp leads of all types.
  *       - in: query
  *         name: store
@@ -1483,7 +1374,7 @@ router.post(
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *         description: Sort order: ascending (asc) or descending (desc).
+ *         description: "Sort order: ascending (asc) or descending (desc)."
  *     responses:
  *       200:
  *         description: Returns a list of FollowUp leads and pagination info.
@@ -1725,7 +1616,7 @@ router.get(
  *       - FollowUp leads can only be moved to Reports (final state)
  *       - All fields (callStatus, leadStatus, callDuration, remarks, leadType, store) are preserved
  *       - The FollowUp lead is removed from FollowUps collection after update
- *       - Reports are sorted by `lead_type` (general, lossOfSale, bookingConfirmation, return, justDial)
+ *       - Reports are sorted by `lead_type` (general, lossOfSale, return, justDial)
  *       - The `lead_type` from FollowUp is explicitly preserved in the Report for proper sorting
  *       - Reports are created ONLY in this endpoint, NEVER when moving Leads → FollowUps
  *       
@@ -1793,7 +1684,7 @@ router.get(
  *                     **Sorting:** Reports are sorted by `lead_type` field:
  *                     - `"general"` → General/New Leads section
  *                     - `"lossOfSale"` → Loss of Sale section
- *                     - `"bookingConfirmation"` → Booking section
+
  *                     - `"return"` → Return section
  *                     - `"justDial"` → Just Dial section
  *                     
@@ -1809,7 +1700,7 @@ router.get(
  *                       type: string
  *                     lead_type:
  *                       type: string
- *                       description: Lead type preserved from FollowUp. Used for sorting reports (general, lossOfSale, bookingConfirmation, return, justDial).
+ *                       description: Lead type preserved from FollowUp. Used for sorting reports (general, lossOfSale, return, justDial).
  *                       example: "general"
  *                     call_status:
  *                       type: string
@@ -1836,7 +1727,7 @@ router.get(
  *                     lead_name: "John Doe"
  *                     phone_number: "9876543210"
  *                     store: "Suitor Guy - Edappally"
- *                     lead_type: "bookingConfirmation"
+ *                     lead_type: "return"
  *                     call_status: "Called"
  *                     lead_status: "Interested"
  *                     call_duration: 300
@@ -1895,7 +1786,7 @@ router.post(
  *       Returns starred calls (leads marked as issues) filtered by optional parameters.
  *       
  *       **Filtering Options:**
- *       - **Lead Type**: Filter by leadType (lossOfSale, return, bookingConfirmation, justDial, general)
+ *       - **Lead Type**: Filter by leadType (lossOfSale, return, justDial, general)
  *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
  *       - **Sorting**: Sort by issueMarkedAt, createdAt, name, or store (asc/desc)
  *       - **Pagination**: Control page size and navigation
@@ -1905,7 +1796,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, bookingConfirmation, return, justDial]
+ *           enum: [lossOfSale, general, return, justDial]
  *         description: Type of lead to fetch. If omitted, returns starred calls of all types.
  *       - in: query
  *         name: store
@@ -1943,7 +1834,7 @@ router.post(
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *         description: Sort order: ascending (asc) or descending (desc). Default is desc.
+ *         description: "Sort order: ascending (asc) or descending (desc). Default is desc."
  *     responses:
  *       200:
  *         description: Returns a list of starred calls and pagination info.
@@ -2027,7 +1918,7 @@ router.get("/starred-calls/:id", protect, getStarredCallById);
  *           description: Store name
  *         leadType:
  *           type: string
- *           enum: [lossOfSale, return, bookingConfirmation, justDial, general]
+ *           enum: [lossOfSale, return, justDial, general]
  *           description: Lead type
  *         source:
  *           type: string

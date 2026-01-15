@@ -37,13 +37,8 @@ const runAll = async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log();
 
-    // Step 2: Sync Booking Confirmation (API)
-    console.log("📦 Step 2/5: Syncing Booking Confirmation...");
-    console.log("-".repeat(60));
-    const { run: syncBooking } = await import("./api/sync_booking.js");
-    await syncBooking();
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log();
+    // Step 2: Sync Booking Confirmation - REMOVED
+
 
     // Step 3: Sync Returns (API)
     console.log("📦 Step 3/5: Syncing Returns...");
@@ -78,7 +73,7 @@ const runAll = async () => {
     console.log();
     console.log("✅ Summary:");
     console.log("   • Stores synced");
-    console.log("   • Booking Confirmation synced (incremental - only NEW records, duplicates skipped)");
+
     console.log("   • Return synced (incremental - only NEW records, duplicates skipped)");
     console.log("   • Walk-in data imported (incremental - only modified files, duplicates updated)");
     console.log("   • Loss of Sale data imported (incremental - only modified files, duplicates updated)");
