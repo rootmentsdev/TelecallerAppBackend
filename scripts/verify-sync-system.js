@@ -30,13 +30,13 @@ const verifyApiSyncSystem = async () => {
     // 1. Check database state
     console.log("📋 1. Database State Check");
     console.log("-".repeat(50));
-    
+
     const totalLeads = await Lead.countDocuments();
     const bookingLeads = await Lead.countDocuments({ leadType: "bookingConfirmation" });
     const returnLeads = await Lead.countDocuments({ leadType: "return" });
     const lossOfSaleLeads = await Lead.countDocuments({ leadType: "lossOfSale" });
     const generalLeads = await Lead.countDocuments({ leadType: "general" });
-    
+
     console.log(`   Total leads: ${totalLeads.toLocaleString()}`);
     console.log(`   Booking Confirmation: ${bookingLeads.toLocaleString()}`);
     console.log(`   Return: ${returnLeads.toLocaleString()}`);
@@ -47,7 +47,7 @@ const verifyApiSyncSystem = async () => {
     // 2. Check sync logs
     console.log("📋 2. Sync Log Status");
     console.log("-".repeat(50));
-    
+
     const syncLogs = await SyncLog.find().sort({ lastSyncAt: -1 });
     if (syncLogs.length === 0) {
       console.log("   ⚠️  No sync logs found - no syncs have been run yet");
@@ -62,7 +62,7 @@ const verifyApiSyncSystem = async () => {
     // 3. Check for duplicates
     console.log("📋 3. Duplicate Check");
     console.log("-".repeat(50));
-    
+
     const bookingDuplicates = await Lead.aggregate([
       { $match: { leadType: "bookingConfirmation", bookingNo: { $exists: true, $ne: "" } } },
       { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
@@ -79,7 +79,7 @@ const verifyApiSyncSystem = async () => {
 
     console.log(`   Booking duplicates: ${bookingDuplicates[0]?.duplicateSets || 0}`);
     console.log(`   Return duplicates: ${returnDuplicates[0]?.duplicateSets || 0}`);
-    
+
     if ((bookingDuplicates[0]?.duplicateSets || 0) === 0 && (returnDuplicates[0]?.duplicateSets || 0) === 0) {
       console.log("   ✅ No duplicates found - deduplication working correctly");
     } else {
@@ -90,17 +90,17 @@ const verifyApiSyncSystem = async () => {
     // 4. Verify incremental sync capability
     console.log("📋 4. Incremental Sync Verification");
     console.log("-".repeat(50));
-    
-    const recentBookings = await Lead.find({ 
+
+    const recentBookings = await Lead.find({
       leadType: "bookingConfirmation",
       createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
     }).countDocuments();
-    
-    const recentReturns = await Lead.find({ 
+
+    const recentReturns = await Lead.find({
       leadType: "return",
       createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
     }).countDocuments();
-    
+
     console.log(`   Recent bookings (24h): ${recentBookings}`);
     console.log(`   Recent returns (24h): ${recentReturns}`);
     console.log("   ✅ Incremental sync ready");
@@ -109,7 +109,7 @@ const verifyApiSyncSystem = async () => {
     // 5. Configuration check
     console.log("📋 5. Configuration Check");
     console.log("-".repeat(50));
-    
+
     console.log(`   API_SYNC_ENABLED: ${process.env.API_SYNC_ENABLED || 'true'}`);
     console.log(`   API_SYNC_TIME: ${process.env.API_SYNC_TIME || '*/5 * * * *'}`);
     console.log(`   API_SYNC_TIMEZONE: ${process.env.API_SYNC_TIMEZONE || 'UTC'}`);
