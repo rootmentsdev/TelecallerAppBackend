@@ -1438,14 +1438,23 @@ export const updateJustDialLead = async (req, res) => {
 // POST - Create new lead (All fields are POST)
 export const createAddLead = async (req, res) => {
   try {
-    const { customer_name, phone_number, brand, store_location, lead_status, call_status, follow_up_date } = req.body;
+    const { customer_name, phone_number, brand, store_location, lead_status, call_status, follow_up_date, follow_up_flag } = req.body;
 
     // Check if lead with same phone number already exists
     const existingLead = await Lead.findOne({ phone: phone_number });
     if (existingLead) {
       return res.status(400).json({
-        message: "Lead with this phone number already exists",
+        message: "Lead with this phone number already exists in Leads",
         existingLeadId: existingLead._id,
+      });
+    }
+
+    // Also check FollowUps to prevent duplicates across collections
+    const existingFollowUp = await FollowUp.findOne({ phone: phone_number });
+    if (existingFollowUp) {
+      return res.status(400).json({
+        message: "Lead with this phone number already exists in Follow-ups",
+        existingLeadId: existingFollowUp._id,
       });
     }
 
@@ -1466,6 +1475,57 @@ export const createAddLead = async (req, res) => {
       ? (storeLocationClean ? `${brandClean} - ${storeLocationClean}` : brandClean)
       : storeLocationClean;
 
+    // IF follow_up_flag is true, create strictly in FollowUp model
+    if (follow_up_flag === true) {
+      // Validate follow_up_date (REQUIRED for follow-ups)
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
+        return res.status(400).json({
+          message: "follow_up_date is required when follow_up_flag is true.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
+        });
+      }
+
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+
+      console.log(`📝 Creating new lead directly in FollowUps: ${customer_name} (${phone_number})`);
+
+      const followUp = await FollowUp.create({
+        name: customer_name,
+        phone: phone_number,
+        brand: brandClean,
+        store: storeValue,
+        leadStatus: lead_status || "No Status",
+        callStatus: call_status || "Not Called",
+        followUpDate: validatedDate,
+        followUpFlag: true,
+        createdBy: req.user._id,
+        leadType: "general", // Default for manually added leads
+        source: "Manual Entry (FollowUp)"
+      });
+
+      return res.status(201).json({
+        message: "Lead created and added to follow-ups successfully",
+        lead: {
+          id: followUp._id,
+          customer_name: followUp.name,
+          phone_number: followUp.phone,
+          brand: followUp.brand,
+          store_location: followUp.store,
+          lead_status: followUp.leadStatus,
+          call_status: followUp.callStatus,
+          follow_up_date: followUp.followUpDate,
+          lead_type: followUp.leadType,
+          collection: "FollowUps"
+        },
+      });
+    }
+
+    // Default behavior: Create in Leads collection
     const lead = await Lead.create({
       name: customer_name,
       phone: phone_number,
@@ -1473,9 +1533,10 @@ export const createAddLead = async (req, res) => {
       store: storeValue,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
-      followUpDate: follow_up_date,
+      followUpDate: follow_up_date, // Saved but not active unless flag is set (which is false here)
       createdBy: req.user._id,
       leadType: "general",
+      source: "Manual Entry"
     });
 
     res.status(201).json({

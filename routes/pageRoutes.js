@@ -781,7 +781,13 @@
  *               store_location: { type: string }
  *               lead_status: { type: string }
  *               call_status: { type: string }
- *               follow_up_date: { type: string, format: date-time }
+ *               follow_up_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Required if follow_up_flag is true. The lead will be created directly in the FollowUps collection."
+ *               follow_up_flag:
+ *                 type: boolean
+ *                 description: "If true, the lead is created strictly in the FollowUps collection (bypassing Leads). Requires follow_up_date."
  *     responses:
  *       201:
  *         description: Lead created successfully
