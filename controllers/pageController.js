@@ -402,7 +402,8 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
 
 // Helper function to handle lead movement with priority: markAsIssue > markForFollowUp > Report
 // Returns { type: 'starredCall'|'followUp'|'report', data: object, message: string }
-const handleLeadMovement = async (updatedLead, req, remarks, changedFields, callDuration) => {
+// sourceModel defaults to Lead, can be passed as FollowUp
+const handleLeadMovement = async (updatedLead, req, remarks, changedFields, callDuration, sourceModel = Lead) => {
   const { mark_as_issue } = req.body;
   const followUpFlag = updatedLead.followUpFlag;
   const id = updatedLead._id || updatedLead.id;
@@ -439,16 +440,16 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
       throw starredCallError;
     }
 
-    // ONLY delete Lead AFTER StarredCall is successfully created and verified
+    // ONLY delete Lead/FollowUp AFTER StarredCall is successfully created and verified
     try {
-      const deleteResult = await Lead.findByIdAndDelete(id);
+      const deleteResult = await sourceModel.findByIdAndDelete(id);
       if (deleteResult) {
-        console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        console.log(`✅ ID ${id} removed from ${sourceModel.modelName} collection`);
       } else {
-        console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
+        console.warn(`⚠️  ID ${id} deletion returned null (may have been already deleted from ${sourceModel.modelName})`);
       }
     } catch (deleteError) {
-      console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+      console.error(`❌ Failed to delete ID: ${id} from ${sourceModel.modelName}`, deleteError);
       console.error(`⚠️  WARNING: StarredCall created (ID: ${starredCall._id}) but Lead deletion failed.`);
     }
 
@@ -481,12 +482,12 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
     }
 
     try {
-      const deleteResult = await Lead.findByIdAndDelete(id);
+      const deleteResult = await sourceModel.findByIdAndDelete(id);
       if (deleteResult) {
-        console.log(`✅ Lead ID ${id} removed from Leads collection`);
+        console.log(`✅ ID ${id} removed from ${sourceModel.modelName} collection`);
       }
     } catch (deleteError) {
-      console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+      console.error(`❌ Failed to delete ID: ${id} from ${sourceModel.modelName}`, deleteError);
       console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed.`);
     }
 
@@ -518,12 +519,12 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
   }
 
   try {
-    const deleteResult = await Lead.findByIdAndDelete(id);
+    const deleteResult = await sourceModel.findByIdAndDelete(id);
     if (deleteResult) {
-      console.log(`✅ Lead ID ${id} removed from Leads collection`);
+      console.log(`✅ ID ${id} removed from ${sourceModel.modelName} collection`);
     }
   } catch (deleteError) {
-    console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
+    console.error(`❌ Failed to delete ID: ${id} from ${sourceModel.modelName}`, deleteError);
     console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed.`);
   }
 
@@ -2108,9 +2109,11 @@ export const updateFollowUp = async (req, res) => {
       call_status,
       lead_status,
       follow_up_date,
+      follow_up_flag, // Extract follow_up_flag
       remarks,
       call_duration,
-      rating
+      rating,
+      mark_as_issue // Extract mark_as_issue
     } = req.body;
 
     // Validate remarks input
@@ -2120,7 +2123,6 @@ export const updateFollowUp = async (req, res) => {
     }
 
     // CRITICAL: Fetch ONLY from FollowUp model (not Lead)
-    // This ensures we're working with leads that have already moved through the lifecycle
     console.log(`🔍 Looking up FollowUp with ID: ${id}`);
     const followUp = await FollowUp.findById(id);
     if (!followUp) {
@@ -2142,28 +2144,64 @@ export const updateFollowUp = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // Update FollowUp with new data (callStatus, leadStatus, remarks, callDuration)
+    // CRITICAL: Normalize mark_as_issue for validation check
+    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+
+    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
+    if (isMarkAsIssueForValidation && follow_up_flag === true) {
+      return res.status(400).json({
+        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        error: "VALIDATION_ERROR"
+      });
+    }
+
+    // Update FollowUp with new data
     const updateData = {};
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (follow_up_date !== undefined) {
-      // Validate follow_up_date if provided
-      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-      if (validatedDate) {
-        updateData.followUpDate = validatedDate;
-      } else if (follow_up_date !== null) {
-        // Only error if it's not explicitly null (which means clear the date)
-        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format) or null." });
-      } else {
-        updateData.followUpDate = null;
+
+    // Follow-up date validation and flag handling
+    // We must emulate updateLead behavior to ensure handleLeadMovement works correctly
+    if (follow_up_flag === true) {
+      // When checkbox is checked, date is REQUIRED
+      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
+        return res.status(400).json({
+          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
+          error: "VALIDATION_ERROR",
+          field: "follow_up_date",
+          required: true
+        });
       }
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true;
+    } else if (follow_up_date !== undefined && follow_up_date !== null) {
+      // If date is provided without explicit flag, auto-set flag to true
+      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+      if (!validatedDate) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+      }
+      updateData.followUpDate = validatedDate;
+      updateData.followUpFlag = true; // Auto-set flag when date is provided
+    } else if (follow_up_flag === false) {
+      // Explicitly unset follow-up flag (Move to Report)
+      updateData.followUpFlag = false;
+      updateData.followUpDate = null;
+    } else {
+      // Default: Ensure followUpFlag is false so it moves to Report (unless it was already false)
+      // Since this is a FollowUp document, it likely has followUpFlag=true. We want to complete it (false) by default.
+      // But only if no specific flag was provided.
+      updateData.followUpFlag = false;
     }
+
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     // Handle rating field (1-5 stars for return leads in FollowUps)
     if (rating !== undefined && rating !== null) {
-      // Validate rating is between 1 and 5
       const ratingNum = parseInt(rating);
       if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
         return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
@@ -2180,165 +2218,40 @@ export const updateFollowUp = async (req, res) => {
       changedFields[key] = { before: beforeFollowUp[key], after: updatedFollowUp[key] };
     });
 
-    // Create Report entry from FollowUp
-    // This is the ONLY place where Reports are created from FollowUps
-    // Reports are sorted by lead_type (general, lossOfSale, bookingConfirmation, return, justDial)
-    // CRITICAL: Report must be created BEFORE deleting FollowUp to ensure data integrity
-    let report;
-    let reportCreated = false;
-
+    // Reuse handleLeadMovement for consistency
     try {
-      console.log(`📝 Creating report for FollowUp ID: ${id}`);
-      console.log(`   FollowUp leadType: ${updatedFollowUp.leadType}`);
-      console.log(`   FollowUp name: ${updatedFollowUp.name}`);
-      console.log(`   FollowUp phone: ${updatedFollowUp.phone}`);
+      // Pass FollowUp as the source model for deletion
+      const result = await handleLeadMovement(updatedFollowUp, req, remarksValidation.normalizedRemarks, changedFields, call_duration, FollowUp);
 
-      // CRITICAL: Ensure leadType is preserved from FollowUp
-      // Reports are sorted by lead_type (general, lossOfSale, bookingConfirmation, return, justDial)
-      // No need for category field - sorting is based on lead_type only
-      const followUpLeadType = updatedFollowUp.leadType || updatedFollowUp.lead_type || "general";
-      console.log(`   Preserving leadType: ${followUpLeadType} for report`);
+      // Handle response based on where the lead moved
+      if (result.type === 'starredCall') {
+        res.json({ message: "Follow-up lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      } else if (result.type === 'followUp') {
+        res.json({ message: "Follow-up lead updated and scheduled for next follow-up", followUp: result.data });
+      } else {
+        // Report
+        // Ensure lead_type is explicit (handleLeadMovement does this via createReportFromLead, but we want to be safe)
+        const reportObj = result.data;
+        const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "general";
 
-      report = await createReportFromLead(
-        updatedFollowUp,
-        req.user._id,
-        remarksValidation.normalizedRemarks,
-        changedFields,
-        call_duration || updatedFollowUp.callDuration || 0,
-        null // No category needed - sorting is by lead_type only
-      );
-
-      // CRITICAL: Explicitly ensure lead_type is set correctly in the report
-      // This ensures proper sorting in reports by lead type
-      if (report && report._id) {
-        await Report.findByIdAndUpdate(report._id, {
-          $set: {
-            lead_type: followUpLeadType
+        res.json({
+          message: "Follow-up lead updated and moved to reports",
+          report: {
+            ...reportObj,
+            lead_type: finalLeadType,
+            report_id: reportObj.report_id || String(reportObj._id)
           }
         });
-        // Re-fetch to get updated report
-        report = await Report.findById(report._id);
       }
-
-      // Verify report was created
-      if (!report || !report._id) {
-        throw new Error("Report creation returned null or invalid report");
-      }
-
-      // Verify report exists in database (double-check with retry)
-      let verifiedReport = await Report.findById(report._id);
-      if (!verifiedReport) {
-        // Retry once after a short delay (in case of replication lag)
-        await new Promise(resolve => setTimeout(resolve, 100));
-        verifiedReport = await Report.findById(report._id);
-        if (!verifiedReport) {
-          throw new Error("Report was created but not found in database after verification");
-        }
-      }
-
-      // Final verification: Ensure report has all required fields
-      if (!verifiedReport.lead_name && !verifiedReport.phone_number) {
-        throw new Error("Report was created but missing required fields (lead_name, phone_number)");
-      }
-
-      // Mark report as successfully created
-      reportCreated = true;
-      report = verifiedReport;
-
-      console.log(`✅ Report created successfully with ID: ${report._id}`);
-      console.log(`   Report lead_type: ${report.lead_type || updatedFollowUp.leadType || "general"}`);
-      console.log(`   Report lead_name: ${report.lead_name || updatedFollowUp.name}`);
-      console.log(`   Report phone_number: ${report.phone_number || updatedFollowUp.phone}`);
-      console.log(`   Report will be sorted by lead_type: ${report.lead_type}`);
-
-    } catch (reportError) {
-      console.error(`❌ CRITICAL: Failed to create report for FollowUp ID: ${id}`);
-      console.error(`   Error details:`, reportError.message);
-      console.error(`   Stack:`, reportError.stack);
-      console.error(`   FollowUp will NOT be deleted to prevent data loss`);
-      // DO NOT delete FollowUp if report creation failed
+    } catch (movementError) {
+      console.error(`❌ CRITICAL: Failed to move follow-up lead. ID: ${id}`);
+      console.error(`   Error details:`, movementError.message);
       return res.status(500).json({
-        message: `Failed to create report: ${reportError.message}. FollowUp lead was not deleted.`,
-        error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
+        message: `Failed to move/complete follow-up: ${movementError.message}. Lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
       });
     }
 
-    // CRITICAL: Only delete FollowUp if report was successfully created
-    // This ensures data integrity - we never lose data
-    if (!reportCreated || !report || !report._id) {
-      console.error(`❌ CRITICAL: Report creation verification failed. FollowUp will NOT be deleted.`);
-      return res.status(500).json({
-        message: "Report creation verification failed. FollowUp lead was not deleted to prevent data loss."
-      });
-    }
-
-    // Remove from FollowUps collection (lifecycle complete: FollowUps → Reports)
-    // Only delete AFTER confirming report was successfully created
-    // CRITICAL: This deletion MUST happen for the lifecycle to complete
-    let followUpDeleted = false;
-    try {
-      // Verify FollowUp still exists before deletion
-      const followUpToDelete = await FollowUp.findById(id);
-      if (!followUpToDelete) {
-        console.warn(`⚠️  FollowUp ID ${id} not found for deletion (may have been already deleted)`);
-        followUpDeleted = true; // Consider it deleted if it doesn't exist
-      } else {
-        const deleteResult = await FollowUp.findByIdAndDelete(id);
-        if (deleteResult) {
-          followUpDeleted = true;
-          console.log(`✅ FollowUp ID ${id} removed from FollowUps collection`);
-          console.log(`   Report ID ${report._id} is now the final state`);
-        } else {
-          console.error(`❌ CRITICAL: FollowUp ID ${id} deletion returned null`);
-          console.error(`   Report ID ${report._id} exists, but FollowUp deletion failed`);
-          // Try one more time with direct delete
-          try {
-            await FollowUp.deleteOne({ _id: id });
-            const verifyDelete = await FollowUp.findById(id);
-            if (!verifyDelete) {
-              followUpDeleted = true;
-              console.log(`✅ FollowUp ID ${id} deleted on retry`);
-            }
-          } catch (retryError) {
-            console.error(`❌ Retry deletion also failed:`, retryError);
-          }
-        }
-      }
-    } catch (deleteError) {
-      console.error(`❌ Failed to delete FollowUp ID: ${id}`, deleteError);
-      console.error(`   Error details:`, deleteError.message);
-      console.error(`   Stack:`, deleteError.stack);
-      // Report was already created, so we should still return success
-      // But log the error for investigation
-      console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but FollowUp deletion failed. Manual cleanup may be needed.`);
-    }
-
-    // Final verification: Check if FollowUp still exists
-    if (!followUpDeleted) {
-      const stillExists = await FollowUp.findById(id);
-      if (stillExists) {
-        console.error(`❌ CRITICAL: FollowUp ID ${id} still exists after deletion attempt!`);
-        console.error(`   Report ID ${report._id} was created, but FollowUp was not deleted.`);
-        console.error(`   This is a data integrity issue - manual cleanup required.`);
-      }
-    }
-
-    // DEFENSIVE: Ensure we never touch the Leads collection from this endpoint
-    // This endpoint ONLY works with FollowUps → Reports transition
-
-    // Build response with all necessary fields
-    // CRITICAL: lead_type is the only field needed for sorting (not category)
-    const reportObj = report.toObject ? report.toObject() : report;
-    const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "general";
-
-    res.json({
-      message: "Follow-up lead updated and moved to reports",
-      report: {
-        ...reportObj,
-        lead_type: finalLeadType, // Explicitly set lead_type for proper sorting
-        report_id: reportObj.report_id || String(report._id)
-      }
-    });
   } catch (error) {
     console.error(`❌ Error in updateFollowUp for ID ${req.params.id}:`, error);
     console.error('Stack trace:', error.stack);

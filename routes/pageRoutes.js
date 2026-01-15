@@ -1657,6 +1657,14 @@ router.get(
  *                 nullable: true
  *                 description: Updated remarks. **Only include if user provides input.** If no input, use `null` or omit the field. Max 1000 characters if provided.
  *                 example: null
+ *               mark_as_issue:
+ *                 type: boolean
+ *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection instead of Reports."
+ *                 example: false
+ *               follow_up_flag:
+ *                 type: boolean
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead stays in FollowUps collection (id may change)."
+ *                 example: false
  *               call_duration:
  *                 type: number
  *                 description: Call duration in seconds
