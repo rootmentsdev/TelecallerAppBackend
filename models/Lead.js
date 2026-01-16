@@ -63,9 +63,9 @@ leadSchema.index({ assignedTo: 1 });
 leadSchema.index({ phone: 1, name: 1, leadType: 1, store: 1 });
 leadSchema.index({ bookingNo: 1, phone: 1, leadType: 1 });
 
-// CRITICAL: Unique partial index for bookingConfirmation and return leads
+// CRITICAL: Unique partial index for return leads
 // Prevents duplicates at database level, even under concurrent syncs
-// Only applies to bookingConfirmation and return leads with bookingNo
+// Only applies to return leads with bookingNo
 leadSchema.index(
   { bookingNo: 1, phone: 1, leadType: 1 },
   {

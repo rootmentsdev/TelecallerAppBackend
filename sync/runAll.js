@@ -29,7 +29,7 @@ const runAll = async () => {
   await connectDB();
 
   try {
-    // Step 1: Sync Stores (needed for booking sync)
+    // Step 1: Sync Stores (needed for general sync)
     console.log("📦 Step 1/5: Syncing Stores...");
     console.log("-".repeat(60));
     const { run: syncStores } = await import("./api/sync_storelist.js");
@@ -37,7 +37,7 @@ const runAll = async () => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log();
 
-    // Step 2: Sync Booking Confirmation - REMOVED
+    // Step 2: [Removed - Booking Confirmation deprecated]
 
 
     // Step 3: Sync Returns (API)

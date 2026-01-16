@@ -16,7 +16,6 @@
     "import:lossofsale": "node sync/csv/import_lossofsale.js",
     "import:all:walkin": "node sync/csv/import_all_walkin.js",
     "import:all:lossofsale": "node sync/csv/import_all_lossofsale.js",
-    "cleanup:booking-confirmation": "node scripts/delete-booking-confirmation-leads.js",
     "sync:return": "node sync/api/sync_return.js",
     "sync:stores": "node sync/api/sync_storelist.js",
     "test:api": "node scripts/test-api-validation.js",

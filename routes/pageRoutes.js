@@ -148,7 +148,7 @@
  *         description: |
  *           Filter leads with function/event date on or after this date (YYYY-MM-DD).
  *           Example: `?functionDateFrom=2024-03-01` returns leads with function date from March 1, 2024 onwards.
- *           Useful for filtering booking confirmation and return leads by event date.
+ *           Useful for filtering return leads by event date.
  *           Can be combined with `functionDateTo` for a date range.
  *       - in: query
  *         name: functionDateTo
@@ -407,10 +407,8 @@
  *                   3. Get Return leads for a store:
  *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Kottayam`
  *                   
- *                   4. Get Booking Confirmation leads for a store:
- *                      `GET /api/pages/leads?leadType=return&store=Suitor Guy - Edappally`
- *                   
- *                   5. Get leads for location only:
+                     
+ *                   4. Get leads for location only:
  *                      `GET /api/pages/leads?store=Kottayam`
  *                   
  *                   6. Get leads for brand only:

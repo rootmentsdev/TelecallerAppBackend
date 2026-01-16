@@ -263,7 +263,6 @@ const runApiOnlySync = async () => {
   console.log();
 
   let storeSuccess = false;
-  let bookingSuccess = false;
   let returnSuccess = false;
   const errors = [];
   let lockReleased = false;
@@ -274,9 +273,9 @@ const runApiOnlySync = async () => {
     console.log("-".repeat(60));
     console.log();
 
-    // Step 1: Sync Stores (must complete before booking/return)
+    // Step 1: Sync Stores (must complete before return)
     try {
-      console.log("📦 Step 1/3: Starting Stores sync...");
+      console.log("📦 Step 1/2: Starting Stores sync...");
       const { run: syncStores } = await import("./api/sync_storelist.js");
       await syncStores();
       storeSuccess = true;
@@ -288,13 +287,9 @@ const runApiOnlySync = async () => {
       throw error; // Stop execution if store sync fails (booking/return depend on stores)
     }
 
-    // Step 2: Sync Booking Confirmation - REMOVED PER USER REQUEST
-    // Booking sync logic removed.
-
-
-    // Step 3: Sync Returns (awaits booking sync completion)
+    // Step 2: Sync Returns (awaits store sync completion)
     try {
-      console.log("📦 Step 3/3: Starting Returns sync...");
+      console.log("📦 Step 2/2: Starting Returns sync...");
       const { run: syncReturn } = await import("./api/sync_return.js");
       await syncReturn();
       returnSuccess = true;
@@ -306,7 +301,7 @@ const runApiOnlySync = async () => {
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    const allSuccess = storeSuccess && bookingSuccess && returnSuccess;
+    const allSuccess = storeSuccess && returnSuccess;
 
     console.log("=".repeat(60));
     if (allSuccess) {
