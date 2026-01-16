@@ -32,13 +32,13 @@ const verifyApiSyncSystem = async () => {
     console.log("-".repeat(50));
 
     const totalLeads = await Lead.countDocuments();
-    const bookingLeads = await Lead.countDocuments({ leadType: "bookingConfirmation" });
+
     const returnLeads = await Lead.countDocuments({ leadType: "return" });
     const lossOfSaleLeads = await Lead.countDocuments({ leadType: "lossOfSale" });
     const generalLeads = await Lead.countDocuments({ leadType: "general" });
 
     console.log(`   Total leads: ${totalLeads.toLocaleString()}`);
-    console.log(`   Booking Confirmation: ${bookingLeads.toLocaleString()}`);
+
     console.log(`   Return: ${returnLeads.toLocaleString()}`);
     console.log(`   Loss of Sale: ${lossOfSaleLeads.toLocaleString()}`);
     console.log(`   General/Walk-in: ${generalLeads.toLocaleString()}`);
@@ -63,13 +63,6 @@ const verifyApiSyncSystem = async () => {
     console.log("📋 3. Duplicate Check");
     console.log("-".repeat(50));
 
-    const bookingDuplicates = await Lead.aggregate([
-      { $match: { leadType: "bookingConfirmation", bookingNo: { $exists: true, $ne: "" } } },
-      { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
-      { $match: { count: { $gt: 1 } } },
-      { $count: "duplicateSets" }
-    ]);
-
     const returnDuplicates = await Lead.aggregate([
       { $match: { leadType: "return", bookingNo: { $exists: true, $ne: "" } } },
       { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
@@ -77,10 +70,9 @@ const verifyApiSyncSystem = async () => {
       { $count: "duplicateSets" }
     ]);
 
-    console.log(`   Booking duplicates: ${bookingDuplicates[0]?.duplicateSets || 0}`);
     console.log(`   Return duplicates: ${returnDuplicates[0]?.duplicateSets || 0}`);
 
-    if ((bookingDuplicates[0]?.duplicateSets || 0) === 0 && (returnDuplicates[0]?.duplicateSets || 0) === 0) {
+    if ((returnDuplicates[0]?.duplicateSets || 0) === 0) {
       console.log("   ✅ No duplicates found - deduplication working correctly");
     } else {
       console.log("   ⚠️  Duplicates found - may need cleanup");
@@ -91,22 +83,16 @@ const verifyApiSyncSystem = async () => {
     console.log("📋 4. Incremental Sync Verification");
     console.log("-".repeat(50));
 
-    const recentBookings = await Lead.find({
-      leadType: "bookingConfirmation",
-      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
-    }).countDocuments();
-
     const recentReturns = await Lead.find({
       leadType: "return",
       createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
     }).countDocuments();
 
-    console.log(`   Recent bookings (24h): ${recentBookings}`);
     console.log(`   Recent returns (24h): ${recentReturns}`);
     console.log("   ✅ Incremental sync ready");
     console.log();
 
-    // 5. Configuration check
+    // 5. Configuration Check
     console.log("📋 5. Configuration Check");
     console.log("-".repeat(50));
 
@@ -131,7 +117,6 @@ const verifyApiSyncSystem = async () => {
     console.log("   • npm run sync:api    (API-only, used by scheduler)");
     console.log("   • npm run sync:all    (Full sync including CSV)");
     console.log("   • npm run sync:return (Individual return sync)");
-    console.log("   • npm run sync:booking (Individual booking sync)");
     console.log();
     console.log("⏰ Automatic Sync:");
     console.log("   • Runs every 5 minutes");

@@ -42,15 +42,13 @@ const verifyData = async () => {
     console.log();
 
     // Count by leadType
-    const bookingCount = await Lead.countDocuments({ leadType: "bookingConfirmation" });
     const returnCount = await Lead.countDocuments({ leadType: "return" });
     const walkinCount = await Lead.countDocuments({ leadType: "general", source: "Walk-in" });
     const lossOfSaleCount = await Lead.countDocuments({ leadType: "lossOfSale" });
     const justDialCount = await Lead.countDocuments({ leadType: "justDial" });
-    const otherCount = totalLeads - bookingCount - returnCount - walkinCount - lossOfSaleCount - justDialCount;
+    const otherCount = totalLeads - returnCount - walkinCount - lossOfSaleCount - justDialCount;
 
     console.log("   📋 Leads by Type:");
-    console.log(`      ✅ Booking Confirmation: ${bookingCount.toLocaleString()}`);
     console.log(`      ✅ Return: ${returnCount.toLocaleString()}`);
     console.log(`      ✅ Walk-in: ${walkinCount.toLocaleString()}`);
     console.log(`      ✅ Loss of Sale: ${lossOfSaleCount.toLocaleString()}`);
@@ -59,26 +57,17 @@ const verifyData = async () => {
     console.log();
 
     // Count by source
-    const bookingSource = await Lead.countDocuments({ source: "Booking" });
     const returnSource = await Lead.countDocuments({ source: "Return" });
     const walkinSource = await Lead.countDocuments({ source: "Walk-in" });
     const lossOfSaleSource = await Lead.countDocuments({ source: "Loss of Sale" });
 
     console.log("   📋 Leads by Source:");
-    console.log(`      Booking: ${bookingSource.toLocaleString()}`);
     console.log(`      Return: ${returnSource.toLocaleString()}`);
     console.log(`      Walk-in: ${walkinSource.toLocaleString()}`);
     console.log(`      Loss of Sale: ${lossOfSaleSource.toLocaleString()}`);
     console.log();
 
-    // Check for duplicates in booking/return
-    const bookingDuplicates = await Lead.aggregate([
-      { $match: { leadType: "bookingConfirmation", bookingNo: { $exists: true, $ne: "" } } },
-      { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
-      { $match: { count: { $gt: 1 } } },
-      { $count: "duplicateSets" }
-    ]);
-
+    // Check for duplicates in return
     const returnDuplicates = await Lead.aggregate([
       { $match: { leadType: "return", bookingNo: { $exists: true, $ne: "" } } },
       { $group: { _id: { bookingNo: "$bookingNo", phone: "$phone" }, count: { $sum: 1 } } },
@@ -87,9 +76,8 @@ const verifyData = async () => {
     ]);
 
     console.log("   🔍 Duplicate Check:");
-    console.log(`      Booking Confirmation duplicates: ${bookingDuplicates[0]?.duplicateSets || 0}`);
     console.log(`      Return duplicates: ${returnDuplicates[0]?.duplicateSets || 0}`);
-    if ((bookingDuplicates[0]?.duplicateSets || 0) > 0 || (returnDuplicates[0]?.duplicateSets || 0) > 0) {
+    if ((returnDuplicates[0]?.duplicateSets || 0) > 0) {
       console.log(`      ⚠️  Run: npm run cleanup:duplicates`);
     }
     console.log();
@@ -253,18 +241,7 @@ const verifyData = async () => {
     console.log();
 
     // Sample Booking
-    const sampleBooking = await Lead.findOne({ leadType: "bookingConfirmation" })
-      .select("name phone store bookingNo securityAmount enquiryDate functionDate")
-      .lean();
-    if (sampleBooking) {
-      console.log("   ✅ Booking Confirmation Sample:");
-      console.log(`      Name: ${sampleBooking.name}`);
-      console.log(`      Phone: ${sampleBooking.phone}`);
-      console.log(`      Store: ${sampleBooking.store}`);
-      console.log(`      Booking No: ${sampleBooking.bookingNo || "N/A"}`);
-      console.log(`      Security Amount: ${sampleBooking.securityAmount || "N/A"}`);
-      console.log();
-    }
+
 
     // Sample Return
     const sampleReturn = await Lead.findOne({ leadType: "return" })
@@ -299,8 +276,7 @@ const verifyData = async () => {
     console.log("=".repeat(70));
     console.log();
 
-    const allSynced = syncLogs.length >= 2 && 
-      syncLogs.some(log => log.syncType === "booking") && 
+    const allSynced = syncLogs.length >= 1 &&
       syncLogs.some(log => log.syncType === "return");
 
     if (allSynced) {
@@ -310,9 +286,6 @@ const verifyData = async () => {
       console.log(`   ✅ Users: ${totalUsers}`);
     } else {
       console.log("   ⚠️  Some syncs may be missing:");
-      if (!syncLogs.some(log => log.syncType === "booking")) {
-        console.log("      ❌ Booking sync not run - Run: npm run sync:booking");
-      }
       if (!syncLogs.some(log => log.syncType === "return")) {
         console.log("      ❌ Return sync not run - Run: npm run sync:return");
       }
