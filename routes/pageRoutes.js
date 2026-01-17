@@ -684,7 +684,7 @@
  * @swagger
  * /api/pages/add-lead:
  *   post:
- *     summary: Create a new lead
+ *     summary: Create a new lead (Lead, FollowUp, or Complaint)
  *     tags:
  *       - Add Lead
  *     security:
@@ -695,39 +695,63 @@
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - customer_name
+ *               - phone_number
+ *               - store_location
  *             properties:
- *               customer_name: { type: string }
- *               phone_number: { type: string }
- *               brand: { type: string }
- *               store_location: { type: string }
- *               lead_status: { type: string }
- *               call_status: { type: string }
-              subCategory: { type: string }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              remarks: { type: string }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry], default: enquiry }
-              functionDate: { type: string, format: date-time }
-              mark_as_complaint:
-                type: boolean
-                description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
+ *               customer_name:
+ *                 type: string
+ *               phone_number:
+ *                 type: string
+ *                 description: "Must be exactly 10 digits"
+ *               brand:
+ *                 type: string
+ *               store_location:
+ *                 type: string
+ *               lead_status:
+ *                 type: string
+ *               call_status:
+ *                 type: string
+ *               subCategory:
+ *                 type: string
+ *               itemCategory:
+ *                 type: string
+ *               closingAction:
+ *                 type: string
+ *               reasons:
+ *                 type: string
+ *               remarks:
+ *                 type: string
+ *               leadType:
+ *                 type: string
+ *                 description: "Default: enquiry. Other values: lossOfSale, return."
+ *               functionDate:
+ *                 type: string
+ *                 format: date-time
+ *               mark_as_complaint:
+ *                 type: boolean
+ *                 description: "Priority 1. If true, creates a Complaint directly (bypassing Leads/FollowUps). Cannot be used with follow_up_flag."
+ *               follow_up_flag:
+ *                 type: boolean
+ *                 description: "Priority 2. If true, creates a FollowUp directly (bypassing Leads). Requires follow_up_date."
  *               follow_up_date:
  *                 type: string
  *                 format: date-time
- *                 description: "Required if follow_up_flag is true. The lead will be created directly in the FollowUps collection."
- *               follow_up_flag:
- *                 type: boolean
- *                 description: "If true, the lead is created strictly in the FollowUps collection (bypassing Leads). Requires follow_up_date."
+ *                 description: "Required if follow_up_flag is true."
  *     responses:
  *       201:
- *         description: Lead created successfully
+ *         description: |
+ *           Resource created successfully. The response body contains one of 'lead', 'followUp', or 'complaint' depending on routing:
+ *           - If mark_as_complaint=true → returns { message, complaint }
+ *           - If follow_up_flag=true → returns { message, followUp }
+ *           - Otherwise → returns { message, lead }
  *       400:
- *         description: Validation error
+ *         description: Validation error (invalid phone, missing date, conflicting flags)
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Only admin or teamLead can add leads
+ *         description: Forbidden (Admin/Team Lead only)
  *       500:
  *         description: Internal server error
  */

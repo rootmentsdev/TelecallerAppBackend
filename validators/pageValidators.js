@@ -243,7 +243,40 @@ export const addLeadPostValidator = [
     .isString()
     .trim()
     .withMessage('Call status must be a string'),
-  dateValidator('follow_up_date')
+  dateValidator('follow_up_date'),
+  body('follow_up_flag')
+    .optional()
+    .isBoolean()
+    .withMessage('follow_up_flag must be a boolean'),
+  body('mark_as_complaint')
+    .optional()
+    .isBoolean()
+    .withMessage('mark_as_complaint must be a boolean'),
+  body('leadType')
+    .optional()
+    .isString()
+    .trim(),
+  dateValidator('functionDate'),
+  body('subCategory')
+    .optional()
+    .isString()
+    .trim(),
+  body('itemCategory')
+    .optional()
+    .isString()
+    .trim(),
+  body('closingAction')
+    .optional()
+    .isString()
+    .trim(),
+  body('remarks')
+    .optional()
+    .isString()
+    .trim(),
+  body('reasons')
+    .optional()
+    .isString()
+    .trim()
 ];
 
 // Generic lead update validator (for 'general' or unknown lead types)
