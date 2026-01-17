@@ -234,10 +234,14 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
 
     // Additional Information
     reason: lead.reason || undefined,
+    reasons: lead.reasons || undefined,
     reasonCollectedFromStore: lead.reasonCollectedFromStore || lead.reason_collected_from_store || undefined,
     rating: lead.rating || undefined,
     attendedBy: lead.attendedBy || lead.attended_by || undefined,
     remarks: lead.remarks || "",
+    subCategory: lead.subCategory || undefined,
+    itemCategory: lead.itemCategory || undefined,
+    closingAction: lead.closingAction || undefined,
 
     // Call Duration
     callDuration: (callDuration !== undefined && callDuration !== null) ? callDuration : (lead.callDuration || lead.call_duration || 0),
@@ -345,9 +349,17 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.reason_collected_from_store = lead.reasonCollectedFromStore ?? lead.reason_collected_from_store ?? "";
   payload.call_duration = lead.callDuration ?? callDuration ?? 0;
 
+  // CRITICAL: Explicitly map new fields to camelCase to match Report schema
+  payload.subCategory = lead.subCategory ?? lead.sub_category ?? null;
+  payload.itemCategory = lead.itemCategory ?? lead.item_category ?? null;
+  payload.closingAction = lead.closingAction ?? lead.closing_action ?? null;
+  payload.reasons = lead.reasons ?? null;
+  payload.leadType = lead.leadType ?? lead.lead_type ?? "general";
+  payload.functionDate = lead.functionDate ?? lead.function_date ?? null;
+
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -589,6 +601,7 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDurat
     closingStatus: lead.closingStatus || lead.closing_status,
     followUpFlag: lead.followUpFlag || lead.follow_up_flag || false,
     reason: lead.reason,
+    reasons: lead.reasons,
     reasonCollectedFromStore: lead.reasonCollectedFromStore || lead.reason_collected_from_store,
     rating: lead.rating,
     attendedBy: lead.attendedBy || lead.attended_by,
@@ -599,6 +612,9 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDurat
 
     // Issue-specific fields (remarks can override lead.remarks)
     remarks: remarksValidation.normalizedRemarks || lead.remarks || "",
+    subCategory: lead.subCategory,
+    itemCategory: lead.itemCategory,
+    closingAction: lead.closingAction,
     issueMarkedBy: userId,
     issueMarkedAt: new Date(),
     sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
@@ -881,7 +897,7 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_issue } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -959,7 +975,17 @@ export const updateLossOfSaleLead = async (req, res) => {
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    if (!lead.leadType || lead.leadType === "general") {
+    // Update new fields if provided
+    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
+    if (closingAction !== undefined) updateData.closingAction = closingAction;
+    if (reasons !== undefined) updateData.reasons = reasons;
+    // Allow updating leadType if provided
+    if (leadType !== undefined) updateData.leadType = leadType;
+    // Allow updating functionDate if provided
+    if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
       updateData.leadType = "lossOfSale";
     }
 
@@ -1148,7 +1174,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_issue } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1235,7 +1261,17 @@ export const updateReturnLead = async (req, res) => {
     if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    if (!lead.leadType || lead.leadType === "general") {
+    // Update new fields if provided
+    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
+    if (closingAction !== undefined) updateData.closingAction = closingAction;
+    if (reasons !== undefined) updateData.reasons = reasons;
+    // Allow updating leadType if provided
+    if (leadType !== undefined) updateData.leadType = leadType;
+    // Allow updating functionDate if provided
+    if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
       updateData.leadType = "return";
     }
 
@@ -1306,7 +1342,7 @@ export const getJustDialLead = async (req, res) => {
 export const updateJustDialLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, closing_status, reason, follow_up_flag, follow_up_date, call_date, remarks, call_duration, mark_as_issue } = req.body;
+    const { call_status, lead_status, closing_status, reason, follow_up_flag, follow_up_date, call_date, remarks, call_duration, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
 
     const lead = await Lead.findById(id);
     if (!lead) {
@@ -1387,7 +1423,17 @@ export const updateJustDialLead = async (req, res) => {
     }
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    if (!lead.leadType || lead.leadType === "general") {
+    // Update new fields if provided
+    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
+    if (closingAction !== undefined) updateData.closingAction = closingAction;
+    if (reasons !== undefined) updateData.reasons = reasons;
+    // Allow updating leadType if provided
+    if (leadType !== undefined) updateData.leadType = leadType;
+    // Allow updating functionDate if provided
+    if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
       updateData.leadType = "justDial";
     }
 
@@ -1438,7 +1484,24 @@ export const updateJustDialLead = async (req, res) => {
 // POST - Create new lead (All fields are POST)
 export const createAddLead = async (req, res) => {
   try {
-    const { customer_name, phone_number, brand, store_location, lead_status, call_status, follow_up_date, follow_up_flag } = req.body;
+    const {
+      customer_name,
+      phone_number,
+      brand,
+      store_location,
+      lead_status,
+      call_status,
+      follow_up_date,
+      follow_up_flag,
+      leadType,
+      functionDate,
+      subCategory,
+      itemCategory,
+      closingAction,
+      remarks,
+      reasons,
+      mark_as_issue
+    } = req.body;
 
     // Check if lead with same phone number already exists
     const existingLead = await Lead.findOne({ phone: phone_number });
@@ -1475,57 +1538,158 @@ export const createAddLead = async (req, res) => {
       ? (storeLocationClean ? `${brandClean} - ${storeLocationClean}` : brandClean)
       : storeLocationClean;
 
-    // IF follow_up_flag is true, create strictly in FollowUp model
-    if (follow_up_flag === true) {
-      // Validate follow_up_date (REQUIRED for follow-ups)
-      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
-        return res.status(400).json({
-          message: "follow_up_date is required when follow_up_flag is true.",
-          error: "VALIDATION_ERROR",
-          field: "follow_up_date",
-          required: true
-        });
-      }
-
-      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-      if (!validatedDate) {
-        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
-      }
-
-      console.log(`📝 Creating new lead directly in FollowUps: ${customer_name} (${phone_number})`);
-
-      const followUp = await FollowUp.create({
-        name: customer_name,
-        phone: phone_number,
-        brand: brandClean,
-        store: storeValue,
-        leadStatus: lead_status || "No Status",
-        callStatus: call_status || "Not Called",
-        followUpDate: validatedDate,
-        followUpFlag: true,
-        createdBy: req.user._id,
-        leadType: "general", // Default for manually added leads
-        source: "Manual Entry (FollowUp)"
-      });
-
-      return res.status(201).json({
-        message: "Lead created and added to follow-ups successfully",
-        lead: {
-          id: followUp._id,
-          customer_name: followUp.name,
-          phone_number: followUp.phone,
-          brand: followUp.brand,
-          store_location: followUp.store,
-          lead_status: followUp.leadStatus,
-          call_status: followUp.callStatus,
-          follow_up_date: followUp.followUpDate,
-          lead_type: followUp.leadType,
-          collection: "FollowUps"
-        },
+    /* REMOVED IF BLOCK START
+    // Validate follow_up_date (REQUIRED for follow-ups)
+    if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
+      return res.status(400).json({
+        message: "follow_up_date is required when follow_up_flag is true.",
+        error: "VALIDATION_ERROR",
+        field: "follow_up_date",
+        required: true
       });
     }
+     
+    const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
+    if (!validatedDate) {
+      return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
+    }
+     
+    console.log(`📝 Creating new lead directly in FollowUps: ${customer_name} (${phone_number})`);
+     
+    const followUp = await FollowUp.create({
+      name: customer_name,
+      phone: phone_number,
+      brand: brandClean,
+      store: storeValue,
+      leadStatus: lead_status || "No Status",
+      callStatus: call_status || "Not Called",
+      followUpDate: validatedDate,
+      followUpFlag: true,
+      createdBy: req.user._id,
+      leadType: "general", // Default for manually added leads
+      source: "Manual Entry (FollowUp)"
+    });
+     
+    return res.status(201).json({
+      message: "Lead created and added to follow-ups successfully",
+      lead: {
+        id: followUp._id,
+        customer_name: followUp.name,
+        phone_number: followUp.phone,
+        brand: followUp.brand,
+        store_location: followUp.store,
+        lead_status: followUp.leadStatus,
+        call_status: followUp.callStatus,
+        follow_up_date: followUp.followUpDate,
+        lead_type: followUp.leadType,
+        collection: "FollowUps"
+      },
+    });
+    }
+     
+        */
+    // Default leadType to "enquiry" if not provided (requested default)
+    const finalLeadType = leadType || "enquiry";
 
-    // Default behavior: Create in Leads collection
+    // Prepare lead data
+    const leadData = {
+      name: customer_name,
+      phone: phone_number,
+      brand: brandClean,
+      store: storeValue,
+      leadStatus: lead_status || "No Status",
+      callStatus: call_status || "Not Called",
+      followUpDate: follow_up_date ? new Date(follow_up_date) : null,
+      followUpFlag: follow_up_flag === true || follow_up_flag === "true", // Normalize boolean
+      createdBy: req.user._id,
+      leadType: finalLeadType,
+      source: "Manual Entry",
+      // Map optional new fields (store as null if not provided)
+      subCategory: subCategory ?? null,
+      itemCategory: itemCategory ?? null,
+      closingAction: closingAction ?? null,
+      remarks: remarks ? String(remarks).trim() : "",
+      reasons: reasons ? String(reasons).trim() : null,
+      functionDate: functionDate ? new Date(functionDate) : null,
+    };
+
+    // Create lead in Leads collection first
+    const lead = await Lead.create(leadData);
+
+    // Post-creation Movement Logic
+    // Normalize boolean flags
+    const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1;
+    const isFollowUp = lead.followUpFlag === true;
+
+    // Priority 1: mark_as_issue
+    if (isMarkAsIssue) {
+      try {
+        console.log(`[createAddLead] Handling immediate movement to StarredCalls for Lead ID: ${lead._id}`);
+        // Reuse handleLeadMovement (it handles creating StarredCall and deleting from Leads)
+        // Pass empty object for changedFields since it's a new lead
+        const result = await handleLeadMovement(lead, req, leadData.remarks, {}, 0, Lead);
+
+        return res.status(201).json({
+          message: "Lead created and moved to starred calls (issue call)",
+          starredCall: result.data
+        });
+      } catch (moveError) {
+        console.error("Error moving new lead to starred calls:", moveError);
+        // Fallback: return created lead but warn
+        return res.status(201).json({
+          message: "Lead created but failed to move to starred calls",
+          lead: lead,
+          error: moveError.message
+        });
+      }
+    }
+    // Priority 2: follow_up_flag (only if not marked as issue)
+    else if (isFollowUp) {
+      if (!leadData.followUpDate) {
+        // Should have been validated by caller or frontend, but safeguard here
+      }
+
+      try {
+        console.log(`[createAddLead] Handling immediate movement to FollowUps for Lead ID: ${lead._id}`);
+        const result = await handleLeadMovement(lead, req, leadData.remarks, {}, 0, Lead);
+
+        return res.status(201).json({
+          message: "Lead created and moved to follow-ups",
+          followUp: result.data
+        });
+      } catch (moveError) {
+        console.error("Error moving new lead to follow-ups:", moveError);
+        return res.status(201).json({
+          message: "Lead created but failed to move to follow-ups",
+          lead: lead,
+          error: moveError.message
+        });
+      }
+    }
+
+    // Priority 3: Default (Stay in Leads)
+    res.status(201).json({
+      message: "Lead created successfully",
+      lead: {
+        id: lead._id,
+        customer_name: lead.name,
+        phone_number: lead.phone,
+        brand: lead.brand,
+        store_location: lead.store,
+        lead_status: lead.leadStatus,
+        call_status: lead.callStatus,
+        follow_up_date: lead.followUpDate,
+        lead_type: lead.leadType,
+        function_date: lead.functionDate,
+        sub_category: lead.subCategory,
+        item_category: lead.itemCategory,
+        closing_action: lead.closingAction,
+        remarks: lead.remarks,
+        reasons: lead.reasons
+      },
+    });
+
+    /* // Default behavior: Create in Leads collection
     const lead = await Lead.create({
       name: customer_name,
       phone: phone_number,
@@ -1538,7 +1702,7 @@ export const createAddLead = async (req, res) => {
       leadType: "general",
       source: "Manual Entry"
     });
-
+    
     res.status(201).json({
       message: "Lead created successfully",
       lead: {
@@ -1551,7 +1715,7 @@ export const createAddLead = async (req, res) => {
         call_status: lead.callStatus,
         follow_up_date: lead.followUpDate,
       },
-    });
+    }); */
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1887,7 +2051,7 @@ export const getGeneralLead = async (req, res) => {
 export const updateGeneralLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating, call_duration, mark_as_issue } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating, call_duration, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1968,8 +2132,18 @@ export const updateGeneralLead = async (req, res) => {
     if (rating !== undefined) updateData.rating = rating;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    // Ensure leadType is set to general
-    if (!lead.leadType || lead.leadType === "general") {
+    // Update new fields if provided
+    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
+    if (closingAction !== undefined) updateData.closingAction = closingAction;
+    if (reasons !== undefined) updateData.reasons = reasons;
+    // Allow updating leadType if provided
+    if (leadType !== undefined) updateData.leadType = leadType;
+    // Allow updating functionDate if provided
+    if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    // Ensure leadType is set to general (or preserved if already set)
+    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
       updateData.leadType = "general";
     }
 
@@ -2174,7 +2348,8 @@ export const updateFollowUp = async (req, res) => {
       remarks,
       call_duration,
       rating,
-      mark_as_issue // Extract mark_as_issue
+      mark_as_issue, // Extract mark_as_issue
+      subCategory, itemCategory, closingAction, reasons, leadType, functionDate // Extract new fields
     } = req.body;
 
     // Validate remarks input
@@ -2269,6 +2444,15 @@ export const updateFollowUp = async (req, res) => {
       }
       updateData.rating = ratingNum;
     }
+
+    // Update new fields if provided
+    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
+    if (closingAction !== undefined) updateData.closingAction = closingAction;
+    if (reasons !== undefined) updateData.reasons = reasons;
+    // Allow updating leadType and functionDate in FollowUps as well
+    if (leadType !== undefined) updateData.leadType = leadType;
+    if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
 
     const beforeFollowUp = followUp.toObject();
     const updatedFollowUp = await FollowUp.findByIdAndUpdate(id, updateData, { new: true });

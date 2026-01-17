@@ -545,6 +545,12 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
+              subCategory: { type: string }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+              reasons: { type: string }
+              functionDate: { type: string, format: date-time }
+              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: lossOfSale }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               mark_as_issue:
@@ -638,6 +644,12 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               remarks: { type: string }
+              subCategory: { type: string }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+              reasons: { type: string }
+              functionDate: { type: string, format: date-time }
+              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
@@ -728,6 +740,12 @@
  *               lead_status: { type: string }
  *               closing_status: { type: string }
  *               reason: { type: string }
+              subCategory: { type: string }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+              reasons: { type: string }
+              functionDate: { type: string, format: date-time }
+              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: justDial }
  *               follow_up_flag: 
  *                 type: boolean
  *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
@@ -779,6 +797,13 @@
  *               store_location: { type: string }
  *               lead_status: { type: string }
  *               call_status: { type: string }
+              subCategory: { type: string }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+              reasons: { type: string }
+              remarks: { type: string }
+              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: enquiry }
+              functionDate: { type: string, format: date-time }
  *               follow_up_date:
  *                 type: string
  *                 format: date-time
@@ -1144,6 +1169,12 @@ router.get(
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               call_date: { type: string, format: date-time }
  *               reason_collected_from_store: { type: string }
+              subCategory: { type: string }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+              reasons: { type: string }
+              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: general }
+              functionDate: { type: string, format: date-time }
  *               remarks: { type: string }
  *               closing_status: { type: string }
  *               rating: { type: integer }
@@ -1661,6 +1692,21 @@ router.get(
  *                 nullable: true
  *                 description: Updated remarks. **Only include if user provides input.** If no input, use `null` or omit the field. Max 1000 characters if provided.
  *                 example: null
+ *               subCategory:
+ *                 type: string
+ *               itemCategory:
+ *                 type: string
+ *               closingAction:
+ *                 type: string
+ *               reasons:
+ *                 type: string
+ *               functionDate:
+ *                 type: string
+ *                 format: date-time
+ *               leadType:
+ *                 type: string
+ *                 enum: [lossOfSale, return, justDial, general, enquiry]
+ *                 default: general
  *               mark_as_issue:
  *                 type: boolean
  *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection instead of Reports."

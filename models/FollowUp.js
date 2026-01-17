@@ -13,10 +13,12 @@ const followUpSchema = new mongoose.Schema(
     source: { type: String },
     leadType: {
       type: String,
-      enum: ["lossOfSale", "return", "justDial", "general"],
-      default: "general"
+      enum: ["lossOfSale", "return", "justDial", "general", "enquiry"],
+      default: "enquiry"
     },
     brand: { type: String },
+    subCategory: { type: String, default: null },
+    itemCategory: { type: String, default: null },
 
     // Dates - same as Lead
     enquiryDate: { type: Date },
@@ -34,12 +36,14 @@ const followUpSchema = new mongoose.Schema(
     callStatus: { type: String, default: "Not Called" },
     leadStatus: { type: String, default: "No Status" },
     closingStatus: { type: String },
+    closingAction: { type: String, default: null },
 
     // Follow-up - same as Lead
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information - same as Lead
     reason: { type: String },
+    reasons: { type: String, default: null },
     reasonCollectedFromStore: { type: String },
     rating: { type: Number, min: 1, max: 5 },
     attendedBy: { type: String },

@@ -32,8 +32,8 @@ export const leadGetValidator = [
 export const leadsListValidator = [
   query('leadType')
     .optional()
-    .isIn(['lossOfSale', 'return', 'justDial', 'general'])
-    .withMessage('leadType must be one of: lossOfSale, return, justDial, general'),
+    .isIn(['lossOfSale', 'return', 'justDial', 'general', 'enquiry'])
+    .withMessage('leadType must be one of: lossOfSale, return, justDial, general, enquiry'),
   query('page')
     .optional()
     .isInt({ min: 1 })
