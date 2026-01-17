@@ -1160,7 +1160,7 @@ export const updateReturnLead = async (req, res) => {
 
 // ==================== Add Lead Page ====================
 
-// POST - Create new lead (All fields are POST)
+// POST - Create new lead (All fields are use POST body)
 export const createAddLead = async (req, res) => {
   try {
     const {
@@ -1182,166 +1182,169 @@ export const createAddLead = async (req, res) => {
       mark_as_complaint
     } = req.body;
 
-    // Check if lead with same phone number already exists
-    const existingLead = await Lead.findOne({ phone: phone_number });
+    // 1. Validation =================================================
+
+    // Phone validation: exactly 10 digits
+    const phoneClean = (phone_number || '').trim().replace(/\s+/g, '');
+    if (!/^\d{10}$/.test(phoneClean)) {
+      return res.status(400).json({ message: "Phone number must be exactly 10 digits" });
+    }
+
+    // Flag normalization
+    const isMarkAsComplaint = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1;
+    const isFollowUp = follow_up_flag === true || follow_up_flag === "true";
+
+    // Mutual exclusion validation
+    if (isMarkAsComplaint && isFollowUp) {
+      return res.status(400).json({ message: "Cannot mark as both complaint and follow-up simultaneously." });
+    }
+
+    // Date Validations
+    let validFollowUpDate = null;
+    if (follow_up_date) {
+      const d = new Date(follow_up_date);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid ISO date." });
+      }
+      validFollowUpDate = d;
+    }
+
+    // Rule: If follow_up_flag is true, date is REQUIRED
+    if (isFollowUp && !validFollowUpDate) {
+      return res.status(400).json({ message: "follow_up_date is required and must be valid when follow_up_flag is true." });
+    }
+
+    let validFunctionDate = null;
+    if (functionDate) {
+      const d = new Date(functionDate);
+      if (isNaN(d.getTime())) {
+        return res.status(400).json({ message: "Invalid functionDate format. Must be a valid ISO date." });
+      }
+      validFunctionDate = d;
+    }
+
+    // 2. Duplicate Checks ===========================================
+    // (Preserving existing logic: prevent duplicates in Leads/FollowUps)
+
+    // Check Leads
+    const existingLead = await Lead.findOne({ phone: phoneClean });
     if (existingLead) {
       return res.status(400).json({
         message: "Lead with this phone number already exists in Leads",
-        existingLeadId: existingLead._id,
+        existingLeadId: existingLead._id
       });
     }
 
-    // Also check FollowUps to prevent duplicates across collections
-    const existingFollowUp = await FollowUp.findOne({ phone: phone_number });
+    // Check FollowUps
+    const existingFollowUp = await FollowUp.findOne({ phone: phoneClean });
     if (existingFollowUp) {
       return res.status(400).json({
         message: "Lead with this phone number already exists in Follow-ups",
-        existingLeadId: existingFollowUp._id,
+        existingLeadId: existingFollowUp._id
       });
     }
 
-    // Clean and deduplicate brand/store values to avoid "Brand - Brand - Location" issues
+    // 3. Data Preparation ===========================================
+
+    // Store/Brand Cleaning
     const brandClean = (brand || '').trim();
     let storeLocationClean = (store_location || '').trim();
-
     if (brandClean) {
-      // If store_location already starts with the brand (e.g. "Brand - Location"), remove the duplicate prefix
       const escapedBrand = brandClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const brandPrefixRegex = new RegExp(`^${escapedBrand}\\s*-\\s*`, 'i');
       if (brandPrefixRegex.test(storeLocationClean)) {
         storeLocationClean = storeLocationClean.replace(brandPrefixRegex, '').trim();
       }
     }
-
     const storeValue = brandClean
       ? (storeLocationClean ? `${brandClean} - ${storeLocationClean}` : brandClean)
       : storeLocationClean;
 
-    // Default leadType to "enquiry" if not provided (requested default)
-    const finalLeadType = leadType || "enquiry";
-
-    // Prepare lead data
-    const leadData = {
+    // Common fields map
+    const commonData = {
       name: customer_name,
-      phone: phone_number,
-      brand: brandClean,
+      phone: phoneClean,
+      brand: brandClean || undefined,
       store: storeValue,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
-      followUpDate: follow_up_date ? new Date(follow_up_date) : null,
-      followUpFlag: follow_up_flag === true || follow_up_flag === "true", // Normalize boolean
-      createdBy: req.user._id,
-      leadType: finalLeadType,
+      leadType: leadType || "enquiry", // Default to enquiry
       source: "Manual Entry",
-      // Map optional new fields (store as null if not provided)
-      subCategory: subCategory ?? null,
-      itemCategory: itemCategory ?? null,
-      closingAction: closingAction ?? null,
+      subCategory: subCategory || undefined,
+      itemCategory: itemCategory || undefined,
+      closingAction: closingAction || undefined,
       remarks: remarks ? String(remarks).trim() : "",
-      reasons: reasons ? String(reasons).trim() : null,
-      functionDate: functionDate ? new Date(functionDate) : null,
+      reasons: reasons ? String(reasons).trim() : undefined,
+      functionDate: validFunctionDate || undefined,
+      followUpDate: validFollowUpDate || undefined,
+      callDuration: 0,
+      createdBy: req.user._id,
+      assignedTo: req.user._id // Assign to creator by default? Usually yes for manual entry.
     };
 
-    // Create lead in Leads collection first
-    const lead = await Lead.create(leadData);
+    // 4. Branching Logic (Routing) ==================================
 
-    // Post-creation Movement Logic
-    // Normalize boolean flags
-    const isMarkAsComplaint = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1;
-    const isFollowUp = lead.followUpFlag === true;
-
-    // Priority 1: mark_as_complaint
+    // Case A: Complaint
     if (isMarkAsComplaint) {
-      try {
-        console.log(`[createAddLead] Handling immediate movement to Complaints for Lead ID: ${lead._id}`);
-        // Reuse handleLeadMovement (it handles creating Complaint and deleting from Leads)
-        // Pass empty object for changedFields since it's a new lead
-        const result = await handleLeadMovement(lead, req, leadData.remarks, {}, 0, Lead);
-
-        return res.status(201).json({
-          message: "Lead created and moved to complaints",
-          complaint: result.data
-        });
-      } catch (moveError) {
-        console.error("Error moving new lead to complaints:", moveError);
-        // Fallback: return created lead but warn
-        return res.status(201).json({
-          message: "Lead created but failed to move to complaints",
-          lead: lead,
-          error: moveError.message
-        });
-      }
+      const complaintData = {
+        ...commonData,
+        complaintMarkedAt: new Date(),
+        complaintMarkedBy: req.user._id,
+        // Ensure strictly required Complaint fields are present if any (Complaint model usually flexible)
+      };
+      const complaint = await Complaint.create(complaintData);
+      return res.status(201).json({
+        message: "Lead created and moved to complaints",
+        complaint: complaint
+      });
     }
-    // Priority 2: follow_up_flag (only if not marked as complaint)
+
+    // Case B: FollowUp
     else if (isFollowUp) {
-      try {
-        console.log(`[createAddLead] Handling immediate movement to FollowUps for Lead ID: ${lead._id}`);
-        const result = await handleLeadMovement(lead, req, leadData.remarks, {}, 0, Lead);
-
-        return res.status(201).json({
-          message: "Lead created and moved to follow-ups",
-          followUp: result.data
-        });
-      } catch (moveError) {
-        console.error("Error moving new lead to follow-ups:", moveError);
-        return res.status(201).json({
-          message: "Lead created but failed to move to follow-ups",
-          lead: lead,
-          error: moveError.message
-        });
-      }
+      const followUpData = {
+        ...commonData,
+        followUpFlag: true,
+        // followUpDate is already in commonData (and validated)
+        movedToFollowUpAt: new Date(),
+        movedToFollowUpBy: req.user._id,
+      };
+      const followUp = await FollowUp.create(followUpData);
+      return res.status(201).json({
+        message: "Lead created and moved to follow-ups",
+        followUp: followUp
+      });
     }
 
-    // Priority 3: Default (Stay in Leads)
-    res.status(201).json({
-      message: "Lead created successfully",
-      lead: {
-        id: lead._id,
-        customer_name: lead.name,
-        phone_number: lead.phone,
-        brand: lead.brand,
-        store_location: lead.store,
-        lead_status: lead.leadStatus,
-        call_status: lead.callStatus,
-        follow_up_date: lead.followUpDate,
-        lead_type: lead.leadType,
-        function_date: lead.functionDate,
-        sub_category: lead.subCategory,
-        item_category: lead.itemCategory,
-        closing_action: lead.closingAction,
-        remarks: lead.remarks,
-        reasons: lead.reasons
-      },
-    });
+    // Case C: Standard Lead
+    else {
+      const leadData = {
+        ...commonData,
+        followUpFlag: false,
+        // followUpDate can be present (inactive)
+      };
+      const lead = await Lead.create(leadData);
+      return res.status(201).json({
+        message: "Lead created successfully",
+        lead: {
+          id: lead._id,
+          customer_name: lead.name,
+          phone_number: lead.phone,
+          brand: lead.brand,
+          store_location: lead.store,
+          lead_status: lead.leadStatus,
+          call_status: lead.callStatus,
+          follow_up_date: lead.followUpDate,
+          lead_type: lead.leadType,
+          function_date: lead.functionDate,
+          remarks: lead.remarks
+        },
+      });
+    }
 
-    /* // Default behavior: Create in Leads collection
-    const lead = await Lead.create({
-      name: customer_name,
-      phone: phone_number,
-      brand: brandClean,
-      store: storeValue,
-      leadStatus: lead_status || "No Status",
-      callStatus: call_status || "Not Called",
-      followUpDate: follow_up_date, // Saved but not active unless flag is set (which is false here)
-      createdBy: req.user._id,
-      leadType: "general",
-      source: "Manual Entry"
-    });
-    
-    res.status(201).json({
-      message: "Lead created successfully",
-      lead: {
-        id: lead._id,
-        customer_name: lead.name,
-        phone_number: lead.phone,
-        brand: lead.brand,
-        store_location: lead.store,
-        lead_status: lead.leadStatus,
-        call_status: lead.callStatus,
-        follow_up_date: lead.followUpDate,
-      },
-    }); */
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: error.message });
   }
 };
