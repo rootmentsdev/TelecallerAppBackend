@@ -7,7 +7,18 @@ const reportSchema = new mongoose.Schema({
   editedAt: { type: Date, default: Date.now },
   note: { type: String, default: null },
   // Call duration in seconds
-  callDuration: { type: Number, default: 0, index: true }
+  callDuration: { type: Number, default: 0, index: true },
+
+  // Explicitly defined fields for consistency across collections
+  leadType: { type: String, default: "enquiry", index: true },
+  functionDate: { type: Date, default: null },
+  subCategory: { type: String, default: null },
+  itemCategory: { type: String, default: null },
+  closingAction: { type: String, default: null },
+  reasons: { type: String, default: null },
+  remarks: { type: String, default: "" },
+  lead_status: { type: String, default: "" },
+  call_status: { type: String, default: "" }
 }, { timestamps: true, strict: false });
 
 export default mongoose.model("Report", reportSchema);

@@ -11,10 +11,12 @@ const leadSchema = new mongoose.Schema(
     source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.
     leadType: {
       type: String,
-      enum: ["lossOfSale", "return", "justDial", "general"],
-      default: "general"
+      enum: ["lossOfSale", "return", "justDial", "general", "enquiry"],
+      default: "enquiry"
     },
     brand: { type: String }, // For Add Lead page
+    subCategory: { type: String, default: null },
+    itemCategory: { type: String, default: null },
 
     // Dates
     enquiryDate: { type: Date },
@@ -32,12 +34,14 @@ const leadSchema = new mongoose.Schema(
     callStatus: { type: String, default: "Not Called" },
     leadStatus: { type: String, default: "No Status" },
     closingStatus: { type: String }, // For Just Dial page
+    closingAction: { type: String, default: null },
 
     // Follow-up
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information
     reason: { type: String }, // For Just Dial page
+    reasons: { type: String, default: null },
     reasonCollectedFromStore: { type: String }, // For Loss of Sale page
     rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
     attendedBy: { type: String },
