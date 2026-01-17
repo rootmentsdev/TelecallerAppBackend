@@ -1,7 +1,7 @@
 import Lead from "../models/Lead.js";
 import FollowUp from "../models/FollowUp.js";
 import Report from "../models/Report.js";
-import StarredCall from "../models/StarredCall.js";
+import Complaint from "../models/Complaint.js";
 import mongoose from "mongoose";
 
 // Helper function to check access permissions
@@ -209,7 +209,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
 
     // Source and Type
     source: lead.source || undefined,
-    leadType: lead.leadType || lead.lead_type || "general",
+    leadType: lead.leadType || lead.lead_type || "enquiry",
     brand: lead.brand || undefined,
 
     // Dates
@@ -331,7 +331,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.store = lead.store ?? "";
   // CRITICAL: Ensure lead_type is always set (never empty string)
   // This is essential for proper sorting in reports
-  payload.lead_type = lead.leadType ?? lead.lead_type ?? "general";
+  payload.lead_type = lead.leadType ?? lead.lead_type ?? "enquiry";
   payload.call_status = lead.callStatus ?? lead.call_status ?? "";
   payload.lead_status = lead.leadStatus ?? lead.lead_status ?? "";
   payload.function_date = lead.functionDate ?? lead.function_date ?? null;
@@ -354,7 +354,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.itemCategory = lead.itemCategory ?? lead.item_category ?? null;
   payload.closingAction = lead.closingAction ?? lead.closing_action ?? null;
   payload.reasons = lead.reasons ?? null;
-  payload.leadType = lead.leadType ?? lead.lead_type ?? "general";
+  payload.leadType = lead.leadType ?? lead.lead_type ?? "enquiry";
   payload.functionDate = lead.functionDate ?? lead.function_date ?? null;
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
@@ -412,47 +412,47 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   return await Report.findById(report._id);
 };
 
-// Helper function to handle lead movement with priority: markAsIssue > markForFollowUp > Report
-// Returns { type: 'starredCall'|'followUp'|'report', data: object, message: string }
+// Helper function to handle lead movement with priority: markAsComplaint > markForFollowUp > Report
+// Returns { type: 'complaint'|'followUp'|'report', data: object, message: string }
 // sourceModel defaults to Lead, can be passed as FollowUp
 const handleLeadMovement = async (updatedLead, req, remarks, changedFields, callDuration, sourceModel = Lead) => {
-  const { mark_as_issue } = req.body;
+  const { mark_as_complaint } = req.body;
   const followUpFlag = updatedLead.followUpFlag;
   const id = updatedLead._id || updatedLead.id;
 
-  // CRITICAL: Normalize mark_as_issue to handle string "true", boolean true, or number 1
+  // CRITICAL: Normalize mark_as_complaint to handle string "true", boolean true, or number 1
   // This ensures checkbox values from frontend are correctly recognized
-  const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+  const isMarkAsComplaint = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1 || mark_as_complaint === "1";
 
   // Diagnostic logging
-  console.log(`[handleLeadMovement] Lead ID: ${id}, mark_as_issue (raw): ${mark_as_issue} (type: ${typeof mark_as_issue}), normalized: ${isMarkAsIssue}, followUpFlag: ${followUpFlag}`);
+  console.log(`[handleLeadMovement] Lead ID: ${id}, mark_as_complaint (raw): ${mark_as_complaint} (type: ${typeof mark_as_complaint}), normalized: ${isMarkAsComplaint}, followUpFlag: ${followUpFlag}`);
 
-  // PRIORITY 1: markAsIssue (highest priority)
-  if (isMarkAsIssue) {
-    let starredCall;
+  // PRIORITY 1: markAsComplaint (highest priority)
+  if (isMarkAsComplaint) {
+    let complaint;
     try {
-      console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
-      starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarks, callDuration);
+      console.log(`⭐ Moving Lead to Complaints collection. Lead ID: ${id}`);
+      complaint = await moveLeadToComplaint(updatedLead, req.user._id, remarks, callDuration);
 
-      if (!starredCall || !starredCall._id) {
-        throw new Error("StarredCall creation returned null or invalid StarredCall");
+      if (!complaint || !complaint._id) {
+        throw new Error("Complaint creation returned null or invalid Complaint");
       }
 
       // Final verification that document exists in database
-      const verifiedStarredCall = await StarredCall.findById(starredCall._id);
-      if (!verifiedStarredCall) {
-        throw new Error("StarredCall was created but not found in database");
+      const verifiedComplaint = await Complaint.findById(complaint._id);
+      if (!verifiedComplaint) {
+        throw new Error("Complaint was created but not found in database");
       }
 
-      console.log(`✅ StarredCall created successfully with ID: ${starredCall._id}`);
-      starredCall = verifiedStarredCall;
-    } catch (starredCallError) {
-      console.error(`❌ CRITICAL: Failed to create StarredCall for Lead ID: ${id}`);
-      console.error(`   Error details:`, starredCallError.message);
-      throw starredCallError;
+      console.log(`✅ Complaint created successfully with ID: ${complaint._id}`);
+      complaint = verifiedComplaint;
+    } catch (complaintError) {
+      console.error(`❌ CRITICAL: Failed to create Complaint for Lead ID: ${id}`);
+      console.error(`   Error details:`, complaintError.message);
+      throw complaintError;
     }
 
-    // ONLY delete Lead/FollowUp AFTER StarredCall is successfully created and verified
+    // ONLY delete Lead/FollowUp AFTER Complaint is successfully created and verified
     try {
       const deleteResult = await sourceModel.findByIdAndDelete(id);
       if (deleteResult) {
@@ -462,11 +462,11 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
       }
     } catch (deleteError) {
       console.error(`❌ Failed to delete ID: ${id} from ${sourceModel.modelName}`, deleteError);
-      console.error(`⚠️  WARNING: StarredCall created (ID: ${starredCall._id}) but Lead deletion failed.`);
+      console.error(`⚠️  WARNING: Complaint created (ID: ${complaint._id}) but Lead deletion failed.`);
     }
 
-    const starredCallObj = starredCall.toObject ? starredCall.toObject() : starredCall;
-    return { type: 'starredCall', data: starredCallObj, message: 'Lead updated and moved to starred calls (issue call)' };
+    const complaintObj = complaint.toObject ? complaint.toObject() : complaint;
+    return { type: 'complaint', data: complaintObj, message: 'Lead updated and moved to complaints' };
   }
 
   // PRIORITY 2: markForFollowUp
@@ -544,8 +544,8 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
   return { type: 'report', data: reportObj, message: 'Lead updated and moved to reports' };
 };
 
-// Helper to move a lead to StarredCalls collection (Issue Calls)
-const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDuration = 0) => {
+// Helper to move a lead to Complaints collection
+const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration = 0) => {
   // Get sourceLeadId from original document BEFORE converting to object
   const sourceLeadIdValue = leadDoc._id || leadDoc.id;
 
@@ -560,7 +560,7 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDurat
     if (!lead.name) missingFields.push('name');
     if (!lead.phone) missingFields.push('phone');
     if (!lead.store) missingFields.push('store');
-    throw new Error(`Missing required fields for StarredCall creation: ${missingFields.join(', ')}`);
+    throw new Error(`Missing required fields for Complaint creation: ${missingFields.join(', ')}`);
   }
 
   // Validate and normalize remarks
@@ -579,14 +579,14 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDurat
   // Fields to exclude from lead data (internal mongoose fields)
   const excludeFields = ['_id', '__v', 'createdAt', 'updatedAt'];
 
-  // Create StarredCall document with all lead fields flattened (no snapshot)
-  const starredCallData = {
+  // Create Complaint document with all lead fields flattened (no snapshot)
+  const complaintData = {
     // Copy all lead fields directly (flattened structure)
     name: lead.name,
     phone: lead.phone,
     store: lead.store,
     source: lead.source,
-    leadType: lead.leadType || lead.lead_type || "general",
+    leadType: lead.leadType || lead.lead_type || "enquiry",
     brand: lead.brand,
     enquiryDate: lead.enquiryDate || lead.enquiry_date,
     visitDate: lead.visitDate || lead.visit_date,
@@ -610,51 +610,51 @@ const moveLeadToStarredCalls = async (leadDoc, userId, remarks = null, callDurat
     assignedTo: lead.assignedTo || lead.assigned_to,
     assignedAt: lead.assignedAt || lead.assigned_at,
 
-    // Issue-specific fields (remarks can override lead.remarks)
+    // Complaint-specific fields (remarks can override lead.remarks)
     remarks: remarksValidation.normalizedRemarks || lead.remarks || "",
     subCategory: lead.subCategory,
     itemCategory: lead.itemCategory,
     closingAction: lead.closingAction,
-    issueMarkedBy: userId,
-    issueMarkedAt: new Date(),
+    complaintMarkedBy: userId,
+    complaintMarkedAt: new Date(),
     sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
   };
 
   // Remove undefined values and excluded fields
-  Object.keys(starredCallData).forEach(key => {
-    if (starredCallData[key] === undefined || excludeFields.includes(key)) {
-      delete starredCallData[key];
+  Object.keys(complaintData).forEach(key => {
+    if (complaintData[key] === undefined || excludeFields.includes(key)) {
+      delete complaintData[key];
     }
   });
 
-  // Create StarredCall document
-  let starredCall;
+  // Create Complaint document
+  let complaint;
   try {
-    console.log(`⭐ Creating StarredCall (Issue Call). Lead ID: ${sourceLeadIdValue}, Name: ${starredCallData.name}, Phone: ${starredCallData.phone}`);
-    starredCall = await StarredCall.create(starredCallData);
-    console.log(`✅ StarredCall created: ${starredCall._id}`);
+    console.log(`⭐ Creating Complaint. Lead ID: ${sourceLeadIdValue}, Name: ${complaintData.name}, Phone: ${complaintData.phone}`);
+    complaint = await Complaint.create(complaintData);
+    console.log(`✅ Complaint created: ${complaint._id}`);
 
     // Verify the document was actually saved to database
-    const savedDoc = await StarredCall.findById(starredCall._id);
+    const savedDoc = await Complaint.findById(complaint._id);
     if (!savedDoc) {
-      throw new Error(`StarredCall was created but not found in database immediately after creation`);
+      throw new Error(`Complaint was created but not found in database immediately after creation`);
     }
   } catch (createError) {
-    console.error(`❌ Failed to create StarredCall document:`, createError);
+    console.error(`❌ Failed to create Complaint document:`, createError);
     console.error(`   Error name: ${createError.name}, Error code: ${createError.code}`);
-    console.error(`   StarredCallData keys:`, Object.keys(starredCallData));
-    console.error(`   sourceLeadId type:`, typeof starredCallData.sourceLeadId, `value:`, starredCallData.sourceLeadId);
+    console.error(`   ComplaintData keys:`, Object.keys(complaintData));
+    console.error(`   sourceLeadId type:`, typeof complaintData.sourceLeadId, `value:`, complaintData.sourceLeadId);
 
     // Re-throw with more context
     if (createError.name === 'ValidationError') {
       const validationErrors = Object.values(createError.errors || {}).map(e => e.message).join(', ');
-      throw new Error(`StarredCall validation failed: ${validationErrors}`);
+      throw new Error(`Complaint validation failed: ${validationErrors}`);
     } else {
-      throw new Error(`Failed to create StarredCall: ${createError.message || createError.toString()}`);
+      throw new Error(`Failed to create Complaint: ${createError.message || createError.toString()}`);
     }
   }
 
-  return starredCall;
+  return complaint;
 };
 
 // ==================== Leads Listing ====================
@@ -718,9 +718,8 @@ export const getLeads = async (req, res) => {
     if (leadType) {
       const lowerType = leadType.toLowerCase();
       if (lowerType.includes('return')) dbLeadType = 'return';
-
       else if (lowerType.includes('loss')) dbLeadType = 'lossOfSale';
-      else if (lowerType.includes('walk')) dbLeadType = 'general';
+      // removed walk -> general mapping
     }
 
     const filters = {};
@@ -838,8 +837,6 @@ export const getLeads = async (req, res) => {
       if (lead.leadType === 'return') {
         base.booking_number = lead.bookingNo;
         base.return_date = lead.returnDate;
-      } else if (lead.leadType === 'bookingConfirmation') {
-        base.booking_number = lead.bookingNo;
       } else if (lead.leadType === 'lossOfSale') {
         base.visit_date = lead.visitDate;
         base.reason_collected_from_store = lead.reasonCollectedFromStore;
@@ -897,7 +894,7 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -914,13 +911,13 @@ export const updateLossOfSaleLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // CRITICAL: Normalize mark_as_issue for validation check
-    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    // CRITICAL: Normalize mark_as_complaint for validation check
+    const isMarkAsComplaintForValidation = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1 || mark_as_complaint === "1";
 
-    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (isMarkAsIssueForValidation && follow_up_flag === true) {
+    // CRITICAL: Validate that markAsComplaint and markForFollowUp are not both true
+    if (isMarkAsComplaintForValidation && follow_up_flag === true) {
       return res.status(400).json({
-        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        message: "Cannot mark lead as both complaint and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
       });
     }
@@ -930,13 +927,7 @@ export const updateLossOfSaleLead = async (req, res) => {
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
 
     // CRITICAL: Follow-up date validation and flag handling
-    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
-    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
-    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
-    // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
-      // When checkbox is checked, date is REQUIRED
-      // Check for undefined, null, or empty string
       if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({
           message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
@@ -951,23 +942,17 @@ export const updateLossOfSaleLead = async (req, res) => {
       }
       updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true;
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Loss of Sale lead ID: ${id} (checkbox was checked)`);
     } else if (follow_up_date !== undefined && follow_up_date !== null) {
-      // If date is provided without explicit flag, auto-set flag to true
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
       if (!validatedDate) {
         return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
       }
       updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true; // Auto-set flag when date is provided
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Loss of Sale lead ID: ${id} (date provided)`);
+      updateData.followUpFlag = true;
     } else if (follow_up_flag === false) {
-      // Explicitly unset follow-up flag
       updateData.followUpFlag = false;
-      // Clear follow-up date if flag is false
       updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
     }
 
@@ -990,7 +975,6 @@ export const updateLossOfSaleLead = async (req, res) => {
     }
 
     const beforeLead = lead.toObject();
-
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
 
     const changedFields = {};
@@ -998,142 +982,23 @@ export const updateLossOfSaleLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // CRITICAL: Normalize mark_as_issue to handle string "true", boolean true, or number 1
-    const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
-    console.log(`[updateLossOfSaleLead] Lead ID: ${id}, mark_as_issue (raw): ${mark_as_issue} (type: ${typeof mark_as_issue}), normalized: ${isMarkAsIssue}`);
+    // Handle lead movement with priority: markAsComplaint > markForFollowUp > Report
+    try {
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
 
-    // PRIORITY ORDER: markAsIssue > markForFollowUp > Report
-    // 1. Check markAsIssue first (highest priority)
-    if (isMarkAsIssue) {
-      let starredCall;
-      try {
-        console.log(`⭐ Moving Lead to StarredCalls collection (Issue Call). Lead ID: ${id}`);
-        starredCall = await moveLeadToStarredCalls(updatedLead, req.user._id, remarksValidation.normalizedRemarks, call_duration);
-
-        if (!starredCall || !starredCall._id) {
-          throw new Error("StarredCall creation returned null or invalid StarredCall");
-        }
-
-        const verifiedStarredCall = await StarredCall.findById(starredCall._id);
-        if (!verifiedStarredCall) {
-          throw new Error("StarredCall was created but not found in database");
-        }
-
-        console.log(`✅ StarredCall created successfully with ID: ${starredCall._id}`);
-        starredCall = verifiedStarredCall;
-      } catch (starredCallError) {
-        console.error(`❌ CRITICAL: Failed to create StarredCall for Lead ID: ${id}`);
-        console.error(`   Error details:`, starredCallError.message);
-        return res.status(500).json({
-          message: `Failed to move lead to starred calls: ${starredCallError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? starredCallError.stack : undefined
-        });
+      if (result.type === 'complaint') {
+        res.json({ message: "Loss of Sale lead updated and moved to complaints", complaint: result.data });
+      } else if (result.type === 'followUp') {
+        res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp: result.data });
+      } else {
+        res.json({ message: "Loss of Sale lead updated and moved to reports", report: result.data });
       }
-
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        console.error(`⚠️  WARNING: StarredCall created (ID: ${starredCall._id}) but Lead deletion failed.`);
-      }
-
-      const starredCallObj = starredCall.toObject ? starredCall.toObject() : starredCall;
-      res.json({ message: "Loss of Sale lead updated and moved to starred calls (issue call)", starredCall: starredCallObj });
-      return;
-    }
-
-    // 2. Check followUpFlag (second priority)
-    const followUpFlag = updatedLead.followUpFlag;
-    if (followUpFlag === true) {
-      let followUp;
-      try {
-        console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
-
-        if (!followUp || !followUp._id) {
-          throw new Error("FollowUp creation returned null or invalid FollowUp");
-        }
-
-        const verifiedFollowUp = await FollowUp.findById(followUp._id);
-        if (!verifiedFollowUp) {
-          throw new Error("FollowUp was created but not found in database");
-        }
-
-        console.log(`✅ FollowUp created successfully with ID: ${followUp._id}`);
-        followUp = verifiedFollowUp;
-      } catch (followUpError) {
-        console.error(`❌ CRITICAL: Failed to create FollowUp for Lead ID: ${id}`);
-        console.error(`   Error details:`, followUpError.message);
-        return res.status(500).json({
-          message: `Failed to move lead to follow-ups: ${followUpError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? followUpError.stack : undefined
-        });
-      }
-
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        console.error(`⚠️  WARNING: FollowUp created (ID: ${followUp._id}) but Lead deletion failed.`);
-      }
-
-      const followUpObj = followUp.toObject ? followUp.toObject() : followUp;
-      res.json({ message: "Loss of Sale lead updated and moved to follow-ups", followUp: followUpObj });
-    } else {
-      // Move to Reports collection (existing behavior)
-      // CRITICAL: Create Report FIRST, then delete Lead only if Report creation succeeds
-      let report;
-      try {
-        console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-        report = await createReportFromLead(updatedLead, req.user._id, remarksValidation.normalizedRemarks, changedFields, call_duration);
-
-        // Verify report was created successfully
-        if (!report || !report._id) {
-          throw new Error("Report creation returned null or invalid report");
-        }
-
-        // Verify report exists in database
-        const verifiedReport = await Report.findById(report._id);
-        if (!verifiedReport) {
-          throw new Error("Report was created but not found in database");
-        }
-
-        console.log(`✅ Report created successfully with ID: ${report._id}`);
-        report = verifiedReport;
-      } catch (reportError) {
-        console.error(`❌ CRITICAL: Failed to create Report for Lead ID: ${id}`);
-        console.error(`   Error details:`, reportError.message);
-        console.error(`   Stack:`, reportError.stack);
-        // DO NOT delete Lead if Report creation failed
-        return res.status(500).json({
-          message: `Failed to move lead to reports: ${reportError.message}. Lead was not deleted.`,
-          error: process.env.NODE_ENV === 'development' ? reportError.stack : undefined
-        });
-      }
-
-      // Only delete Lead AFTER Report is successfully created
-      try {
-        const deleteResult = await Lead.findByIdAndDelete(id);
-        if (deleteResult) {
-          console.log(`✅ Lead ID ${id} removed from Leads collection`);
-        } else {
-          console.warn(`⚠️  Lead ID ${id} deletion returned null (may have been already deleted)`);
-        }
-      } catch (deleteError) {
-        console.error(`❌ Failed to delete Lead ID: ${id}`, deleteError);
-        // Report was created, so return success but log the error
-        console.error(`⚠️  WARNING: Report created (ID: ${report._id}) but Lead deletion failed. Manual cleanup may be needed.`);
-      }
-
-      // Convert Mongoose document to plain object to avoid serialization issues
-      const reportObj = report.toObject ? report.toObject() : report;
-      res.json({ message: "Loss of Sale lead updated and moved to reports", report: reportObj });
+    } catch (movementError) {
+      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
+      return res.status(500).json({
+        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
+        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
+      });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1174,7 +1039,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1191,13 +1056,13 @@ export const updateReturnLead = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // CRITICAL: Normalize mark_as_issue for validation check
-    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    // CRITICAL: Normalize mark_as_complaint for validation check
+    const isMarkAsComplaintForValidation = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1 || mark_as_complaint === "1";
 
-    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (isMarkAsIssueForValidation && follow_up_flag === true) {
+    // CRITICAL: Validate that markAsComplaint and markForFollowUp are not both true
+    if (isMarkAsComplaintForValidation && follow_up_flag === true) {
       return res.status(400).json({
-        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        message: "Cannot mark lead as both complaint and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
       });
     }
@@ -1206,9 +1071,8 @@ export const updateReturnLead = async (req, res) => {
     if (call_status !== undefined) updateData.callStatus = call_status;
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
 
-    // Handle rating field (1-5 stars for return leads)
+    // Handle rating field (1-5 stars for Return leads)
     if (rating !== undefined && rating !== null) {
-      // Validate rating is between 1 and 5
       const ratingNum = parseInt(rating);
       if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
         return res.status(400).json({ message: "Rating must be a number between 1 and 5" });
@@ -1217,13 +1081,7 @@ export const updateReturnLead = async (req, res) => {
     }
 
     // CRITICAL: Follow-up date validation and flag handling
-    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
-    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
-    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
-    // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
-      // When checkbox is checked, date is REQUIRED
-      // Check for undefined, null, or empty string
       if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({
           message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
@@ -1238,23 +1096,17 @@ export const updateReturnLead = async (req, res) => {
       }
       updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true;
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Return lead ID: ${id} (checkbox was checked)`);
     } else if (follow_up_date !== undefined && follow_up_date !== null) {
-      // If date is provided without explicit flag, auto-set flag to true
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
       if (!validatedDate) {
         return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
       }
       updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true; // Auto-set flag when date is provided
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Return lead ID: ${id} (date provided)`);
+      updateData.followUpFlag = true;
     } else if (follow_up_flag === false) {
-      // Explicitly unset follow-up flag
       updateData.followUpFlag = false;
-      // Clear follow-up date if flag is false
       updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
     }
 
@@ -1276,7 +1128,6 @@ export const updateReturnLead = async (req, res) => {
     }
 
     const beforeLead = lead.toObject();
-
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
 
     const changedFields = {};
@@ -1284,12 +1135,12 @@ export const updateReturnLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
+    // Handle lead movement with priority: markAsComplaint > markForFollowUp > Report
     try {
       const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
 
-      if (result.type === 'starredCall') {
-        res.json({ message: "Return lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      if (result.type === 'complaint') {
+        res.json({ message: "Return lead updated and moved to complaints", complaint: result.data });
       } else if (result.type === 'followUp') {
         res.json({ message: "Return lead updated and moved to follow-ups", followUp: result.data });
       } else {
@@ -1297,178 +1148,6 @@ export const updateReturnLead = async (req, res) => {
       }
     } catch (movementError) {
       console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
-      console.error(`   Error details:`, movementError.message);
-      return res.status(500).json({
-        message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
-        error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-
-
-// ==================== Just Dial Page ====================
-
-// GET - Fetch Just Dial lead data (GET fields only)
-export const getJustDialLead = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const lead = await Lead.findById(id);
-
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
-    }
-
-    if (!checkAccess(lead, req.user)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // Return only GET fields
-    res.json({
-      lead_name: lead.name,
-      phone_number: lead.phone,
-      enquiry_date: lead.enquiryDate,
-      function_date: lead.functionDate,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// POST - Update Just Dial lead data (POST fields only)
-export const updateJustDialLead = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { call_status, lead_status, closing_status, reason, follow_up_flag, follow_up_date, call_date, remarks, call_duration, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
-
-    const lead = await Lead.findById(id);
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
-    }
-
-    if (!checkAccess(lead, req.user)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // CRITICAL: Normalize mark_as_issue for validation check
-    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
-
-    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (isMarkAsIssueForValidation && follow_up_flag === true) {
-      return res.status(400).json({
-        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
-        error: "VALIDATION_ERROR"
-      });
-    }
-
-    const updateData = {};
-    if (call_status !== undefined) updateData.callStatus = call_status;
-    if (lead_status !== undefined) updateData.leadStatus = lead_status;
-    if (closing_status !== undefined) updateData.closingStatus = closing_status;
-    if (reason !== undefined) updateData.reason = reason;
-
-    // CRITICAL: Follow-up date validation and flag handling
-    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
-    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
-    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
-    // Use the date from frontend (not today's date)
-    if (follow_up_flag === true) {
-      // When checkbox is checked, date is REQUIRED
-      // Check for undefined, null, or empty string
-      if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
-        return res.status(400).json({
-          message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
-          error: "VALIDATION_ERROR",
-          field: "follow_up_date",
-          required: true
-        });
-      }
-      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-      if (!validatedDate) {
-        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
-      }
-      updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true;
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Just Dial lead ID: ${id} (checkbox was checked)`);
-    } else if (follow_up_date !== undefined && follow_up_date !== null) {
-      // If date is provided without explicit flag, auto-set flag to true
-      const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-      if (!validatedDate) {
-        return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
-      }
-      updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true; // Auto-set flag when date is provided
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for Just Dial lead ID: ${id} (date provided)`);
-    } else if (follow_up_flag === false) {
-      // Explicitly unset follow-up flag
-      updateData.followUpFlag = false;
-      // Clear follow-up date if flag is false
-      updateData.followUpDate = null;
-    } else if (follow_up_flag !== undefined) {
-      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
-      updateData.followUpFlag = follow_up_flag;
-    }
-
-    if (call_date !== undefined) updateData.callDate = call_date;
-    // Validate and normalize remarks - converts empty strings to null
-    if (remarks !== undefined) {
-      const remarksValidation = validateAndNormalizeRemarks(remarks);
-      if (!remarksValidation.isValid) {
-        return res.status(400).json({ message: remarksValidation.error });
-      }
-      updateData.remarks = remarksValidation.normalizedRemarks; // Will be null if empty/whitespace
-    }
-    if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
-
-    // Update new fields if provided
-    if (subCategory !== undefined) updateData.subCategory = subCategory;
-    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
-    if (closingAction !== undefined) updateData.closingAction = closingAction;
-    if (reasons !== undefined) updateData.reasons = reasons;
-    // Allow updating leadType if provided
-    if (leadType !== undefined) updateData.leadType = leadType;
-    // Allow updating functionDate if provided
-    if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
-
-    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
-      updateData.leadType = "justDial";
-    }
-
-    const beforeLead = lead.toObject();
-
-    const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
-
-    const changedFields = {};
-    Object.keys(updateData).forEach((key) => {
-      changedFields[key] = {
-        before: beforeLead[key],
-        after: updatedLead[key],
-      };
-    });
-
-    // Validate remarks for Just Dial (needed for handleLeadMovement)
-    const remarksValidation = validateAndNormalizeRemarks(remarks);
-    if (remarks !== undefined && !remarksValidation.isValid) {
-      return res.status(400).json({ message: remarksValidation.error });
-    }
-
-    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
-    try {
-      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
-
-      if (result.type === 'starredCall') {
-        res.json({ message: "Just Dial lead updated and moved to starred calls (issue call)", starredCall: result.data });
-      } else if (result.type === 'followUp') {
-        res.json({ message: "Just Dial lead updated and moved to follow-ups", followUp: result.data });
-      } else {
-        res.json({ message: "Just Dial lead updated and moved to reports", report: result.data });
-      }
-    } catch (movementError) {
-      console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
-      console.error(`   Error details:`, movementError.message);
       return res.status(500).json({
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
@@ -1500,7 +1179,7 @@ export const createAddLead = async (req, res) => {
       closingAction,
       remarks,
       reasons,
-      mark_as_issue
+      mark_as_complaint
     } = req.body;
 
     // Check if lead with same phone number already exists
@@ -1538,56 +1217,6 @@ export const createAddLead = async (req, res) => {
       ? (storeLocationClean ? `${brandClean} - ${storeLocationClean}` : brandClean)
       : storeLocationClean;
 
-    /* REMOVED IF BLOCK START
-    // Validate follow_up_date (REQUIRED for follow-ups)
-    if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
-      return res.status(400).json({
-        message: "follow_up_date is required when follow_up_flag is true.",
-        error: "VALIDATION_ERROR",
-        field: "follow_up_date",
-        required: true
-      });
-    }
-     
-    const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
-    if (!validatedDate) {
-      return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
-    }
-     
-    console.log(`📝 Creating new lead directly in FollowUps: ${customer_name} (${phone_number})`);
-     
-    const followUp = await FollowUp.create({
-      name: customer_name,
-      phone: phone_number,
-      brand: brandClean,
-      store: storeValue,
-      leadStatus: lead_status || "No Status",
-      callStatus: call_status || "Not Called",
-      followUpDate: validatedDate,
-      followUpFlag: true,
-      createdBy: req.user._id,
-      leadType: "general", // Default for manually added leads
-      source: "Manual Entry (FollowUp)"
-    });
-     
-    return res.status(201).json({
-      message: "Lead created and added to follow-ups successfully",
-      lead: {
-        id: followUp._id,
-        customer_name: followUp.name,
-        phone_number: followUp.phone,
-        brand: followUp.brand,
-        store_location: followUp.store,
-        lead_status: followUp.leadStatus,
-        call_status: followUp.callStatus,
-        follow_up_date: followUp.followUpDate,
-        lead_type: followUp.leadType,
-        collection: "FollowUps"
-      },
-    });
-    }
-     
-        */
     // Default leadType to "enquiry" if not provided (requested default)
     const finalLeadType = leadType || "enquiry";
 
@@ -1618,37 +1247,33 @@ export const createAddLead = async (req, res) => {
 
     // Post-creation Movement Logic
     // Normalize boolean flags
-    const isMarkAsIssue = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1;
+    const isMarkAsComplaint = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1;
     const isFollowUp = lead.followUpFlag === true;
 
-    // Priority 1: mark_as_issue
-    if (isMarkAsIssue) {
+    // Priority 1: mark_as_complaint
+    if (isMarkAsComplaint) {
       try {
-        console.log(`[createAddLead] Handling immediate movement to StarredCalls for Lead ID: ${lead._id}`);
-        // Reuse handleLeadMovement (it handles creating StarredCall and deleting from Leads)
+        console.log(`[createAddLead] Handling immediate movement to Complaints for Lead ID: ${lead._id}`);
+        // Reuse handleLeadMovement (it handles creating Complaint and deleting from Leads)
         // Pass empty object for changedFields since it's a new lead
         const result = await handleLeadMovement(lead, req, leadData.remarks, {}, 0, Lead);
 
         return res.status(201).json({
-          message: "Lead created and moved to starred calls (issue call)",
-          starredCall: result.data
+          message: "Lead created and moved to complaints",
+          complaint: result.data
         });
       } catch (moveError) {
-        console.error("Error moving new lead to starred calls:", moveError);
+        console.error("Error moving new lead to complaints:", moveError);
         // Fallback: return created lead but warn
         return res.status(201).json({
-          message: "Lead created but failed to move to starred calls",
+          message: "Lead created but failed to move to complaints",
           lead: lead,
           error: moveError.message
         });
       }
     }
-    // Priority 2: follow_up_flag (only if not marked as issue)
+    // Priority 2: follow_up_flag (only if not marked as complaint)
     else if (isFollowUp) {
-      if (!leadData.followUpDate) {
-        // Should have been validated by caller or frontend, but safeguard here
-      }
-
       try {
         console.log(`[createAddLead] Handling immediate movement to FollowUps for Lead ID: ${lead._id}`);
         const result = await handleLeadMovement(lead, req, leadData.remarks, {}, 0, Lead);
@@ -2018,63 +1643,41 @@ export const getLeadById = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-// ==================== General Lead Page ====================
+// ==================== Generic Lead Update (Enquiry / LossOfSale / etc) ====================
 
-// GET - Fetch General lead data (GET fields only)
-export const getGeneralLead = async (req, res) => {
+// PATCH - Generic update for lead (covers enquiry, lossOfSale, etc.)
+export const updateLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const lead = await Lead.findById(id);
-
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
-    }
-
-    if (!checkAccess(lead, req.user)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    // Return only GET fields for general leads
-    res.json({
-      lead_name: lead.name,
-      phone_number: lead.phone,
-      enquiry_date: lead.enquiryDate,
-      function_date: lead.functionDate,
-      store: lead.store,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// POST - Update General lead data (POST fields only)
-export const updateGeneralLead = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, call_date, reason_collected_from_store, remarks, closing_status, rating, call_duration, mark_as_issue, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
-
-    // Validate remarks input
-    const remarksValidation = validateAndNormalizeRemarks(remarks);
-    if (!remarksValidation.isValid) {
-      return res.status(400).json({ message: remarksValidation.error });
-    }
+    const {
+      call_status,
+      lead_status,
+      follow_up_flag,
+      follow_up_date,
+      call_date,
+      reason_collected_from_store,
+      remarks,
+      closing_status,
+      rating,
+      call_duration,
+      mark_as_complaint, // REMOVED mark_as_issue
+      subCategory, itemCategory, closingAction, reasons, leadType, functionDate
+    } = req.body;
 
     const lead = await Lead.findById(id);
-    if (!lead) {
-      return res.status(404).json({ message: "Lead not found" });
-    }
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
 
     if (!checkAccess(lead, req.user)) {
-      return res.status(403).json({ message: "Access denied" });
+      return res.status(403).json({ message: 'Access denied' });
     }
 
-    // CRITICAL: Normalize mark_as_issue for validation check
-    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    // CRITICAL: Normalize mark_as_complaint for validation check
+    const isMarkAsComplaintForValidation = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1 || mark_as_complaint === "1";
 
-    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (isMarkAsIssueForValidation && follow_up_flag === true) {
+    // CRITICAL: Validate that markAsComplaint and markForFollowUp are not both true
+    if (isMarkAsComplaintForValidation && follow_up_flag === true) {
       return res.status(400).json({
-        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        message: "Cannot mark lead as both complaint and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
       });
     }
@@ -2084,13 +1687,7 @@ export const updateGeneralLead = async (req, res) => {
     if (lead_status !== undefined) updateData.leadStatus = lead_status;
 
     // CRITICAL: Follow-up date validation and flag handling
-    // Rule 1: If follow_up_flag is true, follow_up_date MUST be provided
-    // Rule 2: If follow_up_date is provided, automatically set followUpFlag = true
-    // This ensures leads with follow-up dates move to FollowUps collection, not Reports
-    // Use the date from frontend (not today's date)
     if (follow_up_flag === true) {
-      // When checkbox is checked, date is REQUIRED
-      // Check for undefined, null, or empty string
       if (follow_up_date === undefined || follow_up_date === null || (typeof follow_up_date === 'string' && follow_up_date.trim() === '')) {
         return res.status(400).json({
           message: "follow_up_date is required when follow_up_flag is true. Please provide the follow-up date from frontend.",
@@ -2105,50 +1702,48 @@ export const updateGeneralLead = async (req, res) => {
       }
       updateData.followUpDate = validatedDate;
       updateData.followUpFlag = true;
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for General lead ID: ${id} (checkbox was checked)`);
     } else if (follow_up_date !== undefined && follow_up_date !== null) {
-      // If date is provided without explicit flag, auto-set flag to true
       const validatedDate = validateAndConvertFollowUpDate(follow_up_date);
       if (!validatedDate) {
         return res.status(400).json({ message: "Invalid follow_up_date format. Must be a valid date (ISO 8601 format)." });
       }
       updateData.followUpDate = validatedDate;
-      updateData.followUpFlag = true; // Auto-set flag when date is provided
-      console.log(`✅ Setting followUpDate: ${validatedDate.toISOString()} for General lead ID: ${id} (date provided)`);
+      updateData.followUpFlag = true;
     } else if (follow_up_flag === false) {
-      // Explicitly unset follow-up flag
       updateData.followUpFlag = false;
-      // Clear follow-up date if flag is false
       updateData.followUpDate = null;
     } else if (follow_up_flag !== undefined) {
-      // If flag is provided but not true/false, just set it (shouldn't happen, but handle gracefully)
       updateData.followUpFlag = follow_up_flag;
     }
 
     if (call_date !== undefined) updateData.callDate = call_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
-    if (remarks !== undefined) updateData.remarks = remarksValidation.normalizedRemarks;
+
+    let remarksValidation = null;
+    if (remarks !== undefined) {
+      remarksValidation = validateAndNormalizeRemarks(remarks);
+      if (!remarksValidation.isValid) {
+        return res.status(400).json({ message: remarksValidation.error });
+      }
+      updateData.remarks = remarksValidation.normalizedRemarks;
+    }
     if (closing_status !== undefined) updateData.closingStatus = closing_status;
     if (rating !== undefined) updateData.rating = rating;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    // Update new fields if provided
     if (subCategory !== undefined) updateData.subCategory = subCategory;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
     if (reasons !== undefined) updateData.reasons = reasons;
-    // Allow updating leadType if provided
     if (leadType !== undefined) updateData.leadType = leadType;
-    // Allow updating functionDate if provided
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
 
-    // Ensure leadType is set to general (or preserved if already set)
-    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
-      updateData.leadType = "general";
+    // Ensure leadType is set to enquiry if missing (default for generic update if undefined in doc and update)
+    if (!lead.leadType && !updateData.leadType) {
+      updateData.leadType = "enquiry";
     }
 
     const beforeLead = lead.toObject();
-
     const updatedLead = await Lead.findByIdAndUpdate(id, updateData, { new: true });
 
     const changedFields = {};
@@ -2156,20 +1751,24 @@ export const updateGeneralLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
-    // Handle lead movement with priority: markAsIssue > markForFollowUp > Report
+    // Handle lead movement with priority: markAsComplaint > markForFollowUp > Report
     try {
-      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      // Pass the normalized remarks
+      const remarksToUse = (remarks !== undefined && remarksValidation && remarksValidation.normalizedRemarks !== undefined)
+        ? remarksValidation.normalizedRemarks
+        : lead.remarks; // Use existing remarks if not updated
 
-      if (result.type === 'starredCall') {
-        res.json({ message: "General lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      const result = await handleLeadMovement(updatedLead, req, remarksToUse, changedFields, call_duration);
+
+      if (result.type === 'complaint') {
+        res.json({ message: "Lead updated and moved to complaints", complaint: result.data });
       } else if (result.type === 'followUp') {
-        res.json({ message: "General lead updated and moved to follow-ups", followUp: result.data });
+        res.json({ message: "Lead updated and moved to follow-ups", followUp: result.data });
       } else {
-        res.json({ message: "General lead updated and moved to reports", report: result.data });
+        res.json({ message: "Lead updated and moved to reports", report: result.data });
       }
     } catch (movementError) {
       console.error(`❌ CRITICAL: Failed to move lead. Lead ID: ${id}`);
-      console.error(`   Error details:`, movementError.message);
       return res.status(500).json({
         message: `Failed to move lead: ${movementError.message}. Lead was not deleted.`,
         error: process.env.NODE_ENV === 'development' ? movementError.stack : undefined
@@ -2348,7 +1947,7 @@ export const updateFollowUp = async (req, res) => {
       remarks,
       call_duration,
       rating,
-      mark_as_issue, // Extract mark_as_issue
+      mark_as_complaint, // Extract mark_as_complaint
       subCategory, itemCategory, closingAction, reasons, leadType, functionDate // Extract new fields
     } = req.body;
 
@@ -2380,13 +1979,13 @@ export const updateFollowUp = async (req, res) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    // CRITICAL: Normalize mark_as_issue for validation check
-    const isMarkAsIssueForValidation = mark_as_issue === true || mark_as_issue === "true" || mark_as_issue === 1 || mark_as_issue === "1";
+    // CRITICAL: Normalize mark_as_complaint for validation check
+    const isMarkAsComplaintForValidation = mark_as_complaint === true || mark_as_complaint === "true" || mark_as_complaint === 1 || mark_as_complaint === "1";
 
-    // CRITICAL: Validate that markAsIssue and markForFollowUp are not both true
-    if (isMarkAsIssueForValidation && follow_up_flag === true) {
+    // CRITICAL: Validate that markAsComplaint and markForFollowUp are not both true
+    if (isMarkAsComplaintForValidation && follow_up_flag === true) {
       return res.status(400).json({
-        message: "Cannot mark lead as both issue and follow-up. Please choose only one option.",
+        message: "Cannot mark lead as both complaint and follow-up. Please choose only one option.",
         error: "VALIDATION_ERROR"
       });
     }
@@ -2469,15 +2068,15 @@ export const updateFollowUp = async (req, res) => {
       const result = await handleLeadMovement(updatedFollowUp, req, remarksValidation.normalizedRemarks, changedFields, call_duration, FollowUp);
 
       // Handle response based on where the lead moved
-      if (result.type === 'starredCall') {
-        res.json({ message: "Follow-up lead updated and moved to starred calls (issue call)", starredCall: result.data });
+      if (result.type === 'complaint') {
+        res.json({ message: "Follow-up lead updated and moved to complaints", complaint: result.data });
       } else if (result.type === 'followUp') {
         res.json({ message: "Follow-up lead updated and scheduled for next follow-up", followUp: result.data });
       } else {
         // Report
         // Ensure lead_type is explicit (handleLeadMovement does this via createReportFromLead, but we want to be safe)
         const reportObj = result.data;
-        const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "general";
+        const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "enquiry";
 
         res.json({
           message: "Follow-up lead updated and moved to reports",
@@ -2507,17 +2106,17 @@ export const updateFollowUp = async (req, res) => {
   }
 };
 
-// ==================== Starred Calls (Issue Calls) ====================
+// ==================== Complaints (Renamed from Starred Calls) ====================
 
-// GET - Fetch list of starred calls (issue calls)
-export const getStarredCalls = async (req, res) => {
+// GET - Fetch list of complaints
+export const getComplaints = async (req, res) => {
   try {
     const {
       leadType,
       store,
       page = 1,
       limit = 100,
-      sortBy = 'issueMarkedAt',
+      sortBy = 'complaintMarkedAt',
       sortOrder = 'desc'
     } = req.query;
 
@@ -2539,8 +2138,9 @@ export const getStarredCalls = async (req, res) => {
 
     // Build sort object
     const sortOptions = {};
-    const validSortFields = ["issueMarkedAt", "createdAt", "name", "store"];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : "issueMarkedAt";
+    const validSortFields = ["complaintMarkedAt", "createdAt", "name", "store"];
+    // Default to complaintMarkedAt, fallback to issueMarkedAt if legacy, but here we strictly use complaintMarkedAt
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "complaintMarkedAt";
     sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
 
     // Calculate pagination
@@ -2548,19 +2148,19 @@ export const getStarredCalls = async (req, res) => {
     const limitNum = parseInt(limit, 10) || 100;
     const skip = (pageNum - 1) * limitNum;
 
-    // Fetch starred calls with pagination
-    const [starredCalls, total] = await Promise.all([
-      StarredCall.find(filters)
-        .populate('issueMarkedBy', 'name employeeId')
+    // Fetch complaints with pagination
+    const [complaints, total] = await Promise.all([
+      Complaint.find(filters)
+        .populate('complaintMarkedBy', 'name employeeId')
         .sort(sortOptions)
         .skip(skip)
         .limit(limitNum)
         .lean(),
-      StarredCall.countDocuments(filters)
+      Complaint.countDocuments(filters)
     ]);
 
     res.json({
-      starredCalls,
+      complaints,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -2569,26 +2169,26 @@ export const getStarredCalls = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching starred calls:', error);
+    console.error('Error fetching complaints:', error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// GET - Fetch a single starred call by ID
-export const getStarredCallById = async (req, res) => {
+// GET - Fetch a single complaint by ID
+export const getComplaintById = async (req, res) => {
   try {
     const { id } = req.params;
-    const starredCall = await StarredCall.findById(id)
-      .populate('issueMarkedBy', 'name employeeId')
+    const complaint = await Complaint.findById(id)
+      .populate('complaintMarkedBy', 'name employeeId')
       .lean();
 
-    if (!starredCall) {
-      return res.status(404).json({ message: 'Starred call not found' });
+    if (!complaint) {
+      return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    res.json(starredCall);
+    res.json(complaint);
   } catch (error) {
-    console.error('Error fetching starred call:', error);
+    console.error('Error fetching complaint:', error);
     res.status(500).json({ message: error.message });
   }
 };

@@ -13,7 +13,7 @@ const followUpSchema = new mongoose.Schema(
     source: { type: String },
     leadType: {
       type: String,
-      enum: ["lossOfSale", "return", "justDial", "general", "enquiry"],
+      enum: ["enquiry", "return", "booked", "lossOfSale"],
       default: "enquiry"
     },
     brand: { type: String },

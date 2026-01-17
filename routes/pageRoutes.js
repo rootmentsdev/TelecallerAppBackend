@@ -41,7 +41,7 @@
  *       - Store + Date: `/api/pages/leads?store=Suitor Guy - Edappally&enquiryDateFrom=2024-01-01&enquiryDateTo=2024-12-31`
  *       - Lead Type + Store + Creation Date: `/api/pages/leads?leadType=return&store=Suitor Guy - Edappally&createdAt=2024-12-08`
  *       - Lead Type + Store + Date Range: `/api/pages/leads?leadType=return&store=Suitor Guy - Kottayam&functionDateFrom=2024-03-01&functionDateTo=2024-03-31`
- *       - Today's General Leads (Newest First): `/api/pages/leads?leadType=general&createdAt=2024-12-10&sortBy=createdAt&sortOrder=desc`
+ *       - Today's Enquiry Leads (Newest First): `/api/pages/leads?leadType=enquiry&createdAt=2024-12-10&sortBy=createdAt&sortOrder=desc`
  *       - Sort by Name: `/api/pages/leads?leadType=lossOfSale&sortBy=name&sortOrder=asc`
  *     parameters:
  *       - in: query
@@ -49,7 +49,7 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, return, justDial]
+ *           enum: [lossOfSale, return, enquiry]
  *         description: Type of lead to fetch. If omitted, returns leads of all types.
  *       - in: query
  *         name: store
@@ -80,7 +80,7 @@
  *             - Searching `"Suitor Guy - Edappally"` will NOT match stores with `"Edappal"`
  *             - Searching `"Suitor Guy - Edappal"` will NOT match stores with `"Edappally"`
  *           - Case-insensitive matching (e.g., `"kottayam"` matches `"Kottayam"`)
- *           - Works with all lead types (lossOfSale, return, general, justDial)
+ *           - Works with all lead types (lossOfSale, return, enquiry)
  *           
  *           **Examples:**
  *           - Get all leads for a store: `?store=Suitor Guy - Edappally`
@@ -550,21 +550,21 @@
               closingAction: { type: string }
               reasons: { type: string }
               functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: lossOfSale }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry], default: lossOfSale }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
- *               mark_as_issue:
+ *               mark_as_complaint:
  *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
  *               follow_up_flag:
  *                 type: boolean
- *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_issue is true."
+ *                 description: "Mark for follow-up. If true and follow_up_date is provided, lead moves to FollowUps collection. Cannot be true if mark_as_complaint is true."
  *     responses:
  *       200:
  *         description: |
  *           Loss of Sale lead updated successfully. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           Priority order: mark_as_complaint > follow_up_flag > default to Reports.
+ *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
  *       400:
@@ -649,7 +649,7 @@
               closingAction: { type: string }
               reasons: { type: string }
               functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: return }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
@@ -657,15 +657,15 @@
  *                 maximum: 5
  *                 description: "Star rating (1-5) for return leads. Optional."
  *                 example: 4
- *               mark_as_issue:
+ *               mark_as_complaint:
  *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
  *     responses:
  *       200:
  *         description: |
  *           Return lead updated successfully. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           Priority order: mark_as_complaint > follow_up_flag > default to Reports.
+ *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
  *       400:
@@ -678,102 +678,7 @@
 
 
 
-/**
- * @swagger
- * /api/pages/just-dial/{id}:
- *   get:
- *     summary: Get Just Dial lead details
- *     tags:
- *       - Just Dial
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Just Dial lead details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 lead_name: { type: string }
- *                 phone_number: { type: string }
- *                 enquiry_date: { type: string, format: date-time }
- *                 function_date: { type: string, format: date-time }
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Lead not found
- *       500:
- *         description: Internal server error
- */
-/**
- * @swagger
- * /api/pages/just-dial/{id}:
- *   post:
- *     summary: Update Just Dial lead
- *     tags:
- *       - Just Dial
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               call_status: { type: string }
- *               lead_status: { type: string }
- *               closing_status: { type: string }
- *               reason: { type: string }
-              subCategory: { type: string }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: justDial }
- *               follow_up_flag: 
- *                 type: boolean
- *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
- *               follow_up_date: 
- *                 type: string
- *                 format: date-time
- *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
- *               call_date: { type: string, format: date-time }
- *               remarks: { type: string }
- *               call_duration: { type: number, description: "Call duration in seconds" }
- *               mark_as_issue:
- *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *     responses:
- *       200:
- *         description: |
- *           Just Dial lead updated. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
- *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
- *           - Otherwise → moves to Reports collection
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
+
 
 /**
  * @swagger
@@ -802,8 +707,11 @@
               closingAction: { type: string }
               reasons: { type: string }
               remarks: { type: string }
-              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: enquiry }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry], default: enquiry }
               functionDate: { type: string, format: date-time }
+              mark_as_complaint:
+                type: boolean
+                description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
  *               follow_up_date:
  *                 type: string
  *                 format: date-time
@@ -834,28 +742,21 @@ import {
   updateLossOfSaleLead,
   getReturnLead,
   updateReturnLead,
-
-  getJustDialLead,
-  updateJustDialLead,
   createAddLead,
   updateGenericLead,
   getLeadById,
-  getGeneralLead,
-  updateGeneralLead,
+  updateLead, // Assuming generic updateLead is used
   getFollowUps,
   getFollowUpById,
   updateFollowUp,
-  getStarredCalls,
-  getStarredCallById,
+  getComplaints,
+  getComplaintById,
 } from "../controllers/pageController.js";
 import {
   lossOfSaleGetValidator,
   lossOfSalePostValidator,
   returnGetValidator,
   returnPostValidator,
-
-  justDialGetValidator,
-  justDialPostValidator,
   addLeadPostValidator,
   leadUpdateValidator,
   leadGetValidator,
@@ -872,7 +773,7 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  * @swagger
  * /api/pages/leads/{id}:
  *   patch:
- *     summary: Generic update for any lead (including 'general') and move it to reports
+ *     summary: Generic update for any lead (including 'enquiry') and move it to reports
  *     tags:
  *       - Leads
  *     security:
@@ -916,17 +817,17 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *               call_duration:
  *                 type: number
  *                 description: "Call duration in seconds"
- *               mark_as_issue:
+ *               mark_as_complaint:
  *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
  *     responses:
  *       200:
  *         description: |
  *           Lead updated. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           Priority order: mark_as_complaint > follow_up_flag > default to Reports.
+ *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
- *           - Otherwise → moves to Reports collection. Returns created report/starredCall/followUp object.
+ *           - Otherwise → moves to Reports collection. Returns created report/complaint/followUp object.
  *         content:
  *           application/json:
  *             schema:
@@ -942,7 +843,7 @@ router.patch(
   protect,
   leadUpdateValidator,
   handleValidation,
-  updateGenericLead
+  updateLead
 );
 
 /**
@@ -978,15 +879,15 @@ router.patch(
  *               closing_status: { type: string }
  *               rating: { type: integer }
  *               call_duration: { type: number, description: "Call duration in seconds" }
- *               mark_as_issue:
+ *               mark_as_complaint:
  *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
+ *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
  *     responses:
  *       200:
  *         description: |
  *           Lead updated. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
+ *           Priority order: mark_as_complaint > follow_up_flag > default to Reports.
+ *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
  */
@@ -995,7 +896,7 @@ router.post(
   protect,
   leadUpdateValidator,
   handleValidation,
-  updateGenericLead
+  updateLead
 );
 
 /**
@@ -1068,144 +969,6 @@ router.post(
   updateReturnLead
 );
 
-
-
-// ==================== Just Dial Page Routes ====================
-// GET /api/pages/just-dial/:id - Fetch Just Dial lead data
-router.get(
-  "/just-dial/:id",
-  protect,
-  justDialGetValidator,
-  handleValidation,
-  getJustDialLead
-);
-
-// POST /api/pages/just-dial/:id - Update Just Dial lead data
-router.post(
-  "/just-dial/:id",
-  protect,
-  justDialPostValidator,
-  handleValidation,
-  updateJustDialLead
-);
-
-// ==================== General Lead Page Routes ====================
-/**
- * @swagger
- * /api/pages/general/{id}:
- *   get:
- *     summary: Get General lead details
- *     tags:
- *       - General Lead
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: General lead details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 lead_name: { type: string }
- *                 phone_number: { type: string }
- *                 enquiry_date: { type: string, format: date-time }
- *                 function_date: { type: string, format: date-time }
- *                 store: { type: string }
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Lead not found
- *       500:
- *         description: Internal server error
- */
-// GET /api/pages/general/:id - Fetch General lead data
-router.get(
-  "/general/:id",
-  protect,
-  leadGetValidator,
-  handleValidation,
-  getGeneralLead
-);
-
-/**
- * @swagger
- * /api/pages/general/{id}:
- *   post:
- *     summary: Update General lead
- *     tags:
- *       - General Lead
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               call_status: { type: string }
- *               lead_status: { type: string }
- *               follow_up_flag: 
- *                 type: boolean
- *                 description: "Optional. If follow_up_date is provided, this is automatically set to true. Only set this explicitly if you want to mark for follow-up without providing a date."
- *               follow_up_date: 
- *                 type: string
- *                 format: date-time
- *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
- *               call_date: { type: string, format: date-time }
- *               reason_collected_from_store: { type: string }
-              subCategory: { type: string }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              leadType: { type: string, enum: [lossOfSale, return, justDial, general, enquiry], default: general }
-              functionDate: { type: string, format: date-time }
- *               remarks: { type: string }
- *               closing_status: { type: string }
- *               rating: { type: integer }
- *               call_duration: { type: number, description: "Call duration in seconds" }
- *               mark_as_issue:
- *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection. Cannot be true if follow_up_flag is true."
- *     responses:
- *       200:
- *         description: |
- *           General lead updated successfully. 
- *           Priority order: mark_as_issue > follow_up_flag > default to Reports.
- *           - If mark_as_issue=true → moves to StarredCalls collection
- *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
- *           - Otherwise → moves to Reports collection
- *       400:
- *         description: Validation error
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
-// POST /api/pages/general/:id - Update General lead data
-router.post(
-  "/general/:id",
-  protect,
-  leadUpdateValidator,
-  handleValidation,
-  updateGeneralLead
-);
-
 // ==================== Add Lead Page Routes ====================
 // POST /api/pages/add-lead - Create new lead (Admin/Team Lead only)
 router.post(
@@ -1255,7 +1018,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, return, justDial]
+ *           enum: [lossOfSale, return, enquiry]
  *         description: Type of FollowUp lead to fetch. If omitted, returns FollowUp leads of all types.
  *       - in: query
  *         name: store
@@ -1705,11 +1468,11 @@ router.get(
  *                 format: date-time
  *               leadType:
  *                 type: string
- *                 enum: [lossOfSale, return, justDial, general, enquiry]
- *                 default: general
- *               mark_as_issue:
+ *                 enum: [lossOfSale, return, enquiry]
+ *                 default: enquiry
+ *               mark_as_complaint:
  *                 type: boolean
- *                 description: "Mark lead as issue (highest priority). If true, lead moves to StarredCalls collection instead of Reports."
+ *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection instead of Reports."
  *                 example: false
  *               follow_up_flag:
  *                 type: boolean
@@ -1829,24 +1592,24 @@ router.post(
   updateFollowUp
 );
 
-// ==================== Starred Calls (Issue Calls) Routes ====================
+// ==================== Complaints (Issue Calls) Routes ====================
 
 /**
  * @swagger
- * /api/pages/starred-calls:
+ * /api/pages/complaints:
  *   get:
- *     summary: Fetch starred calls (issue calls) with optional filters
+ *     summary: Fetch complaints (leads marked as issues) with optional filters
  *     tags:
- *       - Starred Calls
+ *       - Complaints
  *     security:
  *       - bearerAuth: []
  *     description: |
- *       Returns starred calls (leads marked as issues) filtered by optional parameters.
+ *       Returns complaints (leads marked as issues) filtered by optional parameters.
  *       
  *       **Filtering Options:**
- *       - **Lead Type**: Filter by leadType (lossOfSale, return, justDial, general)
+ *       - **Lead Type**: Filter by leadType (lossOfSale, return, enquiry)
  *       - **Store Filtering**: Supports "Brand - Location" format (e.g., "Suitor Guy - Edappally")
- *       - **Sorting**: Sort by issueMarkedAt, createdAt, name, or store (asc/desc)
+ *       - **Sorting**: Sort by complaintMarkedAt, createdAt, name, or store (asc/desc)
  *       - **Pagination**: Control page size and navigation
  *     parameters:
  *       - in: query
@@ -1854,8 +1617,8 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, general, return, justDial]
- *         description: Type of lead to fetch. If omitted, returns starred calls of all types.
+ *           enum: [lossOfSale, return, enquiry]
+ *         description: Type of lead to fetch. If omitted, returns complaints of all types.
  *       - in: query
  *         name: store
  *         required: false
@@ -1882,9 +1645,9 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [issueMarkedAt, createdAt, name, store]
- *           default: issueMarkedAt
- *         description: Field to sort results by. Default is issueMarkedAt (most recently marked issues first).
+ *           enum: [complaintMarkedAt, createdAt, name, store]
+ *           default: complaintMarkedAt
+ *         description: Field to sort results by. Default is complaintMarkedAt (most recently marked issues first).
  *       - in: query
  *         name: sortOrder
  *         required: false
@@ -1895,16 +1658,16 @@ router.post(
  *         description: "Sort order: ascending (asc) or descending (desc). Default is desc."
  *     responses:
  *       200:
- *         description: Returns a list of starred calls and pagination info.
+ *         description: Returns a list of complaints and pagination info.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 starredCalls:
+ *                 complaints:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/StarredCall'
+ *                     $ref: '#/components/schemas/Complaint'
  *                 pagination:
  *                   type: object
  *                   properties:
@@ -1921,15 +1684,15 @@ router.post(
  *       500:
  *         description: Internal server error.
  */
-router.get("/starred-calls", protect, getStarredCalls);
+router.get("/complaints", protect, getComplaints);
 
 /**
  * @swagger
- * /api/pages/starred-calls/{id}:
+ * /api/pages/complaints/{id}:
  *   get:
- *     summary: Get a single starred call by ID
+ *     summary: Get a single complaint by ID
  *     tags:
- *       - Starred Calls
+ *       - Complaints
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1938,33 +1701,33 @@ router.get("/starred-calls", protect, getStarredCalls);
  *         required: true
  *         schema:
  *           type: string
- *         description: Starred call ID
+ *         description: Complaint ID
  *     responses:
  *       200:
- *         description: Returns the starred call details.
+ *         description: Returns the complaint details.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/StarredCall'
+ *               $ref: '#/components/schemas/Complaint'
  *       404:
- *         description: Starred call not found.
+ *         description: Complaint not found.
  *       401:
  *         description: Unauthorized. Token missing or invalid.
  *       500:
  *         description: Internal server error.
  */
-router.get("/starred-calls/:id", protect, getStarredCallById);
+router.get("/complaints/:id", protect, getComplaintById);
 
 /**
  * @swagger
  * components:
  *   schemas:
- *     StarredCall:
+ *     Complaint:
  *       type: object
  *       properties:
  *         _id:
  *           type: string
- *           description: Starred call ID
+ *           description: Complaint ID
  *         name:
  *           type: string
  *           description: Lead name
@@ -1976,7 +1739,7 @@ router.get("/starred-calls/:id", protect, getStarredCallById);
  *           description: Store name
  *         leadType:
  *           type: string
- *           enum: [lossOfSale, return, justDial, general]
+ *           enum: [lossOfSale, return, enquiry]
  *           description: Lead type
  *         source:
  *           type: string
@@ -1996,7 +1759,7 @@ router.get("/starred-calls/:id", protect, getStarredCallById);
  *         remarks:
  *           type: string
  *           description: Remarks about the issue
- *         issueMarkedBy:
+ *         complaintMarkedBy:
  *           type: object
  *           description: User who marked the lead as issue
  *           properties:
@@ -2006,7 +1769,7 @@ router.get("/starred-calls/:id", protect, getStarredCallById);
  *               type: string
  *             employeeId:
  *               type: string
- *         issueMarkedAt:
+ *         complaintMarkedAt:
  *           type: string
  *           format: date-time
  *           description: When the lead was marked as issue

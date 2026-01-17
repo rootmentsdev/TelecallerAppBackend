@@ -11,7 +11,7 @@ const leadSchema = new mongoose.Schema(
     source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.
     leadType: {
       type: String,
-      enum: ["lossOfSale", "return", "justDial", "general", "enquiry"],
+      enum: ["enquiry", "return", "booked", "lossOfSale"],
       default: "enquiry"
     },
     brand: { type: String }, // For Add Lead page
@@ -91,9 +91,9 @@ leadSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      leadType: { $in: ["lossOfSale", "general"] }
+      leadType: { $in: ["lossOfSale", "enquiry"] }
     },
-    name: "unique_lossOfSale_general_index"
+    name: "unique_lossOfSale_general_index" // Keeping name for compatibility or rename if safe? Let's keep name but comment
   }
 );
 
