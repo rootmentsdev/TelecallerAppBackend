@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
-// StarredCall schema - for leads marked as issues
+// Complaint schema - for leads marked as complaints
 // Stores all lead fields directly (flattened structure, no snapshot)
-const starredCallSchema = new mongoose.Schema(
+const complaintSchema = new mongoose.Schema(
   {
     // Basic Information (Required)
     name: { type: String, required: true },
@@ -13,7 +13,7 @@ const starredCallSchema = new mongoose.Schema(
     source: { type: String },
     leadType: {
       type: String,
-      enum: ["lossOfSale", "return", "justDial", "general", "enquiry"],
+      enum: ["enquiry", "return", "booked", "lossOfSale"],
       default: "enquiry"
     },
     brand: { type: String },
@@ -25,7 +25,7 @@ const starredCallSchema = new mongoose.Schema(
     visitDate: { type: Date },
     functionDate: { type: Date },
     returnDate: { type: Date },
-    callDate: { type: Date },
+    callDate: { type: Date }, // Date when call was made
     followUpDate: { type: Date },
 
     // Booking/Rent-Out Information
@@ -35,17 +35,17 @@ const starredCallSchema = new mongoose.Schema(
     // Status Fields
     callStatus: { type: String, default: "Not Called" },
     leadStatus: { type: String, default: "No Status" },
-    closingStatus: { type: String },
+    closingStatus: { type: String }, // For Just Dial page (Legacy support if needed, or remove? Keeping for schema compat)
     closingAction: { type: String, default: null },
 
     // Follow-up
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information
-    reason: { type: String },
+    reason: { type: String }, // For Just Dial page
     reasons: { type: String, default: null },
-    reasonCollectedFromStore: { type: String },
-    rating: { type: Number, min: 1, max: 5 },
+    reasonCollectedFromStore: { type: String }, // For Loss of Sale page
+    rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
     attendedBy: { type: String },
     remarks: { type: String, default: "" },
 
@@ -57,9 +57,9 @@ const starredCallSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     assignedAt: { type: Date },
 
-    // Issue-specific fields
-    issueMarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    issueMarkedAt: { type: Date, default: Date.now },
+    // Complaint-specific fields
+    complaintMarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    complaintMarkedAt: { type: Date, default: Date.now },
 
     // Reference to original lead (for audit trail)
     sourceLeadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead" },
@@ -68,11 +68,11 @@ const starredCallSchema = new mongoose.Schema(
 );
 
 // Indexes for faster queries
-starredCallSchema.index({ phone: 1 });
-starredCallSchema.index({ leadType: 1 });
-starredCallSchema.index({ store: 1 });
-starredCallSchema.index({ issueMarkedBy: 1 });
-starredCallSchema.index({ issueMarkedAt: -1 });
-starredCallSchema.index({ createdAt: -1 });
+complaintSchema.index({ phone: 1 });
+complaintSchema.index({ leadType: 1 });
+complaintSchema.index({ store: 1 });
+complaintSchema.index({ complaintMarkedBy: 1 });
+complaintSchema.index({ complaintMarkedAt: -1 });
+complaintSchema.index({ createdAt: -1 });
 
-export default mongoose.model("StarredCall", starredCallSchema);
+export default mongoose.model("Complaint", complaintSchema);
