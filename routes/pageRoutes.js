@@ -567,6 +567,31 @@
  *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 report: { type: object }
+ *                 followUp: { type: object }
+ *                 complaint: { type: object }
+ *             examples:
+ *               movedToReport:
+ *                 summary: Moved to Reports (Default)
+ *                 value:
+ *                   message: "Loss of Sale lead updated and moved to reports"
+ *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "lossOfSale" }
+ *               movedToFollowUp:
+ *                 summary: Moved to FollowUps
+ *                 value:
+ *                   message: "Loss of Sale lead updated and moved to follow-ups"
+ *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-01T10:00:00Z" }
+ *               movedToComplaint:
+ *                 summary: Moved to Complaints
+ *                 value:
+ *                   message: "Loss of Sale lead updated and moved to complaints"
+ *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Serious issue reported" }
  *       400:
  *         description: Validation error
  *       401:
@@ -668,6 +693,31 @@
  *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 report: { type: object }
+ *                 followUp: { type: object }
+ *                 complaint: { type: object }
+ *             examples:
+ *               movedToReport:
+ *                 summary: Moved to Reports (Default)
+ *                 value:
+ *                   message: "Return lead updated and moved to reports"
+ *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "return" }
+ *               movedToFollowUp:
+ *                 summary: Moved to FollowUps
+ *                 value:
+ *                   message: "Return lead updated and moved to follow-ups"
+ *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-01T10:00:00Z" }
+ *               movedToComplaint:
+ *                 summary: Moved to Complaints
+ *                 value:
+ *                   message: "Return lead updated and moved to complaints"
+ *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Item damaged on return" }
  *       400:
  *         description: Validation error
  *       401:

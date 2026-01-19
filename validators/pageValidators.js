@@ -80,6 +80,14 @@ export const lossOfSalePostValidator = [
     .trim()
     .withMessage('Lead status must be a string'),
   dateValidator('follow_up_date'),
+  body('follow_up_flag')
+    .optional()
+    .isBoolean()
+    .withMessage('Follow up flag must be a boolean'),
+  body('mark_as_complaint')
+    .optional()
+    .isBoolean()
+    .withMessage('mark_as_complaint must be a boolean'),
   body('reason_collected_from_store')
     .optional()
     .isString()
@@ -134,6 +142,11 @@ export const returnPostValidator = [
     .optional()
     .isBoolean()
     .withMessage('Follow up flag must be a boolean'),
+  dateValidator('follow_up_date'),
+  body('mark_as_complaint')
+    .optional()
+    .isBoolean()
+    .withMessage('mark_as_complaint must be a boolean'),
   body('remarks')
     .optional()
     .isString()
