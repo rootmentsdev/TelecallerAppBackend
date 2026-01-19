@@ -545,13 +545,13 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
-              subCategory: { type: string }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
- *               remarks: { type: string }
+ *               subCategory: { type: string }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *               reasons: { type: string, nullable: true }
+ *               functionDate: { type: string, format: date-time }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
+ *               remarks: { type: string, nullable: true }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               mark_as_complaint:
  *                 type: boolean
@@ -668,13 +668,13 @@
  *                 type: string
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
- *               remarks: { type: string }
-              subCategory: { type: string }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
+ *               remarks: { type: string, nullable: true }
+ *               subCategory: { type: string }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *               reasons: { type: string, nullable: true }
+ *               functionDate: { type: string, format: date-time }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
