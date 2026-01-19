@@ -29,16 +29,16 @@ const cleanupDuplicates = async (dryRun = true) => {
     let totalDeleted = 0;
     const deletionLog = [];
 
-    // ==================== CLEANUP BOOKING CONFIRMATION ====================
-    console.log("📋 Cleaning Booking Confirmation duplicates...");
+    // ==================== CLEANUP BOOKED ====================
+    console.log("📋 Cleaning Booked duplicates...");
     // For booking: If bookingNo exists, check by bookingNo+phone+leadType
     // If bookingNo is empty, check by phone+name+leadType+store
     const bookingWithBookingNo = await Lead.aggregate([
-      { 
-        $match: { 
-          leadType: "bookingConfirmation",
+      {
+        $match: {
+          leadType: "booked",
           bookingNo: { $exists: true, $ne: "", $ne: null }
-        } 
+        }
       },
       {
         $group: {
@@ -56,15 +56,15 @@ const cleanupDuplicates = async (dryRun = true) => {
     ], { allowDiskUse: true });
 
     const bookingWithoutBookingNo = await Lead.aggregate([
-      { 
-        $match: { 
-          leadType: "bookingConfirmation",
+      {
+        $match: {
+          leadType: "booked",
           $or: [
             { bookingNo: { $exists: false } },
             { bookingNo: "" },
             { bookingNo: null }
           ]
-        } 
+        }
       },
       {
         $group: {
@@ -95,7 +95,7 @@ const cleanupDuplicates = async (dryRun = true) => {
         const deleteResult = await Lead.deleteMany({ _id: { $in: deleteIds } });
         bookingDeleted += deleteResult.deletedCount;
         deletionLog.push({
-          type: "bookingConfirmation",
+          type: "booked",
           group: group._id,
           kept: keepId.toString(),
           deleted: deleteIds.map(id => id.toString()),
@@ -104,7 +104,7 @@ const cleanupDuplicates = async (dryRun = true) => {
       } else {
         bookingDeleted += deleteIds.length;
         deletionLog.push({
-          type: "bookingConfirmation",
+          type: "booked",
           group: group._id,
           kept: keepId.toString(),
           wouldDelete: deleteIds.map(id => id.toString()),
@@ -118,11 +118,11 @@ const cleanupDuplicates = async (dryRun = true) => {
     // ==================== CLEANUP RETURN ====================
     console.log("📋 Cleaning Return duplicates...");
     const returnWithBookingNo = await Lead.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           leadType: "return",
           bookingNo: { $exists: true, $ne: "", $ne: null }
-        } 
+        }
       },
       {
         $group: {
@@ -140,15 +140,15 @@ const cleanupDuplicates = async (dryRun = true) => {
     ], { allowDiskUse: true });
 
     const returnWithoutBookingNo = await Lead.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           leadType: "return",
           $or: [
             { bookingNo: { $exists: false } },
             { bookingNo: "" },
             { bookingNo: null }
           ]
-        } 
+        }
       },
       {
         $group: {
@@ -248,10 +248,10 @@ const cleanupDuplicates = async (dryRun = true) => {
     console.log(`   ${dryRun ? "Would delete" : "Deleted"}: ${lossOfSaleDeleted} duplicates`);
     totalDeleted += lossOfSaleDeleted;
 
-    // ==================== CLEANUP GENERAL ====================
-    console.log("📋 Cleaning General duplicates...");
+    // ==================== CLEANUP ENQUIRY ====================
+    console.log("📋 Cleaning Enquiry duplicates...");
     const generalDuplicates = await Lead.aggregate([
-      { $match: { leadType: "general" } },
+      { $match: { leadType: "enquiry" } },
       {
         $group: {
           _id: {
@@ -278,7 +278,7 @@ const cleanupDuplicates = async (dryRun = true) => {
         const deleteResult = await Lead.deleteMany({ _id: { $in: deleteIds } });
         generalDeleted += deleteResult.deletedCount;
         deletionLog.push({
-          type: "general",
+          type: "enquiry",
           group: group._id,
           kept: keepId.toString(),
           deleted: deleteIds.map(id => id.toString()),
@@ -287,7 +287,7 @@ const cleanupDuplicates = async (dryRun = true) => {
       } else {
         generalDeleted += deleteIds.length;
         deletionLog.push({
-          type: "general",
+          type: "enquiry",
           group: group._id,
           kept: keepId.toString(),
           wouldDelete: deleteIds.map(id => id.toString()),
@@ -298,66 +298,17 @@ const cleanupDuplicates = async (dryRun = true) => {
     console.log(`   ${dryRun ? "Would delete" : "Deleted"}: ${generalDeleted} duplicates`);
     totalDeleted += generalDeleted;
 
-    // ==================== CLEANUP JUST DIAL ====================
-    console.log("📋 Cleaning Just Dial duplicates...");
-    const justDialDuplicates = await Lead.aggregate([
-      { $match: { leadType: "justDial" } },
-      {
-        $group: {
-          _id: {
-            name: "$name",
-            phone: "$phone",
-            leadType: "$leadType",
-            store: "$store"
-          },
-          count: { $sum: 1 },
-          ids: { $push: "$_id" },
-          docs: { $push: { id: "$_id", createdAt: "$createdAt" } }
-        }
-      },
-      { $match: { count: { $gt: 1 } } }
-    ], { allowDiskUse: true });
 
-    let justDialDeleted = 0;
-    for (const group of justDialDuplicates) {
-      group.docs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      const keepId = group.docs[0].id;
-      const deleteIds = group.docs.slice(1).map(d => d.id);
-
-      if (!dryRun) {
-        const deleteResult = await Lead.deleteMany({ _id: { $in: deleteIds } });
-        justDialDeleted += deleteResult.deletedCount;
-        deletionLog.push({
-          type: "justDial",
-          group: group._id,
-          kept: keepId.toString(),
-          deleted: deleteIds.map(id => id.toString()),
-          count: deleteResult.deletedCount
-        });
-      } else {
-        justDialDeleted += deleteIds.length;
-        deletionLog.push({
-          type: "justDial",
-          group: group._id,
-          kept: keepId.toString(),
-          wouldDelete: deleteIds.map(id => id.toString()),
-          count: deleteIds.length
-        });
-      }
-    }
-    console.log(`   ${dryRun ? "Would delete" : "Deleted"}: ${justDialDeleted} duplicates`);
-    totalDeleted += justDialDeleted;
 
     // ==================== SUMMARY ====================
     console.log("\n" + "=".repeat(80));
     console.log("📈 CLEANUP SUMMARY");
     console.log("=".repeat(80));
     console.log(`Total ${dryRun ? "would be deleted" : "deleted"}: ${totalDeleted} duplicate records`);
-    console.log(`Booking Confirmation: ${bookingDeleted}`);
+    console.log(`Booked: ${bookingDeleted}`);
     console.log(`Return: ${returnDeleted}`);
     console.log(`Loss of Sale: ${lossOfSaleDeleted}`);
-    console.log(`General: ${generalDeleted}`);
-    console.log(`Just Dial: ${justDialDeleted}`);
+    console.log(`Enquiry: ${generalDeleted}`);
 
     // Save deletion log
     if (deletionLog.length > 0) {

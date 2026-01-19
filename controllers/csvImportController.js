@@ -142,7 +142,7 @@ export const importLeadsFromCSV = async (req, res) => {
               row.leadType?.trim() ||
               row["lead type"]?.trim() ||
               row["Lead Type"]?.trim() ||
-              (isLossOfSale ? "lossOfSale" : "general")
+              (isLossOfSale ? "lossOfSale" : "enquiry")
             ),
             enquiryDate: row.enquiryDate ? new Date(row.enquiryDate) : (row.Date ? new Date(row.Date) : undefined),
             functionDate: (
@@ -211,9 +211,9 @@ export const importLeadsFromCSV = async (req, res) => {
         }
 
         // Validate leadType
-        const validLeadTypes = ["general", "lossOfSale", "return", "bookingConfirmation", "justDial"];
+        const validLeadTypes = ["enquiry", "lossOfSale", "return", "booked"];
         if (leadData.leadType && !validLeadTypes.includes(leadData.leadType)) {
-          leadData.leadType = "general"; // Default to general if invalid
+          leadData.leadType = "enquiry"; // Default to enquiry if invalid
         }
 
         // Use saveToMongo for duplicate prevention and proper handling

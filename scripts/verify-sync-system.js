@@ -35,13 +35,13 @@ const verifyApiSyncSystem = async () => {
 
     const returnLeads = await Lead.countDocuments({ leadType: "return" });
     const lossOfSaleLeads = await Lead.countDocuments({ leadType: "lossOfSale" });
-    const generalLeads = await Lead.countDocuments({ leadType: "general" });
+    const enquiryLeads = await Lead.countDocuments({ leadType: "enquiry" });
 
     console.log(`   Total leads: ${totalLeads.toLocaleString()}`);
 
     console.log(`   Return: ${returnLeads.toLocaleString()}`);
     console.log(`   Loss of Sale: ${lossOfSaleLeads.toLocaleString()}`);
-    console.log(`   General/Walk-in: ${generalLeads.toLocaleString()}`);
+    console.log(`   Enquiry (Walk-in): ${enquiryLeads.toLocaleString()}`);
     console.log();
 
     // 2. Check sync logs

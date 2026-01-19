@@ -49,7 +49,7 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry]
+ *           enum: [lossOfSale, return, enquiry, booked]
  *         description: Type of lead to fetch. If omitted, returns leads of all types.
  *       - in: query
  *         name: store
@@ -550,7 +550,7 @@
               closingAction: { type: string }
               reasons: { type: string }
               functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry], default: lossOfSale }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
  *               remarks: { type: string }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               mark_as_complaint:
@@ -649,7 +649,7 @@
               closingAction: { type: string }
               reasons: { type: string }
               functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry], default: return }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
@@ -725,7 +725,7 @@
  *                 type: string
  *               leadType:
  *                 type: string
- *                 description: "Default: enquiry. Other values: lossOfSale, return."
+ *                 description: "Default: enquiry. Other values: lossOfSale, return, booked."
  *               functionDate:
  *                 type: string
  *                 format: date-time
@@ -1438,7 +1438,7 @@ router.get(
  *       - FollowUp leads can only be moved to Reports (final state)
  *       - All fields (callStatus, leadStatus, callDuration, remarks, leadType, store) are preserved
  *       - The FollowUp lead is removed from FollowUps collection after update
- *       - Reports are sorted by `lead_type` (general, lossOfSale, return, justDial)
+ *       - Reports are sorted by `lead_type` (lossOfSale, return, enquiry, booked)
  *       - The `lead_type` from FollowUp is explicitly preserved in the Report for proper sorting
  *       - Reports are created ONLY in this endpoint, NEVER when moving Leads → FollowUps
  *       
@@ -1492,7 +1492,7 @@ router.get(
  *                 format: date-time
  *               leadType:
  *                 type: string
- *                 enum: [lossOfSale, return, enquiry]
+ *                 enum: [lossOfSale, return, enquiry, booked]
  *                 default: enquiry
  *               mark_as_complaint:
  *                 type: boolean
@@ -1527,11 +1527,10 @@ router.get(
  *                     Created Report entry with final state. 
  *                     
  *                     **Sorting:** Reports are sorted by `lead_type` field:
- *                     - `"general"` → General/New Leads section
+ *                     - `"enquiry"` → Enquiry/New Leads section
  *                     - `"lossOfSale"` → Loss of Sale section
-
  *                     - `"return"` → Return section
- *                     - `"justDial"` → Just Dial section
+ *                     - `"booked"` → Booked section
  *                     
  *                     The `lead_type` from the FollowUp is explicitly preserved to ensure proper sorting.
  *                   properties:
@@ -1545,8 +1544,8 @@ router.get(
  *                       type: string
  *                     lead_type:
  *                       type: string
- *                       description: Lead type preserved from FollowUp. Used for sorting reports (general, lossOfSale, return, justDial).
- *                       example: "general"
+ *                       description: Lead type preserved from FollowUp. Used for sorting reports (lossOfSale, return, enquiry, booked).
+ *                       example: "enquiry"
  *                     call_status:
  *                       type: string
  *                     lead_status:
@@ -1641,7 +1640,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry]
+ *           enum: [lossOfSale, return, enquiry, booked]
  *         description: Type of lead to fetch. If omitted, returns complaints of all types.
  *       - in: query
  *         name: store
@@ -1763,7 +1762,7 @@ router.get("/complaints/:id", protect, getComplaintById);
  *           description: Store name
  *         leadType:
  *           type: string
- *           enum: [lossOfSale, return, enquiry]
+ *           enum: [lossOfSale, return, enquiry, booked]
  *           description: Lead type
  *         source:
  *           type: string

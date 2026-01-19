@@ -364,7 +364,7 @@ export const mapWalkin = (row) => {
 
   // Determine if this is a Loss of Sale within the Walk-in report
   const isLoss = status && (status.toLowerCase().includes('loss') || status.toLowerCase().includes('lost'));
-  const finalLeadType = isLoss ? "lossOfSale" : "general";
+  const finalLeadType = isLoss ? "lossOfSale" : "enquiry";
 
   // Build complete lead object with all fields
   const leadData = {

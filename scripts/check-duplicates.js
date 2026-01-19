@@ -29,20 +29,19 @@ const checkDuplicates = async () => {
 
     const results = {
       leads: {
-        bookingConfirmation: { duplicates: [], total: 0, duplicateCount: 0 },
+        booked: { duplicates: [], total: 0, duplicateCount: 0 },
         return: { duplicates: [], total: 0, duplicateCount: 0 },
         lossOfSale: { duplicates: [], total: 0, duplicateCount: 0 },
-        general: { duplicates: [], total: 0, duplicateCount: 0 },
-        justDial: { duplicates: [], total: 0, duplicateCount: 0 },
+        enquiry: { duplicates: [], total: 0, duplicateCount: 0 },
       },
       followUps: { duplicates: [], total: 0, duplicateCount: 0 },
       reports: { duplicates: [], total: 0, duplicateCount: 0 },
     };
 
-    // ==================== CHECK BOOKING CONFIRMATION LEADS ====================
-    console.log("📋 Checking Booking Confirmation leads...");
-    const bookingLeads = await Lead.find({ leadType: "bookingConfirmation" }).lean();
-    results.leads.bookingConfirmation.total = bookingLeads.length;
+    // ==================== CHECK BOOKED LEADS ====================
+    console.log("📋 Checking Booked leads...");
+    const bookingLeads = await Lead.find({ leadType: "booked" }).lean();
+    results.leads.booked.total = bookingLeads.length;
 
     // Group by bookingNo + phone + leadType
     const bookingByBookingNo = {};
@@ -69,7 +68,7 @@ const checkDuplicates = async () => {
     // Find duplicates
     for (const [key, leads] of Object.entries(bookingByBookingNo)) {
       if (leads.length > 1) {
-        results.leads.bookingConfirmation.duplicates.push({
+        results.leads.booked.duplicates.push({
           criteria: "bookingNo + phone + leadType",
           key,
           count: leads.length,
@@ -83,18 +82,18 @@ const checkDuplicates = async () => {
             createdAt: l.createdAt,
           })),
         });
-        results.leads.bookingConfirmation.duplicateCount += leads.length - 1;
+        results.leads.booked.duplicateCount += leads.length - 1;
       }
     }
 
     for (const [key, leads] of Object.entries(bookingByNamePhone)) {
       if (leads.length > 1) {
         // Check if this duplicate set is already reported
-        const existing = results.leads.bookingConfirmation.duplicates.find(
+        const existing = results.leads.booked.duplicates.find(
           d => d.ids.some(id => leads.some(l => l._id.toString() === id.toString()))
         );
         if (!existing) {
-          results.leads.bookingConfirmation.duplicates.push({
+          results.leads.booked.duplicates.push({
             criteria: "name + phone + leadType + store",
             key,
             count: leads.length,
@@ -108,7 +107,7 @@ const checkDuplicates = async () => {
               createdAt: l.createdAt,
             })),
           });
-          results.leads.bookingConfirmation.duplicateCount += leads.length - 1;
+          results.leads.booked.duplicateCount += leads.length - 1;
         }
       }
     }
@@ -218,10 +217,10 @@ const checkDuplicates = async () => {
       }
     }
 
-    // ==================== CHECK GENERAL LEADS ====================
-    console.log("📋 Checking General leads...");
-    const generalLeads = await Lead.find({ leadType: "general" }).lean();
-    results.leads.general.total = generalLeads.length;
+    // ==================== CHECK ENQUIRY LEADS ====================
+    console.log("📋 Checking Enquiry leads...");
+    const generalLeads = await Lead.find({ leadType: "enquiry" }).lean();
+    results.leads.enquiry.total = generalLeads.length;
 
     const generalGroups = {};
 
@@ -235,7 +234,7 @@ const checkDuplicates = async () => {
 
     for (const [key, leads] of Object.entries(generalGroups)) {
       if (leads.length > 1) {
-        results.leads.general.duplicates.push({
+        results.leads.enquiry.duplicates.push({
           criteria: "name + phone + leadType + store",
           key,
           count: leads.length,
@@ -249,43 +248,11 @@ const checkDuplicates = async () => {
             createdAt: l.createdAt,
           })),
         });
-        results.leads.general.duplicateCount += leads.length - 1;
+        results.leads.enquiry.duplicateCount += leads.length - 1;
       }
     }
 
-    // ==================== CHECK JUST DIAL LEADS ====================
-    console.log("📋 Checking Just Dial leads...");
-    const justDialLeads = await Lead.find({ leadType: "justDial" }).lean();
-    results.leads.justDial.total = justDialLeads.length;
 
-    const justDialGroups = {};
-
-    for (const lead of justDialLeads) {
-      const key = `${lead.name}_${lead.phone}_${lead.leadType}_${lead.store}`;
-      if (!justDialGroups[key]) {
-        justDialGroups[key] = [];
-      }
-      justDialGroups[key].push(lead);
-    }
-
-    for (const [key, leads] of Object.entries(justDialGroups)) {
-      if (leads.length > 1) {
-        results.leads.justDial.duplicates.push({
-          criteria: "name + phone + leadType + store",
-          key,
-          count: leads.length,
-          ids: leads.map(l => l._id),
-          details: leads.map(l => ({
-            id: l._id,
-            name: l.name,
-            phone: l.phone,
-            store: l.store,
-            createdAt: l.createdAt,
-          })),
-        });
-        results.leads.justDial.duplicateCount += leads.length - 1;
-      }
-    }
 
     // ==================== CHECK FOLLOW-UPS ====================
     console.log("📋 Checking FollowUps...");

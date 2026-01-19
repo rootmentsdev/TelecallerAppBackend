@@ -23,15 +23,14 @@ External Sources
     │
     └─→ CSV Files
         ├─→ Loss of Sale CSV → Loss of Sale Page
-        └─→ Walk-in CSV → General Leads (can be filtered)
+        └─→ Walk-in CSV → Enquiry Leads (can be filtered)
             │
             └─→ MongoDB (Lead Collection)
                 │
                 └─→ UI Pages
                     ├─→ Loss of Sale Page
-                    ├─→ Rent-Out Page
-                    ├─→ Booking Confirmation Page
-                    ├─→ Just Dial Page
+                    ├─→ Return Page
+                    ├─→ Booked Page
                     └─→ Add Lead Page (Manual Entry)
 ```
 
@@ -42,8 +41,8 @@ External Sources
 ### Booking API Import
 
 **Source:** External Booking API  
-**Destination:** Booking Confirmation Page  
-**Lead Type:** `bookingConfirmation`
+**Destination:** Booked Page  
+**Lead Type:** `booked`
 
 #### API Configuration
 ```env
@@ -76,8 +75,8 @@ node sync/runAll.js
 ```
 
 #### UI Mapping
-- **Page:** Booking Confirmation Page
-- **GET Endpoint:** `/api/pages/booking-confirmation/:id`
+- **Page:** Booked Page
+- **GET Endpoint:** `/api/pages/leads?leadType=booked`
 - **Displays:** Lead name, phone, enquiry date, function date, booking number, security amount
 
 ---
@@ -85,8 +84,8 @@ node sync/runAll.js
 ### Rent-Out API Import
 
 **Source:** External Rent-Out API  
-**Destination:** Rent-Out Page  
-**Lead Type:** `rentOutFeedback`
+**Destination:** Return Page  
+**Lead Type:** `return`
 
 #### API Configuration
 ```env
@@ -119,8 +118,8 @@ node sync/runAll.js
 ```
 
 #### UI Mapping
-- **Page:** Rent-Out Page
-- **GET Endpoint:** `/api/pages/rent-out/:id`
+- **Page:** Return Page
+- **GET Endpoint:** `/api/pages/leads?leadType=return`
 - **Displays:** Lead name, phone, booking number, return date, attended by, security amount
 
 ---
@@ -192,8 +191,8 @@ node sync/runAll.js
 ### Walk-in CSV Import
 
 **Source:** CSV File  
-**Destination:** General Leads (can be filtered)  
-**Lead Type:** `general`
+**Destination:** Enquiry Leads (can be filtered)  
+**Lead Type:** `enquiry`
 
 #### CSV File Location
 ```env
@@ -288,12 +287,11 @@ UI Pages
 
 | Source | Lead Type | UI Page |
 |--------|-----------|---------|
-| Booking API | `bookingConfirmation` | Booking Confirmation Page |
-| Rent-Out API | `rentOutFeedback` | Rent-Out Page |
+| Booking API | `booked` | Booked Page |
+| Rent-Out API | `return` | Return Page |
 | Loss of Sale CSV | `lossOfSale` | Loss of Sale Page |
-| Walk-in CSV | `general` | General Leads (filterable) |
-| Just Dial | `justDial` | Just Dial Page |
-| Manual Entry | `general` | Add Lead Page |
+| Walk-in CSV | `enquiry` | Enquiry Leads (filterable) |
+| Manual Entry | `enquiry` | Add Lead Page |
 
 ---
 
@@ -396,10 +394,9 @@ WALKIN_CSV_PATH=data/walkin.csv
 
 **List Leads:**
 ```bash
-GET /api/pages/leads?leadType=bookingConfirmation
-GET /api/pages/leads?leadType=rentOutFeedback
+GET /api/pages/leads?leadType=booked
+GET /api/pages/leads?leadType=return
 GET /api/pages/leads?leadType=lossOfSale
-GET /api/pages/leads?leadType=justDial
 ```
 
 **Get Lead Details:**
@@ -415,9 +412,8 @@ GET /api/pages/just-dial/:id
 | Page | GET Fields Displayed |
 |------|---------------------|
 | **Loss of Sale** | lead_name, phone_number, visit_date, function_date, attended_by |
-| **Rent-Out** | lead_name, phone_number, booking_number, return_date, attended_by, security_amount |
-| **Booking Confirmation** | lead_name, phone_number, enquiry_date, function_date, booking_number, security_amount |
-| **Just Dial** | lead_name, phone_number, enquiry_date, function_date |
+| **Return** | lead_name, phone_number, booking_number, return_date, attended_by, security_amount |
+| **Booked** | lead_name, phone_number, enquiry_date, function_date, booking_number, security_amount |
 
 ---
 
@@ -491,11 +487,11 @@ Check logs for:
 
 | Source | Import Method | Lead Type | UI Page |
 |--------|---------------|-----------|---------|
-| Booking API | External API | `bookingConfirmation` | Booking Confirmation |
-| Rent-Out API | External API | `rentOutFeedback` | Rent-Out |
+| Booking API | External API | `booked` | Booked |
+| Rent-Out API | External API | `return` | Return |
 | Loss of Sale CSV | CSV File | `lossOfSale` | Loss of Sale |
-| Walk-in CSV | CSV File | `general` | General Leads |
-| Manual Entry | API POST | `general` | Add Lead |
+| Walk-in CSV | CSV File | `enquiry` | Enquiry Leads |
+| Manual Entry | API POST | `enquiry` | Add Lead |
 
 ### Quick Start
 

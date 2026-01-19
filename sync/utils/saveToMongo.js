@@ -23,18 +23,18 @@ const normalizeForDuplicateCheck = (leadData) => {
 // Helper function to build case-insensitive query for name and store
 const buildCaseInsensitiveQuery = (normalized, leadType, bookingNo = "") => {
   const escapeRegex = (s) => (s || "").replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   const query = {
     name: { $regex: new RegExp(`^${escapeRegex(normalized.name)}$`, 'i') },
     phone: normalized.phone,
     leadType: leadType,
     store: { $regex: new RegExp(`^${escapeRegex(normalized.store)}$`, 'i') },
   };
-  
+
   if (bookingNo !== "") {
     query.bookingNo = bookingNo;
   }
-  
+
   return query;
 };
 
@@ -80,7 +80,7 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // Check if lead exists in reports or follow-ups (skip if moved)
       const reportOrClauses = [];
-      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+      if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
         reportOrClauses.push(
           { "beforeSnapshot.phone": normalized.phone, "beforeSnapshot.bookingNo": normalized.bookingNo },
           { "leadSnapshot.phone": normalized.phone, "leadSnapshot.bookingNo": normalized.bookingNo },
@@ -104,7 +104,7 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // Also check FollowUps collection - use normalized fields
       const followUpQuery = { phone: normalized.phone };
-      if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+      if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
         followUpQuery.bookingNo = normalized.bookingNo;
         followUpQuery.leadType = leadData.leadType;
       } else {
@@ -126,7 +126,7 @@ export const bulkSaveToMongo = async (leadsData) => {
       const normalizedPhone = (leadData.phone || "").trim();
       const normalizedStore = (leadData.store || "").trim();
       const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
-      
+
       // Build duplicate check query with normalized fields
       const duplicateQuery = {
         name: normalizedName,
@@ -134,7 +134,7 @@ export const bulkSaveToMongo = async (leadsData) => {
         leadType: leadData.leadType,
         store: normalizedStore,
       };
-      
+
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
       if (normalizedBookingNo !== "") {
         duplicateQuery.bookingNo = normalizedBookingNo;
@@ -147,14 +147,14 @@ export const bulkSaveToMongo = async (leadsData) => {
         leadType: leadData.leadType,
         store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
-      
+
       if (normalizedBookingNo !== "") {
         caseInsensitiveQuery.bookingNo = normalizedBookingNo;
       }
 
       // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
-      
+
       // If not found, try case-insensitive match (catches case differences)
       // CRITICAL: This catches duplicates with different casing (e.g., "SHEHIR" vs "shehir")
       if (!existing && normalizedName && normalizedStore) {
@@ -169,16 +169,16 @@ export const bulkSaveToMongo = async (leadsData) => {
         const checkFields = normalizedBookingNo !== ""
           ? `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}", bookingNo="${normalizedBookingNo}"`
           : `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
-        skipReasons.push({ 
-          phone: normalizedPhone, 
+        skipReasons.push({
+          phone: normalizedPhone,
           name: normalizedName,
-          reason: `Duplicate detected: matching ${checkFields}` 
+          reason: `Duplicate detected: matching ${checkFields}`
         });
         continue;
       }
 
       // For booking/return: add to bulk insert (don't update to preserve user edits)
-      if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
+      if (leadData.leadType === "booked" || leadData.leadType === "return") {
         // Add to bulk insert - ensure remarks is included
         const document = { ...leadData };
         if (leadData.hasOwnProperty('remarks')) {
@@ -193,16 +193,16 @@ export const bulkSaveToMongo = async (leadsData) => {
         // For loss of sale and general, use upsert (update if exists, insert if new)
         // CRITICAL: Use normalized fields for consistent duplicate detection
         const normalized = normalizeForDuplicateCheck(leadData);
-        
+
         // Build duplicate query with normalized fields and case-insensitive matching
         const duplicateQuery = buildCaseInsensitiveQuery(normalized, leadData.leadType);
-        
+
         // Add date fields if available (for more precise matching)
         if (leadData.leadType === "lossOfSale") {
           if (leadData.enquiryDate) duplicateQuery.enquiryDate = leadData.enquiryDate;
           else if (leadData.visitDate) duplicateQuery.visitDate = leadData.visitDate;
           else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
-        } else if (leadData.leadType === "general") {
+        } else if (leadData.leadType === "enquiry") {
           if (leadData.enquiryDate) duplicateQuery.enquiryDate = leadData.enquiryDate;
           else if (leadData.functionDate) duplicateQuery.functionDate = leadData.functionDate;
         }
@@ -229,9 +229,9 @@ export const bulkSaveToMongo = async (leadsData) => {
     // Execute bulk operations if any
     if (bulkOps.length > 0) {
       try {
-      const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
-      results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
-        
+        const bulkResult = await Lead.bulkWrite(bulkOps, { ordered: false });
+        results.saved = bulkResult.insertedCount + bulkResult.upsertedCount;
+
         // Handle write errors (including duplicate key errors E11000)
         if (bulkResult.writeErrors && bulkResult.writeErrors.length > 0) {
           let duplicateKeyErrors = 0;
@@ -292,7 +292,7 @@ export const saveToMongo = async (leadData) => {
     const reportOrClauses = [];
 
     // For booking/return, match by phone + bookingNo for accuracy
-    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+    if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
       reportOrClauses.push(
         { "beforeSnapshot.phone": normalized.phone, "beforeSnapshot.bookingNo": normalized.bookingNo },
         { "leadSnapshot.phone": normalized.phone, "leadSnapshot.bookingNo": normalized.bookingNo },
@@ -317,7 +317,7 @@ export const saveToMongo = async (leadData) => {
 
     // Also check FollowUps collection - use normalized fields
     const followUpQuery = { phone: normalized.phone };
-    if ((leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+    if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
       followUpQuery.bookingNo = normalized.bookingNo;
       followUpQuery.leadType = leadData.leadType;
     } else {
@@ -335,13 +335,13 @@ export const saveToMongo = async (leadData) => {
     // These come from API and should only add new records (incremental sync)
     // ALWAYS check: name, phone, leadType, store, bookingNo (if exists)
     // CRITICAL: Normalize and trim all fields for accurate comparison
-    if (leadData.leadType === "bookingConfirmation" || leadData.leadType === "return") {
+    if (leadData.leadType === "booked" || leadData.leadType === "return") {
       // Normalize fields: trim and ensure consistent format
       const normalizedName = (leadData.name || "").trim();
       const normalizedPhone = (leadData.phone || "").trim();
       const normalizedStore = (leadData.store || "").trim();
       const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
-      
+
       // Build comprehensive duplicate check query with normalized fields
       const duplicateQuery = {
         name: normalizedName,
@@ -349,7 +349,7 @@ export const saveToMongo = async (leadData) => {
         leadType: leadData.leadType,
         store: normalizedStore,
       };
-      
+
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
       if (normalizedBookingNo !== "") {
         duplicateQuery.bookingNo = normalizedBookingNo;
@@ -362,14 +362,14 @@ export const saveToMongo = async (leadData) => {
         leadType: leadData.leadType,
         store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
-      
+
       if (normalizedBookingNo !== "") {
         caseInsensitiveQuery.bookingNo = normalizedBookingNo;
       }
 
       // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
-      
+
       // If not found, try case-insensitive match (catches case differences)
       // CRITICAL: This catches duplicates with different casing (e.g., "SHEHIR" vs "shehir")
       if (!existing && normalizedName && normalizedStore) {
@@ -380,7 +380,7 @@ export const saveToMongo = async (leadData) => {
           console.log(`      Incoming: name="${normalizedName}", store="${normalizedStore}", bookingNo="${normalizedBookingNo || 'N/A'}"`);
         }
       }
-      
+
       if (existing) {
         // Record already exists in Leads - skip it to prevent duplicates
         const checkFields = normalizedBookingNo !== ""
@@ -388,25 +388,25 @@ export const saveToMongo = async (leadData) => {
           : `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
         console.log(`   ⏭️  Duplicate detected in Leads - skipped: ${checkFields}`);
         console.log(`      Existing lead ID: ${existing._id}`);
-        return { 
-          skipped: true, 
-          leadId: existing._id, 
-          name: existing.name, 
-          phone: existing.phone, 
-          bookingNo: existing.bookingNo, 
+        return {
+          skipped: true,
+          leadId: existing._id,
+          name: existing.name,
+          phone: existing.phone,
+          bookingNo: existing.bookingNo,
           reason: "Duplicate detected in Leads collection: matching " + (normalizedBookingNo ? "name, phone, leadType, store, bookingNo" : "name, phone, leadType, store")
         };
       }
     }
 
-    // DUPLICATE CHECK FOR LOSS OF SALE/GENERAL: Update if duplicate (upsert)
+    // DUPLICATE CHECK FOR LOSS OF SALE/ENQUIRY: Update if duplicate (upsert)
     // These come from CSV files and should update existing records when re-imported
     // ALWAYS check: name, phone, leadType, store (same base criteria as booking/return)
     // CRITICAL: Normalize and use case-insensitive matching for consistent duplicate detection
-    if (leadData.leadType === "lossOfSale" || leadData.leadType === "general") {
+    if (leadData.leadType === "lossOfSale" || leadData.leadType === "enquiry") {
       // Normalize fields: trim and ensure consistent format (same as booking/return)
       const normalized = normalizeForDuplicateCheck(leadData);
-      
+
       // Build duplicate check query with normalized fields and case-insensitive matching
       const duplicateQuery = buildCaseInsensitiveQuery(normalized, leadData.leadType);
 
@@ -425,8 +425,8 @@ export const saveToMongo = async (leadData) => {
         else if (leadData.functionDate) {
           duplicateQuery.functionDate = leadData.functionDate;
         }
-      } else if (leadData.leadType === "general") {
-        // For general (walk-in): Also check enquiryDate/functionDate if available
+      } else if (leadData.leadType === "enquiry") {
+        // For enquiry (walk-in): Also check enquiryDate/functionDate if available
         if (leadData.enquiryDate) {
           duplicateQuery.enquiryDate = leadData.enquiryDate;
         }
@@ -463,7 +463,7 @@ export const saveToMongo = async (leadData) => {
         ...(duplicateQuery.visitDate && { visitDate: duplicateQuery.visitDate }),
         ...(duplicateQuery.functionDate && { functionDate: duplicateQuery.functionDate }),
       });
-      
+
       // If not found, try case-insensitive match (catches case differences)
       if (!existing && normalized.name && normalized.store) {
         existing = await Lead.findOne(duplicateQuery);
@@ -473,7 +473,7 @@ export const saveToMongo = async (leadData) => {
           console.log(`      Incoming: name="${normalized.name}", store="${normalized.store}", phone="${normalized.phone}"`);
         }
       }
-      
+
       if (existing) {
         // Record already exists - UPDATE it with new data (preserves _id and createdAt)
         // Remove _id and createdAt from update data to preserve original values
@@ -497,13 +497,13 @@ export const saveToMongo = async (leadData) => {
     // For other lead types (justDial) or new records: create new lead
     // Use try-catch to handle duplicate key errors gracefully
     try {
-    // Ensure remarks is explicitly included in leadData before create
-    const createData = { ...leadData };
-    if (leadData.hasOwnProperty('remarks')) {
-      createData.remarks = leadData.remarks ?? null;
-    }
-    const lead = await Lead.create(createData);
-    return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
+      // Ensure remarks is explicitly included in leadData before create
+      const createData = { ...leadData };
+      if (leadData.hasOwnProperty('remarks')) {
+        createData.remarks = leadData.remarks ?? null;
+      }
+      const lead = await Lead.create(createData);
+      return { saved: true, leadId: lead._id, name: lead.name, phone: lead.phone };
     } catch (createError) {
       // Handle duplicate key errors (E11000) - treat as skipped, not error
       if (createError.code === 11000 || createError.name === 'MongoServerError' && createError.code === 11000) {

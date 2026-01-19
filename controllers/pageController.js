@@ -719,7 +719,6 @@ export const getLeads = async (req, res) => {
       const lowerType = leadType.toLowerCase();
       if (lowerType.includes('return')) dbLeadType = 'return';
       else if (lowerType.includes('loss')) dbLeadType = 'lossOfSale';
-      // removed walk -> general mapping
     }
 
     const filters = {};
@@ -834,9 +833,11 @@ export const getLeads = async (req, res) => {
         } : null
       };
 
-      if (lead.leadType === 'return') {
+      if (lead.leadType === 'return' || lead.leadType === 'booked') {
         base.booking_number = lead.bookingNo;
-        base.return_date = lead.returnDate;
+        if (lead.leadType === 'return') {
+          base.return_date = lead.returnDate;
+        }
       } else if (lead.leadType === 'lossOfSale') {
         base.visit_date = lead.visitDate;
         base.reason_collected_from_store = lead.reasonCollectedFromStore;
@@ -970,7 +971,7 @@ export const updateLossOfSaleLead = async (req, res) => {
     // Allow updating functionDate if provided
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
 
-    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
+    if (!lead.leadType) {
       updateData.leadType = "lossOfSale";
     }
 
@@ -1123,7 +1124,7 @@ export const updateReturnLead = async (req, res) => {
     // Allow updating functionDate if provided
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
 
-    if (!lead.leadType || (lead.leadType === "general" && !updateData.leadType)) {
+    if (!lead.leadType) {
       updateData.leadType = "return";
     }
 
@@ -1446,8 +1447,7 @@ export const updateGenericLead = async (req, res) => {
     if (rating !== undefined) updateData.rating = rating;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    // If lead was general and client intends to keep it general, don't overwrite leadType.
-    // If you want to change leadType, frontend can call a specific endpoint or include lead_type in body.
+
 
     // Capture before snapshot
     const beforeLead = lead.toObject();
