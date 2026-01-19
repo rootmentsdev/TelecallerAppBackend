@@ -96,7 +96,7 @@ Now use the token to fetch leads. This endpoint requires authentication.
 - **Headers:**
   - `Authorization: Bearer <your-token-here>`
 - **Query Parameters (optional):**
-  - `leadType`: `lossOfSale`, `bookingConfirmation`, `rentOutFeedback`, `general`, `justDial`
+  - `leadType`: `lossOfSale`, `booked`, `return`, `enquiry`
   - `store`: Store name (e.g., `Zurocci - Edappal`)
   - `source`: `Walk-in` (for walk-in leads)
   - `page`: `1` (pagination)
@@ -136,17 +136,17 @@ https://telecallerappbackend.onrender.com/api/pages/leads?leadType=lossOfSale&st
 
 **Get Walk-in leads:**
 ```
-https://telecallerappbackend.onrender.com/api/pages/leads?leadType=general&source=Walk-in
+https://telecallerappbackend.onrender.com/api/pages/leads?leadType=enquiry&source=Walk-in
 ```
 
 **Get Booking Confirmation leads:**
 ```
-https://telecallerappbackend.onrender.com/api/pages/leads?leadType=bookingConfirmation
+https://telecallerappbackend.onrender.com/api/pages/leads?leadType=booked
 ```
 
 **Get Rent-Out leads:**
 ```
-https://telecallerappbackend.onrender.com/api/pages/leads?leadType=rentOutFeedback
+https://telecallerappbackend.onrender.com/api/pages/leads?leadType=return
 ```
 
 ### Expected Response:
@@ -250,19 +250,14 @@ Update a lead's information (e.g., call status, remarks).
 - **URL:** `https://telecallerappbackend.onrender.com/api/pages/add-lead`
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 
-### Update Booking Confirmation:
+### Update Return Lead:
 - **Method:** `POST`
-- **URL:** `https://telecallerappbackend.onrender.com/api/pages/booking-confirmation`
+- **URL:** `https://telecallerappbackend.onrender.com/api/pages/return/:leadId`
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 
-### Update Rent-Out:
+### Update Booked/Enquiry Lead:
 - **Method:** `POST`
-- **URL:** `https://telecallerappbackend.onrender.com/api/pages/rent-out`
-- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
-
-### Update Just Dial:
-- **Method:** `POST`
-- **URL:** `https://telecallerappbackend.onrender.com/api/pages/just-dial`
+- **URL:** `https://telecallerappbackend.onrender.com/api/pages/leads/:leadId`
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 
 ---

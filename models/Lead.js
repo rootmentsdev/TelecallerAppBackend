@@ -33,14 +33,14 @@ const leadSchema = new mongoose.Schema(
     // Status Fields
     callStatus: { type: String, default: "Not Called" },
     leadStatus: { type: String, default: "No Status" },
-    closingStatus: { type: String }, // For Just Dial page
+    closingStatus: { type: String },
     closingAction: { type: String, default: null },
 
     // Follow-up
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information
-    reason: { type: String }, // For Just Dial page
+    reason: { type: String },
     reasons: { type: String, default: null },
     reasonCollectedFromStore: { type: String }, // For Loss of Sale page
     rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
@@ -82,9 +82,9 @@ leadSchema.index(
   }
 );
 
-// CRITICAL: Unique partial index for lossOfSale and general leads
+// CRITICAL: Unique partial index for lossOfSale and enquiry leads
 // Prevents duplicates at database level, even under concurrent syncs/CSV imports
-// Only applies to lossOfSale and general leads
+// Only applies to lossOfSale and enquiry leads
 // Index on: name, phone, leadType, store (base duplicate criteria)
 leadSchema.index(
   { name: 1, phone: 1, leadType: 1, store: 1 },

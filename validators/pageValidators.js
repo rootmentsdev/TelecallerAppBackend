@@ -32,8 +32,8 @@ export const leadGetValidator = [
 export const leadsListValidator = [
   query('leadType')
     .optional()
-    .isIn(['lossOfSale', 'return', 'justDial', 'general', 'enquiry'])
-    .withMessage('leadType must be one of: lossOfSale, return, justDial, general, enquiry'),
+    .isIn(['lossOfSale', 'return', 'enquiry', 'booked'])
+    .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked'),
   query('page')
     .optional()
     .isInt({ min: 1 })
@@ -148,65 +148,7 @@ export const returnPostValidator = [
 
 
 
-// Just Dial Page Validators
-export const justDialGetValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Lead ID is required')
-    .custom((value) => {
-      if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid lead ID format');
-      }
-      return true;
-    })
-];
 
-export const justDialPostValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Lead ID is required')
-    .custom((value) => {
-      if (!mongoose.Types.ObjectId.isValid(value)) {
-        throw new Error('Invalid lead ID format');
-      }
-      return true;
-    }),
-  body('call_status')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Call status must be a string'),
-  body('lead_status')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Lead status must be a string'),
-  body('closing_status')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Closing status must be a string'),
-  body('reason')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Reason must be a string'),
-  body('follow_up_flag')
-    .optional()
-    .isBoolean()
-    .withMessage('Follow up flag must be a boolean'),
-  dateValidator('call_date'),
-  body('remarks')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('Remarks must be a string'),
-  body('call_duration')
-    .optional()
-    .isNumeric()
-    .withMessage('Call duration must be a number (seconds)')
-    .toFloat()
-];
 
 // Add Lead Page Validators
 export const addLeadPostValidator = [
@@ -255,7 +197,9 @@ export const addLeadPostValidator = [
   body('leadType')
     .optional()
     .isString()
-    .trim(),
+    .trim()
+    .isIn(['lossOfSale', 'return', 'enquiry', 'booked'])
+    .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked'),
   dateValidator('functionDate'),
   body('subCategory')
     .optional()
@@ -279,7 +223,7 @@ export const addLeadPostValidator = [
     .trim()
 ];
 
-// Generic lead update validator (for 'general' or unknown lead types)
+// Generic lead update validator
 export const leadUpdateValidator = [
   param('id')
     .notEmpty()
