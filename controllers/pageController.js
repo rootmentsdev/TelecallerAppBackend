@@ -2078,7 +2078,7 @@ export const updateFollowUp = async (req, res) => {
       } else {
         // Report
         // Ensure lead_type is explicit (handleLeadMovement does this via createReportFromLead, but we want to be safe)
-        const reportObj = result.data;
+        const reportObj = result.data.toObject ? result.data.toObject() : result.data;
         const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "enquiry";
 
         res.json({
