@@ -14,6 +14,10 @@ const reportSchema = new mongoose.Schema({
   functionDate: { type: Date, default: null },
   subCategory: { type: String, default: null },
   itemCategory: { type: String, default: null },
+  service: { type: String, default: null }, // NEW
+  numberOfFunctions: { type: Number, default: 0 }, // NEW
+  numberOfAttires: { type: Number, default: 0 }, // NEW
+  competitor: { type: String, default: null }, // NEW
   closingAction: { type: String, default: null },
   reasons: { type: String, default: null },
   remarks: { type: String, default: "" },

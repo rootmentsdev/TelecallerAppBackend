@@ -685,6 +685,24 @@
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
+ *               securityamount:
+ *                 type: string
+ *                 description: "Security amount deposit (String or Number)"
+ *               service:
+ *                 type: string
+ *                 description: "Type of service provided"
+ *               nooffunction:
+ *                 type: number
+ *                 description: "Number of functions"
+ *               noofattires:
+ *                 type: number
+ *                 description: "Number of attires"
+ *               SubCategory:
+ *                 type: string
+ *                 description: "Sub-category (overrides default/previous)"
+ *               competitor:
+ *                 type: string
+ *                 description: "Competitor name"
  *     responses:
  *       200:
  *         description: |
