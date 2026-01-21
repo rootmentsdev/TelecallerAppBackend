@@ -157,13 +157,45 @@ Defined in `models/Lead.js`:
     *   Unique Index: `{ name: 1, phone: 1, leadType: 1, store: 1 }`
     *   *Effect*: Prevents re-creating the same customer for the same store & type.
 
-*   **Return Leads**:
-    *   Unique Index: `{ bookingNo: 1, phone: 1, leadType: 1 }`
-    *   *Effect*: Ensures a booking number is never duplicated for returns.
+### 1. Creation
+*   **Returns:** Created automatically every 20 mins via Sync.
+*   **Walk-ins/Loss-of-sale:** Created via CSV Uploads (Stored in `Leads`).
+*   **Manual:** Created via `POST /api/pages/add-lead`. 
+    *   **DEFAULT BEHAVIOR**: Manual leads are effectively "Calls that just happened". They are saved directly to **Reports** (Archive). They are **NOT** created in the `Leads` collection unless specified otherwise (legacy/exception).
+    *   **Follow-Up**: If flagged, saves to `FollowUps`.
+    *   **Complaint**: If flagged, saves to `Complaints`.
 
-### 2. CSV Upload Rules
-*   **Normalization**: Phone numbers and store names are normalized before import.
-*   **Behavior**: Duplicate rows in CSV are **skipped** or **updated** based on the specific import script logic, preserving the original lead's creation date.
+### 2. Processing (The Priority Chain)
+When a Telecaller submits an update for a Lead (or FollowUp):
+1.  **Priority 1 (Complaint):** If `mark_as_complaint` is true → **Move to Complaints**. (Logic stops).
+2.  **Priority 2 (Follow-Up):** If `follow_up_flag` is true → **Move to FollowUps**.
+3.  **Priority 3 (Report):** If neither above → **Move to Reports**.
+
+> **Crucial Rule:** A lead cannot exist in two places. It is **Deleted** from the Source (Leads/FollowUps) immediately after being created in the Destination.
+
+### 3. Date Filtering Rules
+*   **Standard Leads:** Filter by `createdAt` (Database creation time).
+*   **Return Leads:** Filter by `returnDate` (The actual event date), **ignoring** `createdAt`.
+
+---
+
+## 🔄 Incremental Sync System
+*   **Scheduler:** Runs every **20 minutes**.
+*   **Scope:** Syncs **Stores** and **Return Leads** ONLY.
+*   **Locking:** Uses a global MongoDB lock (`SyncLock`) to prevent overlapping syncs.
+*   **Expiry:** Locks auto-expire after 15 minutes to prevent deadlocks.
+
+> **Note:** Loss of Sale and Walk-ins are **NOT** synced automatically. They require manual CSV uploads.
+
+---
+
+## 📂 CSV Upload System
+*   **Endpoint:** `/api/upload/csv`
+*   **Supported Types:** `walkin`, `lossofsale`
+*   **Destination:** Always created in `Leads` collection.
+*   **Deduplication:**
+    *   **LossOfSale:** Updates existing record if `name` + `phone` matches.
+    *   **Walk-in:** Updates existing record if `phone` matches.
 
 ---
 
