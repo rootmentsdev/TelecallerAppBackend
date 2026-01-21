@@ -697,9 +697,6 @@
  *               noofattires:
  *                 type: number
  *                 description: "Number of attires"
- *               SubCategory:
- *                 type: string
- *                 description: "Sub-category (overrides default/previous)"
  *               competitor:
  *                 type: string
  *                 description: "Competitor name"

@@ -1040,7 +1040,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate, securityamount, service, nooffunction, noofattires, SubCategory, competitor } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate, securityamount, service, nooffunction, noofattires, competitor } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1132,8 +1132,6 @@ export const updateReturnLead = async (req, res) => {
     // ADDITIONAL FIELDS (Requested 2nd batch)
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
-    // Handle SubCategory (Capitalized input) - maps to existing subCategory field
-    if (SubCategory !== undefined) updateData.subCategory = SubCategory;
 
     if (!lead.leadType) {
       updateData.leadType = "return";

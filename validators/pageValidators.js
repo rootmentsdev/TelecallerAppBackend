@@ -164,6 +164,11 @@ export const returnPostValidator = [
     .isString()
     .trim()
     .withMessage('Service must be a string'),
+  body('subCategory')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('SubCategory must be a string'),
   body('nooffunction')
     .optional()
     .isNumeric()
@@ -174,11 +179,6 @@ export const returnPostValidator = [
     .isNumeric()
     .withMessage('Number of attires must be a number')
     .toInt(),
-  body('SubCategory')
-    .optional()
-    .isString()
-    .trim()
-    .withMessage('SubCategory must be a string'),
   body('competitor')
     .optional()
     .isString()
