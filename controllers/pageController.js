@@ -1325,29 +1325,23 @@ export const createAddLead = async (req, res) => {
       });
     }
 
-    // Case C: Standard Lead
+    // Case C: Default -> Report (Manual Add = Call Complete)
     else {
-      const leadData = {
+      const reportData = {
         ...commonData,
         followUpFlag: false,
-        // followUpDate can be present (inactive)
+        // Map fields to Report schema expectations
+        editedBy: req.user._id,
+        editedAt: new Date(),
+        note: remarks ? String(remarks).trim() : null // Map remarks to note or keep remarks
       };
-      const lead = await Lead.create(leadData);
+      // Report schema has 'remarks' too, so keeping commonData spread is fine.
+      // Report schema usually needs 'leadType' which is in commonData.
+
+      const report = await Report.create(reportData);
       return res.status(201).json({
-        message: "Lead created successfully",
-        lead: {
-          id: lead._id,
-          customer_name: lead.name,
-          phone_number: lead.phone,
-          brand: lead.brand,
-          store_location: lead.store,
-          lead_status: lead.leadStatus,
-          call_status: lead.callStatus,
-          follow_up_date: lead.followUpDate,
-          lead_type: lead.leadType,
-          function_date: lead.functionDate,
-          remarks: lead.remarks
-        },
+        message: "Lead created and moved to reports",
+        report: report
       });
     }
 

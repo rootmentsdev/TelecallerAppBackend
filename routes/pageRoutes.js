@@ -807,10 +807,10 @@
  *     responses:
  *       201:
  *         description: |
- *           Resource created successfully. The response body contains one of 'lead', 'followUp', or 'complaint' depending on routing:
+ *           Resource created successfully. The response body contains one of 'report', 'followUp', or 'complaint' depending on routing:
  *           - If mark_as_complaint=true → returns { message, complaint }
  *           - If follow_up_flag=true → returns { message, followUp }
- *           - Otherwise → returns { message, lead }
+ *           - Otherwise (Default) → returns { message, report } (Saved directly to Reports)
  *       400:
  *         description: Validation error (invalid phone, missing date, conflicting flags)
  *       401:
