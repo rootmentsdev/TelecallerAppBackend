@@ -895,7 +895,7 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -962,10 +962,10 @@ export const updateLossOfSaleLead = async (req, res) => {
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     // Update new fields if provided
-    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
-    if (reasons !== undefined) updateData.reasons = reasons;
+    // reasons removed
     // Allow updating leadType if provided
     if (leadType !== undefined) updateData.leadType = leadType;
     // Allow updating functionDate if provided
@@ -1040,7 +1040,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate, securityamount, service, nooffunction, noofattires, competitor } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, leadType, functionDate, securityamount, service, nooffunction, noofattires, competitor } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1118,7 +1118,7 @@ export const updateReturnLead = async (req, res) => {
     if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
-    if (reasons !== undefined) updateData.reasons = reasons;
+
     // Allow updating leadType if provided
     if (leadType !== undefined) updateData.leadType = leadType;
     // Allow updating functionDate if provided
@@ -1189,7 +1189,7 @@ export const createAddLead = async (req, res) => {
       itemCategory,
       closingAction,
       remarks,
-      reasons,
+
       mark_as_complaint
     } = req.body;
 
@@ -1284,8 +1284,8 @@ export const createAddLead = async (req, res) => {
       subCategory: subCategory || sub_category || undefined,
       itemCategory: itemCategory || undefined,
       closingAction: closingAction || undefined,
-      remarks: remarks ? String(remarks).trim() : "",
-      reasons: reasons ? String(reasons).trim() : undefined,
+      remarks: remarks ? String(remarks).trim() : undefined,
+
       functionDate: validFunctionDate || undefined,
       followUpDate: validFollowUpDate || undefined,
       callDuration: 0,
@@ -1334,7 +1334,7 @@ export const createAddLead = async (req, res) => {
         // Map fields to Report schema expectations
         editedBy: req.user._id,
         editedAt: new Date(),
-        note: remarks ? String(remarks).trim() : null // Map remarks to note or keep remarks
+        // note: removed as per user request (redundant with remarks)
       };
       // Report schema has 'remarks' too, so keeping commonData spread is fine.
       // Report schema usually needs 'leadType' which is in commonData.
@@ -1668,7 +1668,7 @@ export const updateLead = async (req, res) => {
       rating,
       call_duration,
       mark_as_complaint, // REMOVED mark_as_issue
-      subCategory, sub_category, itemCategory, closingAction, reasons, leadType, functionDate
+      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1741,7 +1741,7 @@ export const updateLead = async (req, res) => {
     if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
-    if (reasons !== undefined) updateData.reasons = reasons;
+
     if (leadType !== undefined) updateData.leadType = leadType;
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
 
@@ -1955,7 +1955,7 @@ export const updateFollowUp = async (req, res) => {
       call_duration,
       rating,
       mark_as_complaint, // Extract mark_as_complaint
-      subCategory, sub_category, itemCategory, closingAction, reasons, leadType, functionDate // Extract new fields
+      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate // Extract new fields
     } = req.body;
 
     // Validate remarks input
@@ -2055,7 +2055,7 @@ export const updateFollowUp = async (req, res) => {
     if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
-    if (reasons !== undefined) updateData.reasons = reasons;
+
     // Allow updating leadType and functionDate in FollowUps as well
     if (leadType !== undefined) updateData.leadType = leadType;
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
