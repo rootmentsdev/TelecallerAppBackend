@@ -545,14 +545,13 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
-              subCategory: { type: string }
-              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
- *               remarks: { type: string }
+ *               subCategory: { type: string }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *               reasons: { type: string, nullable: true }
+ *               functionDate: { type: string, format: date-time }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
+ *               remarks: { type: string, nullable: true }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               mark_as_complaint:
  *                 type: boolean
@@ -568,6 +567,31 @@
  *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 report: { type: object }
+ *                 followUp: { type: object }
+ *                 complaint: { type: object }
+ *             examples:
+ *               movedToReport:
+ *                 summary: Moved to Reports (Default)
+ *                 value:
+ *                   message: "Loss of Sale lead updated and moved to reports"
+ *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "lossOfSale" }
+ *               movedToFollowUp:
+ *                 summary: Moved to FollowUps
+ *                 value:
+ *                   message: "Loss of Sale lead updated and moved to follow-ups"
+ *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-01T10:00:00Z" }
+ *               movedToComplaint:
+ *                 summary: Moved to Complaints
+ *                 value:
+ *                   message: "Loss of Sale lead updated and moved to complaints"
+ *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Serious issue reported" }
  *       400:
  *         description: Validation error
  *       401:
@@ -644,14 +668,13 @@
  *                 type: string
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
- *               remarks: { type: string }
-              subCategory: { type: string }
-              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-              reasons: { type: string }
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
+ *               remarks: { type: string, nullable: true }
+ *               subCategory: { type: string }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *               reasons: { type: string, nullable: true }
+ *               functionDate: { type: string, format: date-time }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
@@ -662,6 +685,21 @@
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
+ *               securityamount:
+ *                 type: string
+ *                 description: "Security amount deposit (String or Number)"
+ *               service:
+ *                 type: string
+ *                 description: "Type of service provided"
+ *               nooffunction:
+ *                 type: number
+ *                 description: "Number of functions"
+ *               noofattires:
+ *                 type: number
+ *                 description: "Number of attires"
+ *               competitor:
+ *                 type: string
+ *                 description: "Competitor name"
  *     responses:
  *       200:
  *         description: |
@@ -670,6 +708,31 @@
  *           - If mark_as_complaint=true → moves to Complaints collection
  *           - If follow_up_flag=true and follow_up_date provided → moves to FollowUps collection
  *           - Otherwise → moves to Reports collection
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 report: { type: object }
+ *                 followUp: { type: object }
+ *                 complaint: { type: object }
+ *             examples:
+ *               movedToReport:
+ *                 summary: Moved to Reports (Default)
+ *                 value:
+ *                   message: "Return lead updated and moved to reports"
+ *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "return" }
+ *               movedToFollowUp:
+ *                 summary: Moved to FollowUps
+ *                 value:
+ *                   message: "Return lead updated and moved to follow-ups"
+ *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-01T10:00:00Z" }
+ *               movedToComplaint:
+ *                 summary: Moved to Complaints
+ *                 value:
+ *                   message: "Return lead updated and moved to complaints"
+ *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Item damaged on return" }
  *       400:
  *         description: Validation error
  *       401:
@@ -1535,100 +1598,41 @@ router.get(
  *             - call_status
  *             - lead_status
  *     responses:
- *       200:
- *         description: FollowUp lead updated and moved to Reports successfully. The report will be sorted by `lead_type` in the Reports collection.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 message:
- *                   type: string
- *                   example: "Follow-up lead updated and moved to reports"
- *                 report:
- *                   type: object
- *                   description: |
- *                     Created Report entry with final state. 
- *                     
- *                     **Sorting:** Reports are sorted by `lead_type` field:
- *                     - `"enquiry"` → Enquiry/New Leads section
- *                     - `"lossOfSale"` → Loss of Sale section
- *                     - `"return"` → Return section
- *                     - `"booked"` → Booked section
- *                     
- *                     The `lead_type` from the FollowUp is explicitly preserved to ensure proper sorting.
- *                   properties:
- *                     _id:
- *                       type: string
- *                     lead_name:
- *                       type: string
- *                     phone_number:
- *                       type: string
- *                     store:
- *                       type: string
- *                     lead_type:
- *                       type: string
- *                       description: Lead type preserved from FollowUp. Used for sorting reports (lossOfSale, return, enquiry, booked).
- *                       example: "enquiry"
- *                     call_status:
- *                       type: string
- *                     lead_status:
- *                       type: string
- *                     call_duration:
- *                       type: number
- *                     remarks:
- *                       type: string
- *                       nullable: true
- *                       description: Remarks (null if user provided no input)
- *                     editedBy:
- *                       type: string
- *                     editedAt:
- *                       type: string
- *                       format: date-time
+ *                 message: { type: string }
+ *                 report: { type: object }
+ *                 followUp: { type: object }
+ *                 complaint: { type: object }
  *             examples:
- *               success:
- *                 summary: Successful update
+ *               movedToReport:
+ *                 summary: Moved to Reports (Default)
  *                 value:
  *                   message: "Follow-up lead updated and moved to reports"
- *                   report:
- *                     _id: "507f1f77bcf86cd799439011"
- *                     lead_name: "John Doe"
- *                     phone_number: "9876543210"
- *                     store: "Suitor Guy - Edappally"
- *                     lead_type: "return"
- *                     call_status: "Called"
- *                     lead_status: "Interested"
- *                     call_duration: 300
- *                     remarks: null
- *                     follow_up_date: "2025-01-15T10:00:00.000Z"
- *                     editedBy: "507f1f77bcf86cd799439012"
- *                     editedAt: "2024-12-29T10:30:00.000Z"
+ *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "enquiry" }
+ *               rescheduledFollowUp:
+ *                 summary: Rescheduled Follow-Up (Follow-up Again)
+ *                 value:
+ *                   message: "Follow-up lead updated and scheduled for next follow-up"
+ *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-20T10:00:00Z", follow_up_flag: true }
+ *               movedToComplaint:
+ *                 summary: Moved to Complaints
+ *                 value:
+ *                   message: "Follow-up lead updated and moved to complaints"
+ *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Serious issue reported" }
  *       400:
- *         description: Validation error (e.g., remarks exceeds 1000 characters)
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Remarks field cannot exceed 1000 characters"
+ *         description: Validation error
  *       401:
- *         description: Unauthorized. Token missing or invalid.
+ *         description: Unauthorized
  *       403:
- *         description: Access denied. User doesn't have permission to update this FollowUp lead.
+ *         description: Access denied
  *       404:
- *         description: FollowUp lead not found in FollowUps collection.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Follow-up lead not found. This endpoint only works with leads in the FollowUps collection."
+ *         description: FollowUp lead not found
  *       500:
- *         description: Internal server error.
+ *         description: Internal server error
  */
 // POST /api/pages/follow-ups/:id - Update FollowUp lead (moves to Reports)
 router.post(

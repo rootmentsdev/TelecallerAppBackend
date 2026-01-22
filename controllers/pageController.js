@@ -1040,7 +1040,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, reasons, leadType, functionDate, securityamount, service, nooffunction, noofattires, competitor } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, reasons, leadType, functionDate, securityamount, service, nooffunction, noofattires, competitor } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1123,6 +1123,15 @@ export const updateReturnLead = async (req, res) => {
     if (leadType !== undefined) updateData.leadType = leadType;
     // Allow updating functionDate if provided
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    // NEW FIELDS MAPPING
+    if (securityamount !== undefined) updateData.securityAmount = securityamount;
+    if (service !== undefined) updateData.service = service;
+    if (nooffunction !== undefined) updateData.numberOfFunctions = nooffunction;
+
+    // ADDITIONAL FIELDS (Requested 2nd batch)
+    if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
+    if (competitor !== undefined) updateData.competitor = competitor;
 
     if (!lead.leadType) {
       updateData.leadType = "return";
@@ -2073,7 +2082,7 @@ export const updateFollowUp = async (req, res) => {
       } else {
         // Report
         // Ensure lead_type is explicit (handleLeadMovement does this via createReportFromLead, but we want to be safe)
-        const reportObj = result.data;
+        const reportObj = result.data.toObject ? result.data.toObject() : result.data;
         const finalLeadType = reportObj.lead_type || updatedFollowUp.leadType || "enquiry";
 
         res.json({

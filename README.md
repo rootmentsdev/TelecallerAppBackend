@@ -1,169 +1,103 @@
 # Telecaller App Backend
 
-A robust Node.js/Express backend for the Telecaller Application, designed to manage lead lifecycles, incremental external API syncs, CSV uploads, and comprehensive reporting.
-
-## 🚀 Purpose
-
-This backend serves as the central hub for telecallers, team leads, and admins to:
-*   **Manage Leads**: Track leads from initial enquiry to conversion or closure.
-*   **Automate Data Sync**: Incrementally sync leads from external APIs with protection against overlaps.
-*   **Handle CSV Imports**: Bulk upload leads (Walk-in/Loss of Sale) with strict duplicate checks.
-*   **Track Issues**: Escalate problematic calls directly to a specialized queue.
+> **Production-grade Express.js backend for lead management, telecalling workflows, and automated syncing.**
 
 ---
 
-## ⚡ Key Features
+## 📖 What This Backend Does
+This backend acts as the central hub for the Telecalling operations. It balances three critical sources of data:
+1.  **Automated API Syncs** (for Return leads & Store lists).
+2.  **Manual CSV Imports** (for Walk-in & Loss of Sale leads).
+3.  **Direct Telecaller Input** (Call status, remarks, follow-ups).
 
-*   **Lead Lifecycle Management**: Seamless movement between collections:
-    *   `Leads` (Active) → `FollowUps` (Scheduled) → `Reports` (Closed/Logged).
-*   **Issue Escalation**: 
-    *   Leads marked as "Issue" are moved to the `StarredCalls` collection.
-*   **Smart Duplicate Prevention**: 
-    *   Database-level unique indexes ensure no duplicate leads based on phone, name, store, and lead type.
-*   **Incremental Sync Engine**: 
-    *   Background scheduler (cron) runs every 20 minutes (`sync/apiOnly.js`).
-    *   Uses a `SyncLock` mechanism (MongoDB) to prevent race conditions or overlapping sync jobs.
-*   **CSV Upload Web UI**: 
-    *   Built-in static frontend for Admins to upload bulk leads effectively.
+It enforces a strict **lifecycle** to ensure leads move from "New" to "Processed" without data loss or duplication.
+
+---
+
+## 🧠 Core Concepts
+
+| Concept | Description |
+| :--- | :--- |
+| **Leads** | The active working pool. All new data (Synced Returns, CSV Imports) starts here. |
+| **FollowUps** | A separate holding area for leads that need a callback (`followUpFlag: true`). |
+| **Complaints** | High-priority bucket for issues (`mark_as_complaint: true`). These exit the normal flow immediately. |
+| **Reports** | The **Final Archive**. When a lead is edited/processed (and not moved to FollowUp/Complaint), it moves here. |
+
+---
+
+## 🏷️ Supported Lead Types
+The system strictly supports the following `leadType` enum values:
+*   `return` (Synced automatically)
+*   `lossOfSale` (Imported via CSV)
+*   `enquiry` (Default / Walk-ins)
+*   `booked`
+
+> **Note:** "General" leads are treated as `enquiry` or `lossOfSale` depending on input source.
+
+---
+
+## 🔄 High-Level Workflow
+```text
+[ SOURCE ]                  [ ACTIVE POOL ]             [ OUTCOME ]
+
+External API  --Sync-->     LEADS COLLECTION
+(Returns)                       │
+                                │ (Telecaller calls lead)
+CSV Upload    --Import-->       │ ──> [ Mark as Complaint ] ──> COMPLAINTS
+(Loss/Walkin)                   │
+                                │ ──> [ Flag Follow-Up ] ─────> FOLLOW-UPS
+Manual Entry  --Post-->         │                                 │
+                                │                                 │ (Follow-up Again)
+                                │ ──> [ Edit/Success/Fail ] ──> REPORTS
+```
 
 ---
 
 ## 🛠️ Tech Stack
-
-*   **Runtime**: Node.js
-*   **Framework**: Express.js (v5)
-*   **Database**: MongoDB / Mongoose (v9)
-*   **Documentation**: Swagger (OpenAPI 3.0)
-*   **Scheduling**: node-cron with custom locking logic
-*   **Authentication**: JWT (JSON Web Tokens)
-*   **Deployment**: Optimized for Render.com
+*   **Runtime:** Node.js
+*   **Framework:** Express.js
+*   **Database:** MongoDB (Mongoose)
+*   **Authentication:** JWT + External API Verification
+*   **Scheduling:** `node-cron`
+*   **Documentation:** Swagger UI (`/api-docs`)
 
 ---
 
-## 📂 Repository Structure
+## 🔐 Authentication Flow
+Authentication is **Hybrid**:
+1.  **Login Request:** Frontend sends `employeeId` + `password`.
+2.  **External Verification:** Backend bypasses local password check and verifies credentials against `rootments.in/api/verify_employee`.
+3.  **Local Sync:** If valid, the user is created/updated in local MongoDB (for role/store mapping).
+4.  **Session:** A JWT token is issued for API access.
 
-| Folder | Description |
-| :--- | :--- |
-| `controllers/` | Logic for lead movement (`handleLeadMovement`), reports, and CSV processing. |
-| `models/` | Mongoose schemas (`Lead`, `FollowUp`, `Report`, `StarredCall`, `SyncLock`). |
-| `routes/` | API endpoints definitions (`pageRoutes`, `csvUploadRoutes`, `reportRoutes`). |
-| `sync/` | Core sync engine. `apiOnly.js` (orchestrator) and `api/` (specific sync logic). |
-| `upload-ui/` | Static HTML/JS files for the CSV Upload Web Interface. |
-| `scheduler/` | Cron job setup that triggers the sync engine. |
-| `scripts/` | Maintenance scripts for cleanup, index creation, and verification. |
-| `validators/` | Input validation logic for APIs. |
+> **Roles:** `admin`, `teamLead`, `telecaller`
 
 ---
 
-## 🚀 Quick Start
+## 📡 API Overview
+Detailed contract available at `/api-docs` (Swagger).
 
-### Prerequisites
-*   Node.js (v18+ recommended)
-*   MongoDB (URI string)
+### Leads & Processing
+*   `GET /api/pages/leads` - List active leads (filtering by type, date, store).
+*   `GET /api/pages/follow-ups` - List pending follow-ups.
+*   `POST /api/pages/leads/:id` - Process a lead (Move to Report/Complaint/FollowUp).
+*   `POST /api/pages/follow-ups/:id` - Process a follow-up.
 
-### Setup
+### Special Flows
+*   `GET /api/pages/return/:id` - Specialized view for Return leads (includes Booking No).
+*   `GET /api/pages/loss-of-sale/:id` - Specialized view for Loss of Sale.
 
-1.  **Clone the repository**
-    ```bash
-    git clone <repo-url>
-    cd telecaller-backend
-    ```
-
-2.  **Install dependencies**
-    ```bash
-    npm install
-    ```
-
-3.  **Environment Configuration**
-    Create a `.env` file in the root directory:
-    ```env
-    PORT=8800
-    MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/telecaller
-    JWT_SECRET=your_super_secret_key
-    
-    # External API Config
-    API_BASE_URL=https://rentalapi.rootments.live
-    API_TOKEN=your_external_api_token
-    STORE_USE_POST=false
-    ```
-
-4.  **Run Locally**
-    ```bash
-    # Development mode (restarts on changes)
-    npm run dev
-    
-    # Production start
-    npm start
-    ```
-
-5.  **Access API & Docs**
-    *   Server: `http://localhost:8800`
-    *   Swagger Docs: `http://localhost:8800/api-docs`
-    *   Upload UI: `http://localhost:8800/upload`
+### Reports
+*   `GET /api/reports` - View processed history (Final destination).
 
 ---
 
-## 🐳 Environment Variables
-
-| Variable | Description | Example |
-| :--- | :--- | :--- |
-| `PORT` | API Port | `8800` |
-| `MONGO_URI` | MongoDB Connection String | `mongodb+srv://...` |
-| `JWT_SECRET` | Secret for signing auth tokens | `mysecret123` |
-| `API_BASE_URL` | Base URL for external Rental API | `https://api.example.com` |
-| `API_TOKEN` | Auth token for external API | `abc-123-xyz` |
-| `SYNC_TRIGGER` | (Optional) Label for sync logs | `auto` / `manual` |
-
----
-
-## 🔄 Core Flows
-
-### A) Lead Lifecycle
-Determined by `handleLeadMovement` in `pageController.js`:
-1.  **Lead Update**: User updates a lead status/remarks via `PUT /api/pages/:type/:id`.
-2.  **Move to FollowUp**: If `follow_up_flag: true` AND `follow_up_date` is present:
-    *   Created in `FollowUps`.
-    *   Removed from `Leads`.
-3.  **Move to Reports**: Default action (if closed/updated without follow-up):
-    *   Created in `Reports`.
-    *   Removed from `Leads`.
-
-### B) Issue Flow (Starring)
-1.  **Trigger**: User checks "Mark as Issue" in UI (`mark_as_issue: true`).
-2.  **Priority**: Highest priority. Overrides follow-up flag.
-3.  **Action**: 
-    *   Created in `StarredCalls`.
-    *   Removed from source collection.
-
-### C) External API Sync
-1.  **Trigger**: `scheduler/apiSyncScheduler.js` (Every 20 mins) calls `sync/apiOnly.js`.
-2.  **Locking**: Acquires `SyncLock` (ID: `GLOBAL_API_SYNC`). Auto-expires after 15 mins if stuck.
-3.  **Process**:
-    *   Sync Stores (`sync/api/sync_storelist.js`)
-    *   Sync Returns (`sync/api/sync_return.js`)
-    *   *Note: Booking sync is currently disabled/removed.*
-4.  **Completion**: Releases lock and saves `SyncLog` entry.
-
----
-
-## 🛡️ Duplicate Prevention & Validation
-
-The system enforces strict uniqueness to prevent double-calling.
-
-### 1. Mongoose Indexes
-Defined in `models/Lead.js`:
-
-*   **General/Walk-in/LossOfSale**:
-    *   Unique Index: `{ name: 1, phone: 1, leadType: 1, store: 1 }`
-    *   *Effect*: Prevents re-creating the same customer for the same store & type.
+## ♻️ Lead Lifecycle Explained
 
 ### 1. Creation
 *   **Returns:** Created automatically every 20 mins via Sync.
-*   **Walk-ins/Loss-of-sale:** Created via CSV Uploads (Stored in `Leads`).
-*   **Manual:** Created via `POST /api/pages/add-lead`. 
-    *   **DEFAULT BEHAVIOR**: Manual leads are effectively "Calls that just happened". They are saved directly to **Reports** (Archive). They are **NOT** created in the `Leads` collection unless specified otherwise (legacy/exception).
-    *   **Follow-Up**: If flagged, saves to `FollowUps`.
-    *   **Complaint**: If flagged, saves to `Complaints`.
+*   **Walk-ins/Loss-of-sale:** Created via CSV Uploads.
+*   **Manual:** Created via `POST /api/pages/add-lead`.
 
 ### 2. Processing (The Priority Chain)
 When a Telecaller submits an update for a Lead (or FollowUp):
@@ -192,84 +126,56 @@ When a Telecaller submits an update for a Lead (or FollowUp):
 ## 📂 CSV Upload System
 *   **Endpoint:** `/api/upload/csv`
 *   **Supported Types:** `walkin`, `lossofsale`
-*   **Destination:** Always created in `Leads` collection.
 *   **Deduplication:**
     *   **LossOfSale:** Updates existing record if `name` + `phone` matches.
     *   **Walk-in:** Updates existing record if `phone` matches.
 
 ---
 
-## 📤 Telecaller CSV Upload Web UI
+## ⚙️ Local Setup
 
-A built-in utility for admins to upload leads without Postman.
+1.  **Clone & Install**
+    ```bash
+    git clone <repo>
+    npm install
+    ```
 
-*   **URL**: `https://<your-domain>/upload` (or `/login`)
-*   **Tech**: Vanilla HTML/JS (located in `upload-ui/`).
-*   **API Used**: `POST /api/import/csv`
-*   **Features**:
-    *   Drag-and-drop CSV/Excel.
-    *   Select Lead Type (Walk-in / Loss of Sale).
-    *   Real-time progress and summary (Inserted/Updated/Skipped).
+2.  **Environment Variables (`.env`)**
+    ```env
+    PORT=8800
+    MONGO_URI=mongodb+srv://...
+    JWT_SECRET=your_secret_key
+    
+    # External Auth
+    VERIFY_EMPLOYEE_API_URL=https://rootments.in/api/verify_employee
+    
+    # Automatic Sync
+    API_SYNC_ENABLED=true
+    API_SYNC_TIME="*/20 * * * *"
+    ```
 
----
-
-## 📚 API Documentation
-
-Swagger is available at `/api-docs`.
-
-### Key Endpoints
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/pages/leads` | List leads with filters (store, date, type). |
-| `POST` | `/api/pages/add-lead` | Create a new lead manually. |
-| `PUT` | `/api/pages/:type/:id` | Update lead & move to Report/FollowUp. |
-| `POST` | `/api/upload/csv` | Admin endpoint for bulk CSV import. |
-| `GET` | `/api/reports` | Fetch generated reports. |
-| `GET` | `/api/health` | Service health check. |
-
----
-
-## 🛠️ Scripts & Maintenance
-
-Defined in `package.json`. Use `npm run <script>`:
-
-*   **Sync**:
-    *   `sync:api`: Run external API sync manually.
-    *   `sync:stores`: Sync only stores.
-*   **Maintenance**:
-    *   `check:duplicates`: Scan DB for potential validation violations.
-    *   `cleanup:duplicates`: Remove duplicates based on strict rules.
-    *   `unlock:sync`: Force release the global sync lock (if stuck).
-    *   `verify:data`: comprehensive integrity check.
+3.  **Run**
+    ```bash
+    npm start         # Production
+    npm run dev       # Development (Nodemon)
+    ```
 
 ---
 
-## 🚢 Deployment (Render)
-
-This repo is optimized for Render web services.
-
-*   **Build Command**: `npm install`
-*   **Start Command**: `npm start`
-*   **Static Assets**: The `upload-ui` folder is served statically by Express, so no separate static site is needed.
-*   **Health Check Path**: `/api/health`
-
-**Troubleshooting Render Deploys:**
-1.  **Swagger Errors**: If you see "YAML Semantic Error", ensure no inline YAML in JSDoc uses unescaped format characters.
-2.  **Mongoose Warnings**: "Duplicate index" warnings are benign if the index definition hasn't changed.
+## 🧹 Maintenance Scripts
+Located in `scripts/`:
+*   `verify-sync-system.js`: Checks lock status and next scheduled run.
+*   `unlock-sync.js`: Force-removes a stuck sync lock.
+*   `check-duplicates.js`: Scans DB for duplicate phone numbers.
 
 ---
 
-## 🤝 Contributing
-
-1.  **Branching**: Use `feature/xyz` or `fix/issue-name`.
-2.  **Testing**:
-    *   Run `npm run verify:data` before submitting PRs to ensure no data integrity issues.
-    *   Do not modify business logic (lead movement) without verifying `controller` behavior.
-3.  **Linting**: Ensure code follows the existing ESM import style.
+## ❌ What This Backend Does NOT Do
+*   It does **NOT** sync "Booking" leads automatically (Legacy feature removed).
+*   It does **NOT** allow editing a lead while keeping it in the `Leads` collection (Must move to FollowUp/Report).
+*   It does **NOT** store passwords exclusively in MongoDB; it relies on external validation.
 
 ---
 
 ## 📄 License
-
-**ISC License**
-Property of Rootments. Internal use only recommended.
+Private Property of Rootments.

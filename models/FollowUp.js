@@ -30,7 +30,11 @@ const followUpSchema = new mongoose.Schema(
 
     // Booking/Rent-Out Information - same as Lead
     bookingNo: { type: String },
-    securityAmount: { type: Number },
+    securityAmount: { type: mongoose.Schema.Types.Mixed },
+    service: { type: String }, // NEW
+    numberOfFunctions: { type: Number }, // NEW
+    numberOfAttires: { type: Number }, // NEW
+    competitor: { type: String }, // NEW
 
     // Status Fields - same as Lead (these are edited fields)
     callStatus: { type: String, default: "Not Called" },

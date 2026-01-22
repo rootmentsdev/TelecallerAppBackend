@@ -80,6 +80,14 @@ export const lossOfSalePostValidator = [
     .trim()
     .withMessage('Lead status must be a string'),
   dateValidator('follow_up_date'),
+  body('follow_up_flag')
+    .optional()
+    .isBoolean()
+    .withMessage('Follow up flag must be a boolean'),
+  body('mark_as_complaint')
+    .optional()
+    .isBoolean()
+    .withMessage('mark_as_complaint must be a boolean'),
   body('reason_collected_from_store')
     .optional()
     .isString()
@@ -134,6 +142,11 @@ export const returnPostValidator = [
     .optional()
     .isBoolean()
     .withMessage('Follow up flag must be a boolean'),
+  dateValidator('follow_up_date'),
+  body('mark_as_complaint')
+    .optional()
+    .isBoolean()
+    .withMessage('mark_as_complaint must be a boolean'),
   body('remarks')
     .optional()
     .isString()
@@ -143,7 +156,34 @@ export const returnPostValidator = [
     .optional()
     .isNumeric()
     .withMessage('Call duration must be a number (seconds)')
-    .toFloat()
+    .toFloat(),
+  body('securityamount')
+    .optional(), // Allow any type (String/Number)
+  body('service')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Service must be a string'),
+  body('subCategory')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('SubCategory must be a string'),
+  body('nooffunction')
+    .optional()
+    .isNumeric()
+    .withMessage('Number of functions must be a number')
+    .toInt(),
+  body('noofattires')
+    .optional()
+    .isNumeric()
+    .withMessage('Number of attires must be a number')
+    .toInt(),
+  body('competitor')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Competitor must be a string')
 ];
 
 

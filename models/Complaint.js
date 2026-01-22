@@ -30,7 +30,11 @@ const complaintSchema = new mongoose.Schema(
 
     // Booking/Rent-Out Information
     bookingNo: { type: String },
-    securityAmount: { type: Number },
+    securityAmount: { type: mongoose.Schema.Types.Mixed },
+    service: { type: String }, // NEW
+    numberOfFunctions: { type: Number }, // NEW
+    numberOfAttires: { type: Number }, // NEW
+    competitor: { type: String }, // NEW
 
     // Status Fields
     callStatus: { type: String, default: "Not Called" },
