@@ -545,6 +545,14 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
+              subCategory: { type: string }
+              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+
+              functionDate: { type: string, format: date-time }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
+ *               remarks: { type: string }
  *               subCategory: { type: string }
  *               itemCategory: { type: string }
  *               closingAction: { type: string }
@@ -668,13 +676,14 @@
  *                 type: string
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
- *               remarks: { type: string, nullable: true }
- *               subCategory: { type: string }
- *               itemCategory: { type: string }
- *               closingAction: { type: string }
- *               reasons: { type: string, nullable: true }
- *               functionDate: { type: string, format: date-time }
- *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
+ *               remarks: { type: string }
+              subCategory: { type: string }
+              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
+              itemCategory: { type: string }
+              closingAction: { type: string }
+
+              functionDate: { type: string, format: date-time }
+              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
@@ -787,8 +796,7 @@
  *                 type: string
  *               closingAction:
  *                 type: string
- *               reasons:
- *                 type: string
+
  *               remarks:
  *                 type: string
  *               leadType:
@@ -918,8 +926,7 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *                 type: string
  *               closingAction:
  *                 type: string
- *               reasons:
- *                 type: string
+
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
@@ -986,7 +993,7 @@ router.patch(
  *               sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
  *               itemCategory: { type: string }
  *               closingAction: { type: string }
- *               reasons: { type: string }
+ *
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
@@ -1572,8 +1579,7 @@ router.get(
  *                 type: string
  *               closingAction:
  *                 type: string
- *               reasons:
- *                 type: string
+
  *               functionDate:
  *                 type: string
  *                 format: date-time

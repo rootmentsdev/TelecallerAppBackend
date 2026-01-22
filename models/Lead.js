@@ -8,7 +8,7 @@ const leadSchema = new mongoose.Schema(
     store: { type: String, required: true },
 
     // Source and Type
-    source: { type: String }, // Instagram, JustDial, Walk-in, Loss of Sale, etc.
+    source: { type: String },
     leadType: {
       type: String,
       enum: ["enquiry", "return", "booked", "lossOfSale"],
