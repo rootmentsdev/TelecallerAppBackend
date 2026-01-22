@@ -1182,11 +1182,13 @@ export const createAddLead = async (req, res) => {
       follow_up_flag,
       leadType,
       functionDate,
+      function_date,
       subCategory,
       sub_category, // Handle snake_case input
       itemCategory,
       closingAction,
       remarks,
+      call_duration,
 
       mark_as_complaint
     } = req.body;
@@ -1224,8 +1226,9 @@ export const createAddLead = async (req, res) => {
     }
 
     let validFunctionDate = null;
-    if (functionDate) {
-      const d = new Date(functionDate);
+    const rawFunctionDate = functionDate || function_date;
+    if (rawFunctionDate) {
+      const d = new Date(rawFunctionDate);
       if (isNaN(d.getTime())) {
         return res.status(400).json({ message: "Invalid functionDate format. Must be a valid ISO date." });
       }
@@ -1286,7 +1289,7 @@ export const createAddLead = async (req, res) => {
 
       functionDate: validFunctionDate || undefined,
       followUpDate: validFollowUpDate || undefined,
-      callDuration: 0,
+      callDuration: call_duration ? Number(call_duration) : 0,
       createdBy: req.user._id,
       assignedTo: req.user._id // Assign to creator by default? Usually yes for manual entry.
     };

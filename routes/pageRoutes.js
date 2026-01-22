@@ -801,12 +801,19 @@
 
  *               remarks:
  *                 type: string
+ *               call_duration:
+ *                 type: number
+ *                 description: "Call duration in seconds"
  *               leadType:
  *                 type: string
  *                 description: "Default: enquiry. Other values: lossOfSale, return, booked."
  *               functionDate:
  *                 type: string
  *                 format: date-time
+ *               function_date:
+ *                 type: string
+ *                 format: date-time
+ *                 description: "Alias for functionDate (snake_case)"
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Priority 1. If true, creates a Complaint directly (bypassing Leads/FollowUps). Cannot be used with follow_up_flag."
