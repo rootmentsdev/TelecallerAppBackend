@@ -240,6 +240,7 @@ export const addLeadPostValidator = [
     .isIn(['lossOfSale', 'return', 'enquiry', 'booked'])
     .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked'),
   dateValidator('functionDate'),
+  dateValidator('function_date'),
   body('subCategory')
     .optional()
     .isString()
@@ -256,6 +257,11 @@ export const addLeadPostValidator = [
     .optional()
     .isString()
     .trim(),
+  body('call_duration')
+    .optional()
+    .isNumeric()
+    .withMessage('Call duration must be a number (seconds)')
+    .toFloat(),
 
 ];
 
