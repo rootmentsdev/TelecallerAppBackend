@@ -359,7 +359,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'editedBy', 'editedAt', 'edited_by', 'edited_at'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -1115,7 +1115,7 @@ export const updateReturnLead = async (req, res) => {
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
     // Update new fields if provided
-    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
     if (reasons !== undefined) updateData.reasons = reasons;
@@ -1185,6 +1185,7 @@ export const createAddLead = async (req, res) => {
       leadType,
       functionDate,
       subCategory,
+      sub_category, // Handle snake_case input
       itemCategory,
       closingAction,
       remarks,
@@ -1280,7 +1281,7 @@ export const createAddLead = async (req, res) => {
       callStatus: call_status || "Not Called",
       leadType: leadType || "enquiry", // Default to enquiry
       source: "Manual Entry",
-      subCategory: subCategory || undefined,
+      subCategory: subCategory || sub_category || undefined,
       itemCategory: itemCategory || undefined,
       closingAction: closingAction || undefined,
       remarks: remarks ? String(remarks).trim() : "",
@@ -1667,7 +1668,7 @@ export const updateLead = async (req, res) => {
       rating,
       call_duration,
       mark_as_complaint, // REMOVED mark_as_issue
-      subCategory, itemCategory, closingAction, reasons, leadType, functionDate
+      subCategory, sub_category, itemCategory, closingAction, reasons, leadType, functionDate
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1737,7 +1738,7 @@ export const updateLead = async (req, res) => {
     if (rating !== undefined) updateData.rating = rating;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
     if (reasons !== undefined) updateData.reasons = reasons;
@@ -1954,7 +1955,7 @@ export const updateFollowUp = async (req, res) => {
       call_duration,
       rating,
       mark_as_complaint, // Extract mark_as_complaint
-      subCategory, itemCategory, closingAction, reasons, leadType, functionDate // Extract new fields
+      subCategory, sub_category, itemCategory, closingAction, reasons, leadType, functionDate // Extract new fields
     } = req.body;
 
     // Validate remarks input
@@ -2051,7 +2052,7 @@ export const updateFollowUp = async (req, res) => {
     }
 
     // Update new fields if provided
-    if (subCategory !== undefined) updateData.subCategory = subCategory;
+    if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
     if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
     if (closingAction !== undefined) updateData.closingAction = closingAction;
     if (reasons !== undefined) updateData.reasons = reasons;
