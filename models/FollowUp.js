@@ -4,8 +4,8 @@ import mongoose from "mongoose";
 // FollowUp is a workflow state (not a leadType)
 const followUpSchema = new mongoose.Schema(
   {
-    // Basic Information (Required) - same as Lead
-    name: { type: String, required: true },
+    // Basic Information
+    name: { type: String, required: false },
     phone: { type: String, required: true },
     store: { type: String, required: true },
 
@@ -46,8 +46,7 @@ const followUpSchema = new mongoose.Schema(
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information - same as Lead
-    reason: { type: String },
-    reasons: { type: String, default: null },
+
     reasonCollectedFromStore: { type: String },
     rating: { type: Number, min: 1, max: 5 },
     attendedBy: { type: String },

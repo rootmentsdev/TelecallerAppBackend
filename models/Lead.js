@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const leadSchema = new mongoose.Schema(
   {
-    // Basic Information (Required)
-    name: { type: String, required: true },
+    // Basic Information
+    name: { type: String, required: false },
     phone: { type: String, required: true },
     store: { type: String, required: true },
 
@@ -44,8 +44,7 @@ const leadSchema = new mongoose.Schema(
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information
-    reason: { type: String },
-    reasons: { type: String, default: null },
+
     reasonCollectedFromStore: { type: String }, // For Loss of Sale page
     rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
     attendedBy: { type: String },

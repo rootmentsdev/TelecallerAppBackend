@@ -193,9 +193,8 @@ export const returnPostValidator = [
 // Add Lead Page Validators
 export const addLeadPostValidator = [
   body('customer_name')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('Customer name is required')
     .isString()
     .withMessage('Customer name must be a string'),
   body('phone_number')
@@ -257,10 +256,7 @@ export const addLeadPostValidator = [
     .optional()
     .isString()
     .trim(),
-  body('reasons')
-    .optional()
-    .isString()
-    .trim()
+
 ];
 
 // Generic lead update validator
