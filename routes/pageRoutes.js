@@ -546,6 +546,7 @@
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
               subCategory: { type: string }
+              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
               itemCategory: { type: string }
               closingAction: { type: string }
               reasons: { type: string }
@@ -645,6 +646,7 @@
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               remarks: { type: string }
               subCategory: { type: string }
+              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
               itemCategory: { type: string }
               closingAction: { type: string }
               reasons: { type: string }
@@ -715,6 +717,9 @@
  *                 type: string
  *               subCategory:
  *                 type: string
+ *               sub_category:
+ *                 type: string
+ *                 description: "Alias for subCategory (snake_case)"
  *               itemCategory:
  *                 type: string
  *               closingAction:
@@ -841,6 +846,17 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *               call_duration:
  *                 type: number
  *                 description: "Call duration in seconds"
+ *               subCategory:
+ *                 type: string
+ *               sub_category:
+ *                 type: string
+ *                 description: "Alias for subCategory (snake_case)"
+ *               itemCategory:
+ *                 type: string
+ *               closingAction:
+ *                 type: string
+ *               reasons:
+ *                 type: string
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
@@ -903,6 +919,11 @@ router.patch(
  *               closing_status: { type: string }
  *               rating: { type: integer }
  *               call_duration: { type: number, description: "Call duration in seconds" }
+ *               subCategory: { type: string }
+ *               sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *               reasons: { type: string }
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
@@ -1481,6 +1502,9 @@ router.get(
  *                 example: null
  *               subCategory:
  *                 type: string
+ *               sub_category:
+ *                 type: string
+ *                 description: "Alias for subCategory (snake_case)"
  *               itemCategory:
  *                 type: string
  *               closingAction:
