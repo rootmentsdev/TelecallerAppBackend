@@ -19,7 +19,7 @@ const reportSchema = new mongoose.Schema({
   numberOfAttires: { type: Number, default: 0 }, // NEW
   competitor: { type: String, default: null }, // NEW
   closingAction: { type: String, default: null },
-  reasons: { type: String, default: null },
+
   remarks: { type: String, default: "" },
   lead_status: { type: String, default: "" },
   call_status: { type: String, default: "" }

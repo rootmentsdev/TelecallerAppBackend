@@ -233,8 +233,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
     followUpFlag: lead.followUpFlag || lead.follow_up_flag || false,
 
     // Additional Information
-    reason: lead.reason || undefined,
-    reasons: lead.reasons || undefined,
+
     reasonCollectedFromStore: lead.reasonCollectedFromStore || lead.reason_collected_from_store || undefined,
     rating: lead.rating || undefined,
     attendedBy: lead.attendedBy || lead.attended_by || undefined,
@@ -353,13 +352,13 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.subCategory = lead.subCategory ?? lead.sub_category ?? null;
   payload.itemCategory = lead.itemCategory ?? lead.item_category ?? null;
   payload.closingAction = lead.closingAction ?? lead.closing_action ?? null;
-  payload.reasons = lead.reasons ?? null;
+
   payload.leadType = lead.leadType ?? lead.lead_type ?? "enquiry";
   payload.functionDate = lead.functionDate ?? lead.function_date ?? null;
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'editedBy', 'editedAt', 'edited_by', 'edited_at'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'reason', 'editedBy', 'editedAt', 'edited_by', 'edited_at'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -600,8 +599,7 @@ const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration
     leadStatus: lead.leadStatus || lead.lead_status,
     closingStatus: lead.closingStatus || lead.closing_status,
     followUpFlag: lead.followUpFlag || lead.follow_up_flag || false,
-    reason: lead.reason,
-    reasons: lead.reasons,
+
     reasonCollectedFromStore: lead.reasonCollectedFromStore || lead.reason_collected_from_store,
     rating: lead.rating,
     attendedBy: lead.attendedBy || lead.attended_by,
@@ -1273,7 +1271,7 @@ export const createAddLead = async (req, res) => {
 
     // Common fields map
     const commonData = {
-      name: customer_name,
+      name: customer_name || null,
       phone: phoneClean,
       brand: brandClean || undefined,
       store: storeValue,

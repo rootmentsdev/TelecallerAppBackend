@@ -4,8 +4,8 @@ import mongoose from "mongoose";
 // Stores all lead fields directly (flattened structure, no snapshot)
 const complaintSchema = new mongoose.Schema(
   {
-    // Basic Information (Required)
-    name: { type: String, required: true },
+    // Basic Information
+    name: { type: String, required: false },
     phone: { type: String, required: true },
     store: { type: String, required: true },
 
@@ -46,8 +46,7 @@ const complaintSchema = new mongoose.Schema(
     followUpFlag: { type: Boolean, default: false },
 
     // Additional Information
-    reason: { type: String }, // For Just Dial page
-    reasons: { type: String, default: null },
+
     reasonCollectedFromStore: { type: String }, // For Loss of Sale page
     rating: { type: Number, min: 1, max: 5 }, // For Rent-Out page
     attendedBy: { type: String },

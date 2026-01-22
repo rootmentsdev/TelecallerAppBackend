@@ -556,7 +556,7 @@
  *               subCategory: { type: string }
  *               itemCategory: { type: string }
  *               closingAction: { type: string }
- *               reasons: { type: string, nullable: true }
+
  *               functionDate: { type: string, format: date-time }
  *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
  *               remarks: { type: string, nullable: true }
@@ -770,12 +770,14 @@
  *           schema:
  *             type: object
  *             required:
- *               - customer_name
+
  *               - phone_number
  *               - store_location
  *             properties:
  *               customer_name:
  *                 type: string
+ *                 nullable: true
+ *                 description: "Optional. If not provided, stored as null."
  *               phone_number:
  *                 type: string
  *                 description: "Must be exactly 10 digits"
