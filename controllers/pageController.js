@@ -356,6 +356,13 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.leadType = lead.leadType ?? lead.lead_type ?? "enquiry";
   payload.functionDate = lead.functionDate ?? lead.function_date ?? null;
 
+  // New fields (2026-01-23) - Explicit mapping to match Report schema
+  payload.service = lead.service ?? null;
+  payload.numberOfFunctions = lead.numberOfFunctions ?? lead.number_of_functions ?? lead.nooffunction ?? 0;
+  payload.numberOfAttires = lead.numberOfAttires ?? lead.number_of_attires ?? lead.noofattires ?? 0;
+  payload.competitor = lead.competitor ?? null;
+  payload.securityAmount = lead.securityAmount ?? lead.security_amount ?? null;
+
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
     if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'reason', 'editedBy', 'editedAt', 'edited_by', 'edited_at'].includes(k)) return;
@@ -1957,7 +1964,7 @@ export const updateFollowUp = async (req, res) => {
       call_duration,
       rating,
       mark_as_complaint, // Extract mark_as_complaint
-      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, // Extract new fields
+      subCategory, sub_category, itemCategory, item_category, closingAction, closing_action, leadType, functionDate, // Extract new fields + aliases
       sectionAmount, securityamount, service, nooffunction, noofattires, competitor // New requested fields (2026-01-23)
     } = req.body;
 
@@ -2056,8 +2063,8 @@ export const updateFollowUp = async (req, res) => {
 
     // Update new fields if provided
     if (subCategory !== undefined || sub_category !== undefined) updateData.subCategory = subCategory || sub_category;
-    if (itemCategory !== undefined) updateData.itemCategory = itemCategory;
-    if (closingAction !== undefined) updateData.closingAction = closingAction;
+    if (itemCategory !== undefined || item_category !== undefined) updateData.itemCategory = itemCategory || item_category;
+    if (closingAction !== undefined || closing_action !== undefined) updateData.closingAction = closingAction || closing_action;
 
     // Allow updating leadType and functionDate in FollowUps as well
     if (leadType !== undefined) updateData.leadType = leadType;
