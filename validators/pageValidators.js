@@ -159,6 +159,8 @@ export const returnPostValidator = [
     .toFloat(),
   body('securityamount')
     .optional(), // Allow any type (String/Number)
+  body('sectionAmount')
+    .optional(), // Alias for securityamount
   body('service')
     .optional()
     .isString()

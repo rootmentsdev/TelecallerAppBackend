@@ -697,6 +697,9 @@
  *               securityamount:
  *                 type: string
  *                 description: "Security amount deposit (String or Number)"
+ *               sectionAmount:
+ *                 type: string
+ *                 description: "Alias for securityamount (String or Number)"
  *               service:
  *                 type: string
  *                 description: "Type of service provided"
@@ -1609,6 +1612,9 @@ router.get(
  *                 description: Call duration in seconds
  *                 example: 300
  *                 minimum: 0
+  *               sectionAmount:
+ *                 type: string
+ *                 description: "Alias for securityamount (String or Number)"
  *           required:
  *             - call_status
  *             - lead_status
@@ -1848,6 +1854,9 @@ router.get("/complaints/:id", protect, getComplaintById);
  *         updatedAt:
  *           type: string
  *           format: date-time
+ *         sectionAmount:
+ *           type: string
+ *           description: "Alias for securityamount (String or Number)"
  *         # All other lead fields are also present (enquiryDate, functionDate, visitDate, returnDate, bookingNo, securityAmount, etc.)
  */
 
