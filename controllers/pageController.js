@@ -1957,7 +1957,8 @@ export const updateFollowUp = async (req, res) => {
       call_duration,
       rating,
       mark_as_complaint, // Extract mark_as_complaint
-      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate // Extract new fields
+      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, // Extract new fields
+      sectionAmount, securityamount, service, nooffunction, noofattires, competitor // New requested fields (2026-01-23)
     } = req.body;
 
     // Validate remarks input
@@ -2061,6 +2062,14 @@ export const updateFollowUp = async (req, res) => {
     // Allow updating leadType and functionDate in FollowUps as well
     if (leadType !== undefined) updateData.leadType = leadType;
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    // 2026-01-23: New fields support
+    if (securityamount !== undefined) updateData.securityAmount = securityamount;
+    if (sectionAmount !== undefined) updateData.securityAmount = sectionAmount; // Alias
+    if (service !== undefined) updateData.service = service;
+    if (nooffunction !== undefined) updateData.numberOfFunctions = nooffunction;
+    if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
+    if (competitor !== undefined) updateData.competitor = competitor;
 
     const beforeFollowUp = followUp.toObject();
     const updatedFollowUp = await FollowUp.findByIdAndUpdate(id, updateData, { new: true });

@@ -324,6 +324,30 @@ export const leadUpdateValidator = [
   body('closingAction')
     .optional()
     .isString()
+    .trim(),
+  body('securityamount')
+    .optional(), // Allow any type (String/Number)
+  body('sectionAmount')
+    .optional(), // Alias for securityamount
+  body('service')
+    .optional()
+    .isString()
     .trim()
+    .withMessage('Service must be a string'),
+  body('nooffunction')
+    .optional()
+    .isNumeric()
+    .withMessage('Number of functions must be a number')
+    .toInt(),
+  body('noofattires')
+    .optional()
+    .isNumeric()
+    .withMessage('Number of attires must be a number')
+    .toInt(),
+  body('competitor')
+    .optional()
+    .isString()
+    .trim()
+    .withMessage('Competitor must be a string')
 ];
 
