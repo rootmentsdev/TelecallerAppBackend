@@ -1038,7 +1038,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor } = req.body;
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
