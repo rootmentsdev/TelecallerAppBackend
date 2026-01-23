@@ -1612,7 +1612,7 @@ router.get(
  *                 description: Call duration in seconds
  *                 example: 300
  *                 minimum: 0
-  *               sectionAmount:
+ *               sectionAmount:
  *                 type: string
  *                 description: "Alias for securityamount (String or Number)"
  *           required:
