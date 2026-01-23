@@ -545,13 +545,13 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               reason_collected_from_store: { type: string }
-              subCategory: { type: string }
-              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
+ *               subCategory: { type: string }
+ *               sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *
+ *               functionDate: { type: string, format: date-time }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
  *               remarks: { type: string }
  *               subCategory: { type: string }
  *               itemCategory: { type: string }
@@ -1619,6 +1619,8 @@ router.get(
  *             - call_status
  *             - lead_status
  *     responses:
+ *       200:
+ *         description: Lead updated successfully
  *         content:
  *           application/json:
  *             schema:
