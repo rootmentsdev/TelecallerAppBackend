@@ -1615,6 +1615,18 @@ router.get(
  *               sectionAmount:
  *                 type: string
  *                 description: "Alias for securityamount (String or Number)"
+ *               service:
+ *                 type: string
+ *                 description: "Type of service provided"
+ *               nooffunction:
+ *                 type: number
+ *                 description: "Number of functions"
+ *               noofattires:
+ *                 type: number
+ *                 description: "Number of attires"
+ *               competitor:
+ *                 type: string
+ *                 description: "Competitor name"
  *           required:
  *             - call_status
  *             - lead_status
