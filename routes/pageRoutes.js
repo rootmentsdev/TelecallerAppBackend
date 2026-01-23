@@ -677,13 +677,13 @@
  *                 format: date-time
  *                 description: "Follow-up date selected by telecaller. When provided, automatically sets followUpFlag=true and moves lead to FollowUps collection (not Reports). Date must come from frontend, not auto-generated."
  *               remarks: { type: string }
-              subCategory: { type: string }
-              sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
-              itemCategory: { type: string }
-              closingAction: { type: string }
-
-              functionDate: { type: string, format: date-time }
-              leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
+ *               subCategory: { type: string }
+ *               sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *
+ *               functionDate: { type: string, format: date-time }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
