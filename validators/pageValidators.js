@@ -270,8 +270,7 @@ export const addLeadPostValidator = [
 // Generic lead update validator
 export const leadUpdateValidator = [
   param('id')
-    .notEmpty()
-    .withMessage('Lead ID is required')
+
     .custom((value) => {
       if (!mongoose.Types.ObjectId.isValid(value)) {
         throw new Error('Invalid lead ID format');
@@ -317,6 +316,14 @@ export const leadUpdateValidator = [
     .optional()
     .isNumeric()
     .withMessage('Call duration must be a number (seconds)')
-    .toFloat()
+    .toFloat(),
+  body('subCategory')
+    .optional()
+    .isString()
+    .trim(),
+  body('closingAction')
+    .optional()
+    .isString()
+    .trim()
 ];
 
