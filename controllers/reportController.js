@@ -62,7 +62,7 @@ export const getReports = async (req, res) => {
 
     const query = {};
     if (editedBy) query.editedBy = editedBy;
-    if (leadType) query.lead_type = leadType; // flat field
+    if (leadType) query.leadType = leadType; // Changed from lead_type to leadType to match DB schema
     if (callStatus) query.call_status = callStatus;
     if (leadStatus) query.lead_status = leadStatus;
     if (source) query.source = source;
