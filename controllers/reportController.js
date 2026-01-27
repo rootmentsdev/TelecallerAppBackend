@@ -194,7 +194,7 @@ export const getReports = async (req, res) => {
     }
 
     // Date filtering logic (matching Leads API exactly)
-    
+
     // Single date filter for createdAt (takes priority over range)
     if (createdAt) {
       const parsed = parseQueryDate(createdAt);
@@ -285,6 +285,9 @@ export const getReports = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    console.log('🔍 GET /api/reports - Request Query:', req.query);
+    console.log('🔍 GET /api/reports - Constructed MongoDB Query:', JSON.stringify(query, null, 2));
+
     const [reports, total] = await Promise.all([
       Report.find(query)
         .populate("editedBy", "name employeeId")
@@ -350,14 +353,14 @@ export const getReportById = async (req, res) => {
     const edited_at = report.editedAt;
 
     if (!obj.report_id) obj.report_id = String(report._id);
-    
+
     // Ensure callDuration is included (default to 0 if not present)
     if (obj.callDuration === undefined) obj.callDuration = 0;
-    
+
     // Ensure rating is included (for return leads - 1-5 stars)
     // Rating may be null/undefined if not set, but explicitly preserve it
     const rating = obj.rating !== undefined ? obj.rating : null;
-    
+
     delete obj._id;
     delete obj.__v;
 

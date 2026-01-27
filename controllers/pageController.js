@@ -109,7 +109,32 @@ const buildListSnapshot = (lead) => {
     visit_date: lead.visitDate || null,
     return_date: lead.returnDate || null,
     follow_up_date: lead.followUpDate || null,
-    security_amount: lead.securityAmount || null
+    security_amount: lead.securityAmount || null,
+
+    // Add missing fields for detailed view
+    source: lead.source || null,
+    brand: lead.brand || null,
+    remarks: lead.remarks || null,
+    call_duration: lead.callDuration || 0,
+    rating: lead.rating || null,
+
+    // Categorization fields (snake_case for frontend compatibility)
+    sub_category: lead.subCategory || null,
+    subCategory: lead.subCategory || null, // Provide both for safety
+
+    item_category: lead.itemCategory || null,
+    itemCategory: lead.itemCategory || null,
+
+    closing_action: lead.closingAction || null,
+    closingAction: lead.closingAction || null,
+
+    // New Fields (2026-01-23)
+    service: lead.service || null,
+    number_of_functions: lead.numberOfFunctions || null,
+    numberOfFunctions: lead.numberOfFunctions || null,
+    number_of_attires: lead.numberOfAttires || null,
+    numberOfAttires: lead.numberOfAttires || null,
+    competitor: lead.competitor || null
   };
 };
 
@@ -1194,7 +1219,9 @@ export const createAddLead = async (req, res) => {
       subCategory,
       sub_category, // Handle snake_case input
       itemCategory,
+      item_category, // Handle snake_case input
       closingAction,
+      closing_action, // Handle snake_case input
       remarks,
       call_duration,
 
@@ -1291,8 +1318,8 @@ export const createAddLead = async (req, res) => {
       leadType: leadType || "enquiry", // Default to enquiry
       source: "Manual Entry",
       subCategory: subCategory || sub_category || undefined,
-      itemCategory: itemCategory || undefined,
-      closingAction: closingAction || undefined,
+      itemCategory: itemCategory || item_category || undefined,
+      closingAction: closingAction || closing_action || undefined,
       remarks: remarks ? String(remarks).trim() : undefined,
 
       functionDate: validFunctionDate || undefined,
