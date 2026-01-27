@@ -1214,6 +1214,7 @@ export const createAddLead = async (req, res) => {
       follow_up_date,
       follow_up_flag,
       leadType,
+      lead_type, // Handle snake_case input
       functionDate,
       function_date,
       subCategory,
@@ -1315,7 +1316,7 @@ export const createAddLead = async (req, res) => {
       store: storeValue,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
-      leadType: leadType || "enquiry", // Default to enquiry
+      leadType: leadType || lead_type || "enquiry", // Default to enquiry
       source: "Manual Entry",
       subCategory: subCategory || sub_category || undefined,
       itemCategory: itemCategory || item_category || undefined,
