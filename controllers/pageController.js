@@ -2,7 +2,6 @@ import Lead from "../models/Lead.js";
 import FollowUp from "../models/FollowUp.js";
 import Report from "../models/Report.js";
 import Complaint from "../models/Complaint.js";
-import mongoose from "mongoose";
 
 // Helper function to check access permissions
 const checkAccess = (lead, user) => {
