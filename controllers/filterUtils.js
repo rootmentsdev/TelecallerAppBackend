@@ -117,12 +117,19 @@ export const buildStoreFilter = (storeQuery) => {
         return [...new Set(variants)];
     };
 
-    // Helper to escape and build a "word-boundary" regex pattern using \b for robustness
+    // Helper to escape and build a strict "word-boundary" regex pattern
+    // We use explicit alphanumeric check instead of \b to ensure absolute precision
     const buildStrictRegex = (text) => {
         const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // use word boundary \b. Mongo regex supports it.
-        // It ensures "Edappal" doesn't match "Edappally" (limit l is word char)
-        return `\\b${escaped}\\b`;
+
+        // Special robust fix for Edappal to prevent matching Edappally
+        // Mongo supports PCRE, so negative lookahead (?!ly) works and is unambiguous
+        let corePattern = escaped;
+        if (text === 'Edappal') {
+            corePattern = 'Edappal(?!ly)';
+        }
+
+        return `(^|[^a-zA-Z0-9])${corePattern}([^a-zA-Z0-9]|$)`;
     };
 
     // Split by dash to handle Brand - Location format
@@ -160,7 +167,7 @@ export const buildStoreFilter = (storeQuery) => {
                     orConditions.push({
                         $and: [
                             { store: { $regex: buildStrictRegex(locVar), $options: 'i' } },
-                            { store: { $not: { $regex: /\b(Z|Zorucci|Zurocci)\b/i } } }
+                            { store: { $not: { $regex: /(^|[^a-zA-Z0-9])(Z|Zorucci|Zurocci)([^a-zA-Z0-9]|$)/i } } }
                         ]
                     });
                 }
