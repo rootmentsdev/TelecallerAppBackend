@@ -98,5 +98,6 @@ Interactive API validation and documentation is available at:
 2.  **No Nested Snapshots**: Responses are flattened for easier mobile consumption.
 3.  **Single Source of Truth**: A lead is **deleted** from its source collection immediately upon successful movement to a destination collection.
 4.  **Snake Case Support**: The API accepts snake_case inputs (e.g., `closing_action`) for compatibility but normalizes them to camelCase (`closingAction`) for storage.
+5.  **Strict Store Filtering**: Store lookups MUST use the centralized `buildStoreFilter()` utility. Direct regex construction is forbidden to prevent collisions (e.g., ensuring "Edappal" does not match "Edappally").
 
 ---
