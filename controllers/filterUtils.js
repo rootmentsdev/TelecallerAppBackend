@@ -123,8 +123,12 @@ export const buildStoreFilter = (storeQuery) => {
     const buildStrictRegex = (text) => {
         const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-        // Special robust fix for Edappal to prevent matching Edappally
-        // Mongo supports PCRE, so negative lookahead (?!ly) works and is unambiguous
+        // Explicit negative matching for Edappal to avoid Edappally collision
+        // This is a targeted fix for these two locations only
+        if (text === 'Edappal') {
+            return `(^|[^a-zA-Z0-9])Edappal(?!ly)([^a-zA-Z0-9]|$)`;
+        }
+
         return `(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`;
     };
 
