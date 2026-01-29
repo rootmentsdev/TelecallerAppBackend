@@ -1770,6 +1770,102 @@ router.post(
  *       500:
  *         description: Internal server error.
  */
+/**
+ * @swagger
+ * /api/pages/complaints:
+ *   get:
+ *     summary: Get list of complaints (leads marked as issue)
+ *     tags:
+ *       - Complaints
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Fetch complaints with optional filtering by lead type, store, and date.
+ *       
+ *       **Filtering Options:**
+ *       - **Store**: "Brand - Location" format (e.g., "Suitor Guy - Edappally")
+ *       - **Date**: 
+ *         - `createdAt` (Single day, applies to lead creation date)
+ *         - `dateFrom` / `dateTo` (Range, applies to Complaint Marked Date by default)
+ *       
+ *       **Examples:**
+ *       - Store: `/api/pages/complaints?store=Suitor Guy - Edappally`
+ *       - Date Range: `/api/pages/complaints?dateFrom=2024-01-01&dateTo=2024-01-31`
+ *       - Specific Day: `/api/pages/complaints?createdAt=2024-01-15`
+ *     parameters:
+ *       - in: query
+ *         name: leadType
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [lossOfSale, return, enquiry, booked]
+ *       - in: query
+ *         name: store
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by store name (supports "Brand - Location" matching)
+ *       - in: query
+ *         name: createdAt
+ *         required: false
+ *         schema: 
+ *           type: string
+ *           format: date
+ *         description: Filter by specific Lead Creation Date (YYYY-MM-DD)
+ *       - in: query
+ *         name: dateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter from this date (Applied to Complaint Activity Date)
+ *       - in: query
+ *         name: dateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter to this date
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 100
+ *     responses:
+ *       200:
+ *         description: List of complaints retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 complaints:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Complaint'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     total:
+ *                       type: integer
+ *                     pages:
+ *                       type: integer
+ *       401:
+ *         description: Unauthorized. Token missing or invalid.
+ *       500:
+ *         description: Internal server error.
+ */
 router.get("/complaints", protect, getComplaints);
 
 /**
