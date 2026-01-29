@@ -306,10 +306,43 @@ router.get("/", protect, getReports);
  *       - **Total Duration**: Sum of `callDuration` from reports where `editedBy` matches the user.
  *       - **Total Complaints**: Count of complaints where `complaintMarkedBy` matches the user.
  *       
- *       **Important Notes:**
- *       - This endpoint does **not** accept date filters. It returns all-time stats for the user.
- *       - Data is strictly scoped to `req.user._id`.
- *       - Returns 0 for all fields if no data is found.
+ *       **Filtering:**
+ *       - **Date**: Supports all standard date filters (createdAt, dateFrom/To).
+ *         - `createdAt` filters by Lead Creation Date.
+ *         - `dateFrom` / `dateTo` filters by Work Date (`editedAt` / `complaintMarkedAt`).
+ *       - **Store**: Standard "Brand - Location" filtering available.
+ *       
+ *       **Behavior:**
+ *       - Stats are always scoped to the registered user.
+ *       - Applying filters reduces the counts based on the criteria.
+ *     parameters:
+ *       - in: query
+ *         name: store
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Filter by store name
+ *       - in: query
+ *         name: dateFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by Work Date (from)
+ *       - in: query
+ *         name: dateTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by Work Date (to)
+ *       - in: query
+ *         name: createdAt
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by Lead Creation Date
  *     responses:
  *       200:
  *         description: Call summary retrieved successfully

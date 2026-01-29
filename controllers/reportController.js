@@ -1,5 +1,6 @@
 import Report from "../models/Report.js";
 import Complaint from "../models/Complaint.js";
+import { normalizeQueryParams, parseQueryDate, buildStoreFilter } from "./filterUtils.js";
 
 // GET /api/reports
 // Query params: leadType, editedBy, store, callStatus, leadStatus, source, dateFrom, dateTo, leadCreatedFrom, leadCreatedTo, createdAt, createdAtFrom, createdAtTo, editedAtFrom, editedAtTo, dateField, page, limit
@@ -383,13 +384,120 @@ export const getCallStatusSummary = async (req, res) => {
   try {
     const user = req.user;
 
+    const normalizedQuery = normalizeQueryParams(req.query);
+    const {
+      store,
+      createdAt,
+      createdAtFrom,
+      createdAtTo,
+      dateFrom,
+      dateTo,
+      dateField
+    } = normalizedQuery;
+
+    // Build shared filter object (applied to both Report and Complaint calculations)
+    const baseFilters = {};
+
+    // 1. Store filtering
+    const storeFilter = buildStoreFilter(store);
+    if (storeFilter) {
+      if (storeFilter.$or) baseFilters.$or = storeFilter.$or;
+      else if (storeFilter.store) baseFilters.store = storeFilter.store;
+    }
+
+    // 2. Date filtering
+    // Priority: createdAt (Single Day) > createdAtFrom/To > dateFrom/To
+
+    // 2a. Lead Creation Date (createdAt)
+    if (createdAt) {
+      const parsed = parseQueryDate(createdAt);
+      if (parsed) {
+        const startOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 0, 0, 0, 0));
+        const endOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        baseFilters.createdAt = { $gte: startOfDay, $lte: endOfDay };
+      }
+    } else if (createdAtFrom || createdAtTo) {
+      baseFilters.createdAt = {};
+      if (createdAtFrom) {
+        const parsed = parseQueryDate(createdAtFrom);
+        baseFilters.createdAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(createdAtFrom);
+      }
+      if (createdAtTo) {
+        const parsed = parseQueryDate(createdAtTo);
+        const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(createdAtTo);
+        if (!parsed) end.setHours(23, 59, 59, 999);
+        else end.setUTCHours(23, 59, 59, 999);
+        baseFilters.createdAt.$lte = end;
+      }
+    }
+
+    // 2b. Generic Date (Default: Work Date)
+    // For Reports: 'editedAt'
+    // For Complaints: 'complaintMarkedAt'
+    if ((dateFrom || dateTo) && !baseFilters.createdAt) {
+      // If user explicitly asks for 'createdAt' via dateField, map it to baseFilters.createdAt
+      // Otherwise, keep it generic to map separately for Report vs Complaint
+      if (dateField === 'createdAt') {
+        baseFilters.createdAt = {};
+        if (dateFrom) {
+          const parsed = parseQueryDate(dateFrom);
+          baseFilters.createdAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(dateFrom);
+        }
+        if (dateTo) {
+          const parsed = parseQueryDate(dateTo);
+          const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(dateTo);
+          if (!parsed) end.setHours(23, 59, 59, 999);
+          else end.setUTCHours(23, 59, 59, 999);
+          baseFilters.createdAt.$lte = end;
+        }
+      }
+    }
+
+    // --- REPORT FILTERS ---
+    const reportMatch = { ...baseFilters };
+    reportMatch.editedBy = user._id; // Scope to user
+
+    // Apply generic date filter to 'editedAt' (Work Date) if not already filtered by createdAt
+    if ((dateFrom || dateTo) && dateField !== 'createdAt' && !baseFilters.createdAt) {
+      reportMatch.editedAt = {};
+      if (dateFrom) {
+        const parsed = parseQueryDate(dateFrom);
+        reportMatch.editedAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(dateFrom);
+      }
+      if (dateTo) {
+        const parsed = parseQueryDate(dateTo);
+        const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(dateTo);
+        if (!parsed) end.setHours(23, 59, 59, 999);
+        else end.setUTCHours(23, 59, 59, 999);
+        reportMatch.editedAt.$lte = end;
+      }
+    }
+
+    // --- COMPLAINT FILTERS ---
+    const complaintMatch = { ...baseFilters };
+    complaintMatch.complaintMarkedBy = user._id; // Scope to user
+
+    // Apply generic date filter to 'complaintMarkedAt' (Work Date)
+    if ((dateFrom || dateTo) && dateField !== 'createdAt' && !baseFilters.createdAt) {
+      complaintMatch.complaintMarkedAt = {};
+      if (dateFrom) {
+        const parsed = parseQueryDate(dateFrom);
+        complaintMatch.complaintMarkedAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(dateFrom);
+      }
+      if (dateTo) {
+        const parsed = parseQueryDate(dateTo);
+        const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(dateTo);
+        if (!parsed) end.setHours(23, 59, 59, 999);
+        else end.setUTCHours(23, 59, 59, 999);
+        complaintMatch.complaintMarkedAt.$lte = end;
+      }
+    }
+
     // 1. Total Calls & Duration from Reports
     // Matches reports processed (edited) by the current user
     const reportStats = await Report.aggregate([
       {
-        $match: {
-          editedBy: user._id
-        }
+        $match: reportMatch
       },
       {
         $group: {
@@ -401,9 +509,7 @@ export const getCallStatusSummary = async (req, res) => {
     ]);
 
     // 2. Total Complaints Marked by User
-    const totalComplaints = await Complaint.countDocuments({
-      complaintMarkedBy: user._id
-    });
+    const totalComplaints = await Complaint.countDocuments(complaintMatch);
 
     const stats = reportStats[0] || { totalCalls: 0, totalCallDuration: 0 };
 

@@ -2,6 +2,7 @@ import Lead from "../models/Lead.js";
 import FollowUp from "../models/FollowUp.js";
 import Report from "../models/Report.js";
 import Complaint from "../models/Complaint.js";
+import { normalizeQueryParams, parseQueryDate, buildStoreFilter } from "./filterUtils.js";
 
 // Helper function to check access permissions
 const checkAccess = (lead, user) => {
@@ -2163,28 +2164,76 @@ export const updateFollowUp = async (req, res) => {
 // GET - Fetch list of complaints
 export const getComplaints = async (req, res) => {
   try {
+    const normalizedQuery = normalizeQueryParams(req.query);
+
     const {
       leadType,
       store,
       page = 1,
       limit = 100,
       sortBy = 'complaintMarkedAt',
-      sortOrder = 'desc'
-    } = req.query;
+      sortOrder = 'desc',
+      createdAt,
+      createdAtFrom,
+      createdAtTo,
+      dateFrom,
+      dateTo,
+      dateField
+    } = normalizedQuery;
 
     const filters = {};
     if (leadType) filters.leadType = leadType;
-    if (store) {
-      // Support "Brand - Location" format
-      if (store.includes(" - ")) {
-        const [brand, location] = store.split(" - ").map((s) => s.trim());
-        filters.$or = [
-          { store: { $regex: store, $options: "i" } },
-          { store: { $regex: brand, $options: "i" } },
-          { store: { $regex: location, $options: "i" } },
-        ];
-      } else {
-        filters.store = { $regex: store, $options: "i" };
+
+    // Store filtering (using shared reusable logic)
+    const storeFilter = buildStoreFilter(store);
+    if (storeFilter) {
+      if (storeFilter.$or) filters.$or = storeFilter.$or;
+      else if (storeFilter.store) filters.store = storeFilter.store;
+    }
+
+    // Date filtering (Identical contract to Leads/Reports)
+    // 1. createdAt (Single day) -> Matches database creation date (not marked date) for strict alignment
+    if (createdAt) {
+      const parsed = parseQueryDate(createdAt);
+      if (parsed) {
+        const startOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 0, 0, 0, 0));
+        const endOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
+        filters.createdAt = { $gte: startOfDay, $lte: endOfDay };
+      }
+    } else if (createdAtFrom || createdAtTo) {
+      filters.createdAt = {};
+      if (createdAtFrom) {
+        const parsed = parseQueryDate(createdAtFrom);
+        filters.createdAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(createdAtFrom);
+      }
+      if (createdAtTo) {
+        const parsed = parseQueryDate(createdAtTo);
+        const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(createdAtTo);
+        // If exact date string was passed, ensure end of day
+        if (!parsed) end.setHours(23, 59, 59, 999);
+        else if (parsed) end.setUTCHours(23, 59, 59, 999);
+
+        filters.createdAt.$lte = end;
+      }
+    }
+
+    // 2. Generic Date Filter (dateFrom/dateTo)
+    // Maps to 'complaintMarkedAt' by default (Action Date), or 'createdAt' if dateField is specified
+    if ((dateFrom || dateTo) && !filters.createdAt) {
+      const targetField = dateField === 'createdAt' ? 'createdAt' : 'complaintMarkedAt';
+      filters[targetField] = {};
+
+      if (dateFrom) {
+        const parsed = parseQueryDate(dateFrom);
+        filters[targetField].$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(dateFrom);
+      }
+      if (dateTo) {
+        const parsed = parseQueryDate(dateTo);
+        const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(dateTo);
+        if (!parsed) end.setHours(23, 59, 59, 999);
+        else end.setUTCHours(23, 59, 59, 999);
+
+        filters[targetField].$lte = end;
       }
     }
 
