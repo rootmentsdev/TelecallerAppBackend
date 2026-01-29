@@ -99,7 +99,8 @@ const run = async () => {
   console.log(`   Will fetch return data for each location ID concurrently`);
 
   // Process locations in parallel with concurrency limit
-  const CONCURRENCY_LIMIT = 1; // Process 1 location at once (sequential) to prevent race conditions
+  // Increased to 5 for faster execution. Safe since duplicates are checked per-store.
+  const CONCURRENCY_LIMIT = parseInt(process.env.SYNC_CONCURRENCY) || 5;
   const results = [];
 
   for (let i = 0; i < locationIds.length; i += CONCURRENCY_LIMIT) {

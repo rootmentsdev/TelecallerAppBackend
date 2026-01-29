@@ -80,6 +80,7 @@ The system enforces a strict lifecycle to ensure data integrity. A lead exists i
 *   **Frequency**: Every 20 minutes (`node-cron`).
 *   **Targets**: `Return` leads and `Stores`.
 *   **Logic**: Updates existing records or creates new ones. Locked to prevent overlaps.
+*   **Performance**: Fetches data for multiple locations in parallel (Default Concurrency: 5, Configurable via `SYNC_CONCURRENCY`).
 
 ### CSV Upload
 *   **Target**: `LossOfSale` and `Enquiry` (Walk-ins).
