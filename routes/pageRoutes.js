@@ -1153,7 +1153,7 @@ router.post(
  *         schema:
  *           type: string
  *           example: "Suitor Guy - Edappally"
- *         description: Filter FollowUp leads by store name using "Brand - Location" format.
+ *         description: Filter FollowUp leads by store name using "Brand - Location" format. Note: Edappal and Edappally are treated as strictly separate locations.
  *       - in: query
  *         name: callStatus
  *         required: false
@@ -1804,7 +1804,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by store name (supports "Brand - Location" matching)
+ *         description: Filter by store name (supports "Brand - Location" matching). Note: Edappal and Edappally are treated as strictly separate locations.
  *       - in: query
  *         name: createdAt
  *         required: false
