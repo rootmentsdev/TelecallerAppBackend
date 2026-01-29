@@ -95,12 +95,13 @@ export const buildStoreFilter = (storeQuery) => {
             if (lower.includes('perinthalmanna') || lower.includes('perinathalmann') || lower === 'pmna') {
                 variants.push('Perinthalmanna', 'PMNA');
             }
-            // Strict check for Edappally vs Edappal
+            // STRICT separation for Edappal vs Edappally
             if (lower.includes('edappally') || lower.includes('edapally') || lower.includes('edappall')) {
-                variants.push('Edappally', 'Edapally');
-            } else if (lower.includes('edappal') && !lower.includes('edappally')) {
-                // Only match Edappal if it's NOT Edappally
-                variants.push('Edappal');
+                return ['Edappally'];
+            }
+
+            if (lower === 'edappal') {
+                return ['Edappal'];
             }
 
             if (lower.includes('trivandrum') || lower.includes('thiruvananthapuram') || lower === 'tvm') {
@@ -124,12 +125,7 @@ export const buildStoreFilter = (storeQuery) => {
 
         // Special robust fix for Edappal to prevent matching Edappally
         // Mongo supports PCRE, so negative lookahead (?!ly) works and is unambiguous
-        let corePattern = escaped;
-        if (text === 'Edappal') {
-            corePattern = 'Edappal(?!ly)';
-        }
-
-        return `(^|[^a-zA-Z0-9])${corePattern}([^a-zA-Z0-9]|$)`;
+        return `(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`;
     };
 
     // Split by dash to handle Brand - Location format
