@@ -8,48 +8,25 @@
  */
 
 export const LEAD_API_ID_MAP = {
-    '1': 'Zorucci - Edappally',   // Was Z- Edapally
-    '3': 'Suitor Guy - Edappally', // Was SG-Edappally
-    '5': 'Suitor Guy - Trivandrum', // Was Trivandrum (inferred SG)
-    '6': 'Zorucci - Edappally',   // Alt ID
-    '7': 'Suitor Guy - Perinthalmanna', // Was PMNA (inferred SG - older ID)
-    '8': 'Zorucci - Kottakkal',   // Was Z.Kottakkal
-    '9': 'Suitor Guy - Kottayam', // Was Kottayam (inferred SG)
-    '10': 'Suitor Guy - Perumbavoor', // Was Perumbavoor
-    '11': 'Suitor Guy - Thrissur', // Was Trissur
-    '12': 'Suitor Guy - Chavakkad', // Was Chavakkad
-    '13': 'Suitor Guy - Calicut', // Was CALICUT
-    '14': 'Suitor Guy - Vatakara', // Was VATAKARA
-    '15': 'Suitor Guy - Edappally', // Alt ID
-    '16': 'Zorucci - Perinthalmanna', // Was PMNA (inferred Z - newer ID)
-    '17': 'Suitor Guy - Kottakkal', // Was KOTTAKAL
-    '18': 'Suitor Guy - Manjeri', // Was MANJERY
-    '19': 'Suitor Guy - Palakkad', // Was Palakkad
-    '20': 'Suitor Guy - Kalpetta', // Was KALPETTA
-    '21': 'Suitor Guy - Kannur', // Was KANNUR
-    '23': 'Suitor Guy - MG Road', // MG Road location ID
-
-    // --- New IDs from LocationList API (to ensure coverage) ---
-    '100': 'Zorucci - Edappal',
-    '122': 'Zorucci - Kottakkal',
-    '133': 'Zorucci - Perinthalmanna',
-    '144': 'Zorucci - Edappally',
-    '700': 'Suitor Guy - Trivandrum',
-    '701': 'Suitor Guy - Kottayam',
-    '702': 'Suitor Guy - Edappally',
-    '703': 'Suitor Guy - Perumbavoor',
-    '704': 'Suitor Guy - Thrissur',
-    '705': 'Suitor Guy - Palakkad',
-    '706': 'Suitor Guy - Chavakkad',
-    '707': 'Suitor Guy - Edappal',
-    '708': 'Suitor Guy - Vatakara',
-    '709': 'Suitor Guy - Perinthalmanna',
-    '710': 'Suitor Guy - Manjeri',
-    '711': 'Suitor Guy - Kottakkal',
-    '712': 'Suitor Guy - Calicut',
-    '716': 'Suitor Guy - Kannur',
-    '717': 'Suitor Guy - Kalpetta',
-    '718': 'Suitor Guy - MG Road'
+    '1': 'Zorucci - Edappally',
+    '3': 'Suitor Guy - Edappally',
+    '5': 'Suitor Guy - Trivandrum',
+    '6': 'Zorucci - Edappal',
+    '7': 'Zorucci - Perinthalmanna',
+    '8': 'Zorucci - Kottakkal',
+    '9': 'Zorucci - Kottayam',
+    '10': 'Suitor Guy - Perumbavoor',
+    '11': 'Suitor Guy - Thrissur',
+    '12': 'Suitor Guy - Chavakkad',
+    '13': 'Suitor Guy - Calicut',
+    '14': 'Suitor Guy - Vatakara',
+    '15': 'Suitor Guy - Edappal',
+    '16': 'Suitor Guy - Perinthalmanna',
+    '17': 'Suitor Guy - Kottakkal',
+    '18': 'Suitor Guy - Manjeri',
+    '19': 'Suitor Guy - Palakkad',
+    '20': 'Suitor Guy - Kalpetta',
+    '21': 'Suitor Guy - Kannur'
 };
 
 /**
@@ -66,24 +43,50 @@ export const normalizeStoreName = (rawName) => {
     // 1. Check strict known mappings first
     const knownMappings = {
         'z- edapally': 'Zorucci - Edappally',
+        'z edappally': 'Zorucci - Edappally', // Added variant
+        'z edapally': 'Zorucci - Edappally', // Added variant
         'z- edappal': 'Zorucci - Edappal',
+        'z edappal': 'Zorucci - Edappal', // Added variant
+        'z edapal': 'Zorucci - Edappal', // Added variant
         'z.perinthalmanna': 'Zorucci - Perinthalmanna',
+        'z perinthalmanna': 'Zorucci - Perinthalmanna', // Added variant
         'z.kottakkal': 'Zorucci - Kottakkal',
+        'z kottakal': 'Zorucci - Kottakkal', // Added variant
+        'z kottayam': 'Zorucci - Kottayam', // Added variant
         'sg-edappally': 'Suitor Guy - Edappally',
+        'sg edappally': 'Suitor Guy - Edappally', // Added variant
+        'sg edapally': 'Suitor Guy - Edappally', // Added variant
+        // ... existing SG mappings ...
         'sg-trivandrum': 'Suitor Guy - Trivandrum',
+        'sg trivandrum': 'Suitor Guy - Trivandrum', // Added variant
         'sg.kottayam': 'Suitor Guy - Kottayam',
         'sg.perumbavoor': 'Suitor Guy - Perumbavoor',
+        'sg perumbavoor': 'Suitor Guy - Perumbavoor', // Added variant
         'sg.thrissur': 'Suitor Guy - Thrissur',
+        'sg trissur': 'Suitor Guy - Thrissur', // Added variant
         'sg.chavakkad': 'Suitor Guy - Chavakkad',
+        'sg chavakkad': 'Suitor Guy - Chavakkad', // Added variant
         'sg.calicut': 'Suitor Guy - Calicut',
+        'sg calicut': 'Suitor Guy - Calicut', // Added variant
         'sg.vadakara': 'Suitor Guy - Vatakara',
+        'sg vadakara': 'Suitor Guy - Vatakara', // Added variant
         'sg.edappal': 'Suitor Guy - Edappal',
+        'sg edappal': 'Suitor Guy - Edappal', // Added variant
+        'sg edapal': 'Suitor Guy - Edappal', // Added variant
         'sg.perinthalmanna': 'Suitor Guy - Perinthalmanna',
+        'sg perinthalmanna': 'Suitor Guy - Perinthalmanna', // Added variant
         'sg.kottakkal': 'Suitor Guy - Kottakkal',
+        'sg kottakkal': 'Suitor Guy - Kottakkal', // Added variant
+        'sg kottkal': 'Suitor Guy - Kottakkal', // Added variant
         'sg.manjeri': 'Suitor Guy - Manjeri',
+        'sg manjeri': 'Suitor Guy - Manjeri', // Added variant
         'sg.palakkad': 'Suitor Guy - Palakkad',
+        'sg palakkad': 'Suitor Guy - Palakkad', // Added variant
         'sg.kalpetta': 'Suitor Guy - Kalpetta',
+        'sg kalpetta': 'Suitor Guy - Kalpetta', // Added variant
+        'sg kalpatta': 'Suitor Guy - Kalpetta', // Added variant
         'sg.kannur': 'Suitor Guy - Kannur',
+        'sg kannur': 'Suitor Guy - Kannur', // Added variant
         'sg.mg road': 'Suitor Guy - MG Road',
         // Legacy / Ambiguous mappings (assuming defaults if brand missing)
         'kottayam': 'Suitor Guy - Kottayam',
