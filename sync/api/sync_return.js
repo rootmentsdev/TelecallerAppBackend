@@ -65,7 +65,7 @@ const run = async () => {
       const incrementalDays = parseInt(process.env.API_SYNC_INCREMENTAL_DAYS) || 7;
       const today = new Date();
       const daysAgo = new Date(today.getTime() - incrementalDays * 24 * 60 * 60 * 1000);
-      
+
       dateFrom = daysAgo.toISOString().split('T')[0];
       dateTo = today.toISOString().split('T')[0];
       months = "1";
@@ -99,12 +99,12 @@ const run = async () => {
   console.log(`   Will fetch return data for each location ID concurrently`);
 
   // Process locations in parallel with concurrency limit
-  const CONCURRENCY_LIMIT = 5; // Process 5 locations at once
+  const CONCURRENCY_LIMIT = 1; // Process 1 location at once (sequential) to prevent race conditions
   const results = [];
 
   for (let i = 0; i < locationIds.length; i += CONCURRENCY_LIMIT) {
     const batch = locationIds.slice(i, i + CONCURRENCY_LIMIT);
-    
+
     const batchPromises = batch.map(async (locationId) => {
       const storeName = LOCATION_ID_TO_STORE_NAME[locationId];
       console.log(`\n📍 Processing Location ID: ${locationId} (Store: ${storeName})`);
@@ -229,7 +229,7 @@ const run = async () => {
       // Process each lead sequentially (one at a time) to prevent race conditions
       for (let i = 0; i < returnRecords.length; i++) {
         const row = returnRecords[i];
-        
+
         // Add store name to the row data for mapping
         const rowWithStore = {
           ...row,
@@ -271,8 +271,8 @@ const run = async () => {
 
     const batchResults = await Promise.all(batchPromises);
     results.push(...batchResults);
-    
-    console.log(`\n✅ Completed batch ${Math.floor(i/CONCURRENCY_LIMIT) + 1}/${Math.ceil(locationIds.length/CONCURRENCY_LIMIT)}`);
+
+    console.log(`\n✅ Completed batch ${Math.floor(i / CONCURRENCY_LIMIT) + 1}/${Math.ceil(locationIds.length / CONCURRENCY_LIMIT)}`);
   }
 
   // Aggregate all results

@@ -119,7 +119,7 @@ export const bulkSaveToMongo = async (leadsData) => {
         continue;
       }
 
-      // DUPLICATE CHECK: For ALL lead types, check: name, phone, leadType, store, bookingNo (if exists)
+      // DUPLICATE CHECK: For ALL lead types, check: name, phone, leadType, store
       // This ensures no duplicates are created during bulk sync
       // CRITICAL: Normalize and trim all fields for accurate comparison
       const normalizedName = (leadData.name || "").trim();
@@ -136,10 +136,12 @@ export const bulkSaveToMongo = async (leadsData) => {
       };
 
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
-      if (normalizedBookingNo !== "") {
-        duplicateQuery.bookingNo = normalizedBookingNo;
-      }
+      // REMOVED: bookingNo check is no longer primary for duplicate detection
+      // if (normalizedBookingNo !== "") {
+      //   duplicateQuery.bookingNo = normalizedBookingNo;
+      // }
 
+      // Use case-insensitive comparison for name and store to catch case differences
       // Use case-insensitive comparison for name and store to catch case differences
       const caseInsensitiveQuery = {
         name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
@@ -148,9 +150,10 @@ export const bulkSaveToMongo = async (leadsData) => {
         store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
 
-      if (normalizedBookingNo !== "") {
-        caseInsensitiveQuery.bookingNo = normalizedBookingNo;
-      }
+      // REMOVED: bookingNo check is no longer primary for duplicate detection
+      // if (normalizedBookingNo !== "") {
+      //   caseInsensitiveQuery.bookingNo = normalizedBookingNo;
+      // }
 
       // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
@@ -166,9 +169,7 @@ export const bulkSaveToMongo = async (leadsData) => {
       if (existing) {
         // Record already exists - skip it to prevent duplicates
         results.skipped++;
-        const checkFields = normalizedBookingNo !== ""
-          ? `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}", bookingNo="${normalizedBookingNo}"`
-          : `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
+        const checkFields = `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
         skipReasons.push({
           phone: normalizedPhone,
           name: normalizedName,
@@ -333,7 +334,7 @@ export const saveToMongo = async (leadData) => {
 
     // DUPLICATE CHECK FOR BOOKING/RETURN: Skip if duplicate (don't update to preserve user edits)
     // These come from API and should only add new records (incremental sync)
-    // ALWAYS check: name, phone, leadType, store, bookingNo (if exists)
+    // ALWAYS check: name, phone, leadType, store
     // CRITICAL: Normalize and trim all fields for accurate comparison
     if (leadData.leadType === "booked" || leadData.leadType === "return") {
       // Normalize fields: trim and ensure consistent format
@@ -351,9 +352,10 @@ export const saveToMongo = async (leadData) => {
       };
 
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
-      if (normalizedBookingNo !== "") {
-        duplicateQuery.bookingNo = normalizedBookingNo;
-      }
+      // REMOVED: bookingNo check is no longer primary for duplicate detection
+      // if (normalizedBookingNo !== "") {
+      //   duplicateQuery.bookingNo = normalizedBookingNo;
+      // }
 
       // Use case-insensitive comparison for name and store to catch case differences
       const caseInsensitiveQuery = {
@@ -363,9 +365,10 @@ export const saveToMongo = async (leadData) => {
         store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
 
-      if (normalizedBookingNo !== "") {
-        caseInsensitiveQuery.bookingNo = normalizedBookingNo;
-      }
+      // REMOVED: bookingNo check is no longer primary for duplicate detection
+      // if (normalizedBookingNo !== "") {
+      //   caseInsensitiveQuery.bookingNo = normalizedBookingNo;
+      // }
 
       // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
@@ -396,9 +399,7 @@ export const saveToMongo = async (leadData) => {
 
       if (existing) {
         // Record already exists in Leads - skip it to prevent duplicates
-        const checkFields = normalizedBookingNo !== ""
-          ? `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}", bookingNo="${normalizedBookingNo}"`
-          : `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
+        const checkFields = `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
         console.log(`   ⏭️  Duplicate detected in Leads - skipped: ${checkFields}`);
         console.log(`      Existing lead ID: ${existing._id}`);
         return {
