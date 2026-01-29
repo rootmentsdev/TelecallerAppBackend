@@ -755,7 +755,12 @@ export const getLeads = async (req, res) => {
     if (dbLeadType) filters.leadType = dbLeadType;
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
-    if (store) filters.store = { $regex: store, $options: 'i' };
+    const storeFilter = buildStoreFilter(store);
+    if (storeFilter) {
+      if (storeFilter.$or) filters.$or = storeFilter.$or;
+      else if (storeFilter.$and) filters.$and = storeFilter.$and;
+      else if (storeFilter.store) filters.store = storeFilter.store;
+    }
     if (source) filters.source = source;
 
     const parseQueryDate = (dateStr) => {
@@ -1866,18 +1871,11 @@ export const getFollowUps = async (req, res) => {
 
     const filters = {};
     if (leadType) filters.leadType = leadType;
-    if (store) {
-      // Support "Brand - Location" format
-      if (store.includes(" - ")) {
-        const [brand, location] = store.split(" - ").map((s) => s.trim());
-        filters.$or = [
-          { store: { $regex: store, $options: "i" } },
-          { store: { $regex: brand, $options: "i" } },
-          { store: { $regex: location, $options: "i" } },
-        ];
-      } else {
-        filters.store = { $regex: store, $options: "i" };
-      }
+    const storeFilter = buildStoreFilter(store);
+    if (storeFilter) {
+      if (storeFilter.$or) filters.$or = storeFilter.$or;
+      else if (storeFilter.$and) filters.$and = storeFilter.$and;
+      else if (storeFilter.store) filters.store = storeFilter.store;
     }
     if (callStatus) filters.callStatus = callStatus;
     if (leadStatus) filters.leadStatus = leadStatus;
