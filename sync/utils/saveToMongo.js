@@ -371,13 +371,26 @@ export const saveToMongo = async (leadData) => {
       let existing = await Lead.findOne(duplicateQuery);
 
       // If not found, try case-insensitive match (catches case differences)
-      // CRITICAL: This catches duplicates with different casing (e.g., "SHEHIR" vs "shehir")
       if (!existing && normalizedName && normalizedStore) {
         existing = await Lead.findOne(caseInsensitiveQuery);
+      }
+
+      // CRITICAL: Secondary Check - Check by Name + Phone + LeadType + Store (IGNORING bookingNo)
+      // This handles cases where the booking number might have changed or is missing in one record but it is logically the same lead.
+      // We only do this check if the primary check didn't find anything.
+      if (!existing) {
+        const secondaryQuery = {
+          name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          phone: normalizedPhone,
+          leadType: leadData.leadType,
+          store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          // Do NOT include bookingNo
+        };
+        existing = await Lead.findOne(secondaryQuery);
         if (existing) {
-          console.log(`   ⚠️  Case-insensitive duplicate detected in Leads:`);
-          console.log(`      Existing: name="${existing.name}", store="${existing.store}", bookingNo="${existing.bookingNo || 'N/A'}"`);
-          console.log(`      Incoming: name="${normalizedName}", store="${normalizedStore}", bookingNo="${normalizedBookingNo || 'N/A'}"`);
+          console.log(`   ⚠️  Duplicate detected by Secondary Check (Name+Phone+Type+Store):`);
+          console.log(`      Incoming BookingNo: ${normalizedBookingNo}`);
+          console.log(`      Existing BookingNo: ${existing.bookingNo}`);
         }
       }
 
@@ -394,7 +407,7 @@ export const saveToMongo = async (leadData) => {
           name: existing.name,
           phone: existing.phone,
           bookingNo: existing.bookingNo,
-          reason: "Duplicate detected in Leads collection: matching " + (normalizedBookingNo ? "name, phone, leadType, store, bookingNo" : "name, phone, leadType, store")
+          reason: "Duplicate detected in Leads collection: matching " + checkFields
         };
       }
     }

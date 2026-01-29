@@ -121,7 +121,7 @@ const cleanupDuplicates = async (dryRun = true) => {
       {
         $match: {
           leadType: "return",
-          bookingNo: { $exists: true, $ne: "", $ne: null }
+          bookingNo: { $exists: true, $nin: ["", null] }
         }
       },
       {
@@ -139,15 +139,14 @@ const cleanupDuplicates = async (dryRun = true) => {
       { $match: { count: { $gt: 1 } } }
     ], { allowDiskUse: true });
 
-    const returnWithoutBookingNo = await Lead.aggregate([
+    // Group 2: Check for duplicates by Name + Phone + Store (regardless of booking number)
+    // This catches cases where booking numbers might be different (e.g. re-bookings) but arguably shouldn't be valid duplicates
+    // OR cases where one has a booking number and the other doesn't.
+    const returnByNamePhoneStore = await Lead.aggregate([
       {
         $match: {
-          leadType: "return",
-          $or: [
-            { bookingNo: { $exists: false } },
-            { bookingNo: "" },
-            { bookingNo: null }
-          ]
+          leadType: "return"
+          // Removed checking for missing booking number - run this on ALL returns
         }
       },
       {
@@ -166,17 +165,26 @@ const cleanupDuplicates = async (dryRun = true) => {
       { $match: { count: { $gt: 1 } } }
     ], { allowDiskUse: true });
 
-    const returnDuplicates = [...returnWithBookingNo, ...returnWithoutBookingNo];
+    // Combine both sets of duplicates
+    // Use a Map to ensure we don't process the same group twice if it appears in both
+    // But since the grouping keys are different, they will appear as different groups.
+    // We just need to ensure we don't try to delete the same ID twice (mongo handles this gracefully usually)
+    const returnDuplicates = [...returnWithBookingNo, ...returnByNamePhoneStore];
 
     let returnDeleted = 0;
     for (const group of returnDuplicates) {
+      // Sort: keep the EARLIEST created record (assuming first import was correct)
       group.docs.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
       const keepId = group.docs[0].id;
+      // All other IDs are deletions
       const deleteIds = group.docs.slice(1).map(d => d.id);
 
       if (!dryRun) {
+        // Use deleteMany with $in array of IDs
         const deleteResult = await Lead.deleteMany({ _id: { $in: deleteIds } });
         returnDeleted += deleteResult.deletedCount;
+
         deletionLog.push({
           type: "return",
           group: group._id,

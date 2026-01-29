@@ -110,7 +110,7 @@ const verifyData = async () => {
     nextSyncTime.setMilliseconds(0);
 
     console.log(`   ⏰ Next Sync Run: ${nextSyncTime.toLocaleTimeString()}`);
-    console.log("      (Automatic sync runs every 5 minutes)");
+    console.log("      (Automatic sync runs every 20 minutes)");
     console.log();
 
     console.log("=".repeat(70));
