@@ -96,7 +96,7 @@ export const buildStoreFilter = (storeQuery) => {
                 variants.push('Perinthalmanna', 'PMNA');
             }
             // STRICT separation for Edappal vs Edappally
-            if (lower.includes('edappally') || lower.includes('edapally') || lower.includes('edappall')) {
+            if (lower.includes('edappally') || lower.includes('edapally')) {
                 return ['Edappally'];
             }
 
