@@ -1,4 +1,5 @@
 import Report from "../models/Report.js";
+import Complaint from "../models/Complaint.js";
 
 // GET /api/reports
 // Query params: leadType, editedBy, store, callStatus, leadStatus, source, dateFrom, dateTo, leadCreatedFrom, leadCreatedTo, createdAt, createdAtFrom, createdAtTo, editedAtFrom, editedAtTo, dateField, page, limit
@@ -377,57 +378,40 @@ export const getReportById = async (req, res) => {
 };
 
 // Get call summary report
+// Get call summary report (Per-User Statistics)
 export const getCallStatusSummary = async (req, res) => {
   try {
-    const { date, store } = req.query;
     const user = req.user;
 
-    if (!date) {
-      return res.status(400).json({ message: "Date is required" });
-    }
-
-    const start = new Date(`${date}T00:00:00.000Z`);
-    const end = new Date(`${date}T23:59:59.999Z`);
-
-    let match = {
-      editedAt: { $gte: start, $lte: end }   // ✅ FIXED: use editedAt for date filtering (shows work done on that date)
-    };
-
-    // Telecaller can only see their own reports
-    if (user.role === "telecaller") {
-      match["editedBy._id"] = user._id;
-    }
-
-    // Optional store filter
-    if (store) {
-      match["store"] = store;
-    }
-
-    const summary = await Report.aggregate([
-      { $match: match },
+    // 1. Total Calls & Duration from Reports
+    // Matches reports processed (edited) by the current user
+    const reportStats = await Report.aggregate([
+      {
+        $match: {
+          editedBy: user._id
+        }
+      },
       {
         $group: {
-          _id: "$call_status",
-          count: { $sum: 1 }
+          _id: null,
+          totalCalls: { $sum: 1 },
+          totalCallDuration: { $sum: "$callDuration" }
         }
       }
     ]);
 
-    const result = {
-      connected: 0,
-      not_connected: 0,
-      call_back_later: 0,
-      confirmed: 0,
-    };
-
-    summary.forEach((row) => {
-      const key = row._id?.toLowerCase().replace(/\s+/g, "_");
-      if (result[key] !== undefined) {
-        result[key] = row.count;
-      }
+    // 2. Total Complaints Marked by User
+    const totalComplaints = await Complaint.countDocuments({
+      complaintMarkedBy: user._id
     });
 
-    return res.json(result);
+    const stats = reportStats[0] || { totalCalls: 0, totalCallDuration: 0 };
+
+    return res.json({
+      totalCalls: stats.totalCalls || 0,
+      totalCallDuration: stats.totalCallDuration || 0,
+      totalComplaints: totalComplaints || 0
+    });
 
   } catch (err) {
     return res.status(500).json({ message: err.message });
