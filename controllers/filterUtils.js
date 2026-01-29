@@ -79,7 +79,7 @@ export const buildStoreFilter = (storeQuery) => {
         const lower = text.toLowerCase();
 
         if (type === 'brand') {
-            if (lower.includes('suitor guy') || lower === 'sg') {
+            if (lower === 'suitor guy' || lower === 'suitorguy' || lower === 'sg') {
                 variants.push('Suitor Guy', 'SG');
             }
             if (lower.includes('zorucci') || lower.includes('zurocci') || lower === 'z') {
@@ -95,9 +95,18 @@ export const buildStoreFilter = (storeQuery) => {
             if (lower.includes('perinthalmanna') || lower.includes('perinathalmann') || lower === 'pmna') {
                 variants.push('Perinthalmanna', 'PMNA');
             }
+            // Strict check for Edappally vs Edappal
             if (lower.includes('edappally') || lower.includes('edapally') || lower.includes('edappall')) {
                 variants.push('Edappally', 'Edapally');
+            } else if (lower.includes('edappal') && !lower.includes('edappally')) {
+                // Only match Edappal if it's NOT Edappally
+                variants.push('Edappal');
             }
+
+            if (lower.includes('trivandrum') || lower.includes('thiruvananthapuram') || lower === 'tvm') {
+                variants.push('Trivandrum', 'Thiruvananthapuram', 'TVM');
+            }
+
             if (lower.includes('vadakara') || lower.includes('vatakara')) {
                 variants.push('Vatakara', 'Vadakara');
             }
