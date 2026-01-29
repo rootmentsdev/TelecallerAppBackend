@@ -1406,7 +1406,9 @@ export const updateGenericLead = async (req, res) => {
       closing_status,
       rating,
       call_duration,
-      mark_as_issue
+      mark_as_issue,
+      functionDate, // Add functionDate
+      function_date // Add alias
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1475,6 +1477,16 @@ export const updateGenericLead = async (req, res) => {
 
     if (call_date !== undefined) updateData.callDate = call_date;
     if (reason_collected_from_store !== undefined) updateData.reasonCollectedFromStore = reason_collected_from_store;
+
+    // Support functionDate update
+    if (functionDate || function_date) {
+      const fd = functionDate || function_date;
+      const parsedFnDate = new Date(fd);
+      if (!isNaN(parsedFnDate.getTime())) {
+        updateData.functionDate = parsedFnDate;
+      }
+    }
+
     // Validate and normalize remarks - converts empty strings to null
     let remarksValidation = null;
     if (remarks !== undefined) {

@@ -623,29 +623,50 @@ export const mapReturn = (row) => {
   const functionDate = parseApiDate(row.functionDate || row.eventDate || row.deliveryDate || row.trialDate || row.function_date);
 
   // Set createdAt from returnDate or enquiryDate (actual lead creation date, not import date)
-  // IMPORTANT: Use the earliest available date as the creation date
   const createdAt = returnDate || enquiryDate || undefined;
 
+  // Extract only explicit fields from the API.
+  // Do NOT spread existing row or map generic fields to avoid pollution.
+  // We explicitly select the data points we need.
   const leadData = {
     name: (row.name || row.Name || row.customerName || row.CustomerName || "").trim(),
     phone: phone,
     store: (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim(),
     source: "Return",
-    leadType: "return",
+    leadType: "return", // Explicit constant, as this is a return sync
+
+    // Explicit mapping of allowed fields
     enquiryType: (row.enquiryType || row.type || row.category || row.subCategory || "").trim(),
     bookingNo: (row.bookingNo || row.bookingNumber || row.BookingNo || "").trim(),
+
     returnDate: returnDate,
     enquiryDate: enquiryDate,
     functionDate: functionDate,
-    // Attended By: API uses 'bookingBy'
+
+    // Attended By: API uses 'bookingBy' usually
     attendedBy: (row.attendedBy || row.attended_by || row.staff || row.Staff || row.bookingBy || row.handledBy || "").trim() || undefined,
+
+    // Remarks
     remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
+
+    // Strict Cleanup: Ensure undefined fields are not included
   };
 
-  // Only add createdAt if we have a valid date (Mongoose will use it instead of current date)
   if (createdAt) {
     leadData.createdAt = createdAt;
   }
+
+  // Final cleanup of empty strings/undefined
+  Object.keys(leadData).forEach(key => {
+    if (leadData[key] === undefined || leadData[key] === null || leadData[key] === "") {
+      if (!['remarks', 'attendedBy', 'enquiryType', 'bookingNo'].includes(key)) {
+        // keep optional fields as empty strings if needed, but remove truly undefined ones
+        delete leadData[key];
+      } else if (leadData[key] === undefined || leadData[key] === null) {
+        delete leadData[key];
+      }
+    }
+  });
 
   return leadData;
 };
