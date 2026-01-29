@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
 
-// Helper to robustly parse date strings (YYYY-MM-DD or DD-MM-YYYY)
+/* ----------------------------------------
+   DATE PARSING (UNCHANGED)
+----------------------------------------- */
 export const parseQueryDate = (dateStr) => {
     if (!dateStr) return null;
 
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-        // Check for YYYY-MM-DD
         if (parts[0].length === 4) {
             return {
                 year: parseInt(parts[0], 10),
@@ -14,7 +15,6 @@ export const parseQueryDate = (dateStr) => {
                 day: parseInt(parts[2], 10)
             };
         }
-        // Check for DD-MM-YYYY
         if (parts[2].length === 4) {
             return {
                 year: parseInt(parts[2], 10),
@@ -23,7 +23,7 @@ export const parseQueryDate = (dateStr) => {
             };
         }
     }
-    // Fallback for unexpected formats
+
     const d = new Date(dateStr);
     if (!isNaN(d.getTime())) {
         return {
@@ -35,7 +35,9 @@ export const parseQueryDate = (dateStr) => {
     return null;
 };
 
-// Helper to normalize query parameters (snake_case -> camelCase)
+/* ----------------------------------------
+   QUERY NORMALIZATION (UNCHANGED)
+----------------------------------------- */
 export const normalizeQueryParams = (query, aliases = {}) => {
     const normalized = { ...query };
     const defaultAliases = {
@@ -69,150 +71,100 @@ export const normalizeQueryParams = (query, aliases = {}) => {
     return normalized;
 };
 
-// Advanced Store Filtering Logic
+/* ----------------------------------------
+   STORE FILTER (FINAL, FIXED)
+----------------------------------------- */
 export const buildStoreFilter = (storeQuery) => {
     if (!storeQuery) return null;
 
-    // Helper to get all variants of a brand or location
-    const getVariants = (text, type) => {
-        const variants = [text];
+    const lowerQuery = storeQuery.toLowerCase();
+
+    /* -------------------------------
+       BRAND VARIANTS
+    -------------------------------- */
+    const getBrandVariants = (text) => {
+        const lower = text.toLowerCase();
+        if (lower === 'sg' || lower === 'suitor guy' || lower === 'suitorguy') {
+            return ['Suitor Guy', 'SG'];
+        }
+        if (lower === 'z' || lower.includes('zorucci') || lower.includes('zurocci')) {
+            return ['Zorucci', 'Zurocci', 'Z'];
+        }
+        return [text];
+    };
+
+    /* -------------------------------
+       LOCATION VARIANTS (STRICT)
+    -------------------------------- */
+    const getLocationVariant = (text) => {
         const lower = text.toLowerCase();
 
-        if (type === 'brand') {
-            if (lower === 'suitor guy' || lower === 'suitorguy' || lower === 'sg') {
-                variants.push('Suitor Guy', 'SG');
-            }
-            if (lower.includes('zorucci') || lower.includes('zurocci') || lower === 'z') {
-                variants.push('Zurocci', 'Zorucci', 'Z');
-            }
-        } else if (type === 'location') {
-            if (lower.includes('kottakkal') || lower.includes('kottakal')) {
-                variants.push('Kottakkal', 'Kottakal', 'Z.Kottakkal');
-            }
-            if (lower.includes('manjeri') || lower.includes('manjery')) {
-                variants.push('Manjeri', 'MANJERY');
-            }
-            if (lower.includes('perinthalmanna') || lower.includes('perinathalmann') || lower === 'pmna') {
-                variants.push('Perinthalmanna', 'PMNA');
-            }
-            // STRICT separation for Edappal vs Edappally
-            if (lower.includes('edappally') || lower.includes('edapally')) {
-                return ['Edappally'];
-            }
+        // 🔒 ABSOLUTE SEPARATION
+        if (lower === 'edappal') return 'EDAPPAL';
+        if (lower === 'edappally' || lower === 'edapally') return 'EDAPPALLY';
 
-            if (lower === 'edappal') {
-                return ['Edappal'];
-            }
+        if (lower.includes('kottakkal') || lower.includes('kottakal')) return 'KOTTAKKAL';
+        if (lower.includes('manjeri') || lower.includes('manjery')) return 'MANJERI';
+        if (lower.includes('perinthalmanna') || lower === 'pmna') return 'PMNA';
+        if (lower.includes('trivandrum') || lower === 'tvm') return 'TVM';
+        if (lower.includes('vadakara') || lower.includes('vatakara')) return 'VADAKARA';
+        if (lower.includes('calicut') || lower.includes('kozhikode')) return 'CALICUT';
 
-            if (lower.includes('trivandrum') || lower.includes('thiruvananthapuram') || lower === 'tvm') {
-                variants.push('Trivandrum', 'Thiruvananthapuram', 'TVM');
-            }
-
-            if (lower.includes('vadakara') || lower.includes('vatakara')) {
-                variants.push('Vatakara', 'Vadakara');
-            }
-            if (lower.includes('calicut') || lower.includes('kozhikode')) {
-                variants.push('Calicut', 'Kozhikode');
-            }
-        }
-        return [...new Set(variants)];
+        return text;
     };
 
-    // Helper to escape and build a strict "word-boundary" regex pattern
-    // We use explicit alphanumeric check instead of \b to ensure absolute precision
-    const buildStrictRegex = (text) => {
-        const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-        // Explicit negative matching for Edappal to avoid Edappally collision
-        // This is a targeted fix for these two locations only
-        if (text === 'Edappal') {
-            return `(^|[^a-zA-Z0-9])Edappal(?!ly)([^a-zA-Z0-9]|$)`;
+    /* -------------------------------
+       LOCATION REGEX (STRICT)
+    -------------------------------- */
+    const buildLocationRegex = (locationKey) => {
+        switch (locationKey) {
+            case 'EDAPPAL':
+                return /(^|[^a-zA-Z])Edappal([^a-zA-Z]|$)/i;
+            case 'EDAPPALLY':
+                return /(^|[^a-zA-Z])Edappally([^a-zA-Z]|$)/i;
+            case 'KOTTAKKAL':
+                return /Kottakkal|Kottakal/i;
+            case 'MANJERI':
+                return /Manjeri/i;
+            case 'PMNA':
+                return /Perinthalmanna|PMNA/i;
+            case 'TVM':
+                return /Trivandrum|Thiruvananthapuram|TVM/i;
+            case 'VADAKARA':
+                return /Vadakara|Vatakara/i;
+            case 'CALICUT':
+                return /Calicut|Kozhikode/i;
+            default:
+                return new RegExp(locationKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         }
-
-        return `(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`;
     };
 
-    // Split by dash to handle Brand - Location format
-    const hasDash = storeQuery.includes('-') || storeQuery.includes(' - ');
+    /* -------------------------------
+       BRAND + LOCATION SPLIT
+    -------------------------------- */
+    const parts = storeQuery.split('-').map(p => p.trim()).filter(Boolean);
+    const brandPart = parts.length > 1 ? parts[0] : null;
+    const locationPart = parts.length > 1 ? parts[parts.length - 1] : storeQuery;
 
-    if (hasDash) {
-        const parts = storeQuery.split(/[\s-]*[-][\s-]*/).map(p => p.trim()).filter(p => p.length > 0);
+    const brandVariants = brandPart ? getBrandVariants(brandPart) : [];
+    const locationKey = getLocationVariant(locationPart);
+    const locationRegex = buildLocationRegex(locationKey);
 
-        if (parts.length >= 2) {
-            const brandPart = parts[0];
-            const locationPart = parts[parts.length - 1];
-
-            const brandVariations = getVariants(brandPart, 'brand');
-            const locationVariations = getVariants(locationPart, 'location');
-
-            const orConditions = [];
-
-            // Check if this is a Suitor Guy query
-            const isSuitorGuy = brandVariations.some(v => ['Suitor Guy', 'SG'].includes(v));
-
-            for (const brandVar of brandVariations) {
-                for (const locVar of locationVariations) {
-                    orConditions.push({
-                        $and: [
-                            { store: { $regex: buildStrictRegex(brandVar), $options: 'i' } },
-                            { store: { $regex: buildStrictRegex(locVar), $options: 'i' } }
-                        ]
-                    });
-                }
-            }
-
-            // Special handling for implicit Suitor Guy stores
-            if (isSuitorGuy) {
-                for (const locVar of locationVariations) {
-                    orConditions.push({
-                        $and: [
-                            { store: { $regex: buildStrictRegex(locVar), $options: 'i' } },
-                            { store: { $not: { $regex: /(^|[^a-zA-Z0-9])(Z|Zorucci|Zurocci)([^a-zA-Z0-9]|$)/i } } }
-                        ]
-                    });
-                }
-            }
-
-            return { $or: orConditions };
-        } else {
-            // Fallback for weirdly formatted dash query
-            return { store: { $regex: buildStrictRegex(storeQuery), $options: 'i' } };
-        }
-    } else {
-        // No dash - could be just brand OR just location OR both combined without dash
-        const brandVars = getVariants(storeQuery, 'brand');
-        const locVars = getVariants(storeQuery, 'location');
-
-        const hasSpecificBrand = brandVars.some(v => v.toLowerCase() !== storeQuery.toLowerCase());
-        const hasSpecificLoc = locVars.some(v => v.toLowerCase() !== storeQuery.toLowerCase());
-
-        if (hasSpecificBrand && hasSpecificLoc) {
-            const bVars = brandVars.filter(v => v.toLowerCase() !== storeQuery.toLowerCase());
-            const lVars = locVars.filter(v => v.toLowerCase() !== storeQuery.toLowerCase());
-
-            const orConditions = [];
-            for (const brandVar of bVars) {
-                for (const locVar of lVars) {
-                    orConditions.push({
-                        $and: [
-                            { store: { $regex: buildStrictRegex(brandVar), $options: 'i' } },
-                            { store: { $regex: buildStrictRegex(locVar), $options: 'i' } }
-                        ]
-                    });
-                }
-            }
-            return { $or: orConditions };
-        } else {
-            const allVars = [...new Set([...brandVars, ...locVars])];
-            if (allVars.length > 1) {
-                return {
-                    $or: allVars.map(v => ({
-                        store: { $regex: buildStrictRegex(v), $options: 'i' }
+    /* -------------------------------
+       FINAL QUERY (NO OR LEAKAGE)
+    -------------------------------- */
+    if (brandVariants.length) {
+        return {
+            $and: [
+                { store: { $regex: locationRegex } },
+                {
+                    $or: brandVariants.map(b => ({
+                        store: { $regex: new RegExp(`(^|[^a-zA-Z])${b}([^a-zA-Z]|$)`, 'i') }
                     }))
-                };
-            } else {
-                return { store: { $regex: buildStrictRegex(storeQuery), $options: 'i' } };
-            }
-        }
+                }
+            ]
+        };
     }
+
+    return { store: { $regex: locationRegex } };
 };
