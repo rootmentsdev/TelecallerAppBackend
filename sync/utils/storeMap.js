@@ -14,7 +14,7 @@ export const LEAD_API_ID_MAP = {
     '6': 'Zorucci - Edappal',
     '7': 'Zorucci - Perinthalmanna',
     '8': 'Zorucci - Kottakkal',
-    '9': 'Zorucci - Kottayam',
+    '9': 'Suitor Guy - Kottayam',
     '10': 'Suitor Guy - Perumbavoor',
     '11': 'Suitor Guy - Thrissur',
     '12': 'Suitor Guy - Chavakkad',
@@ -26,7 +26,8 @@ export const LEAD_API_ID_MAP = {
     '18': 'Suitor Guy - Manjeri',
     '19': 'Suitor Guy - Palakkad',
     '20': 'Suitor Guy - Kalpetta',
-    '21': 'Suitor Guy - Kannur'
+    '21': 'Suitor Guy - Kannur',
+    '23': 'Suitor Guy - MG Road'
 };
 
 /**
@@ -52,7 +53,6 @@ export const normalizeStoreName = (rawName) => {
         'z perinthalmanna': 'Zorucci - Perinthalmanna', // Added variant
         'z.kottakkal': 'Zorucci - Kottakkal',
         'z kottakal': 'Zorucci - Kottakkal', // Added variant
-        'z kottayam': 'Zorucci - Kottayam', // Added variant
         'sg-edappally': 'Suitor Guy - Edappally',
         'sg edappally': 'Suitor Guy - Edappally', // Added variant
         'sg edapally': 'Suitor Guy - Edappally', // Added variant
