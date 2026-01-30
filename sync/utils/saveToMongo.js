@@ -136,10 +136,10 @@ export const bulkSaveToMongo = async (leadsData) => {
       };
 
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
-      // REMOVED: bookingNo check is no longer primary for duplicate detection
-      // if (normalizedBookingNo !== "") {
-      //   duplicateQuery.bookingNo = normalizedBookingNo;
-      // }
+      // CRITICAL: Re-enabled to allow multiple returns/bookings for same customer
+      if (normalizedBookingNo !== "") {
+        duplicateQuery.bookingNo = normalizedBookingNo;
+      }
 
       // Use case-insensitive comparison for name and store to catch case differences
       // Use case-insensitive comparison for name and store to catch case differences
@@ -150,10 +150,9 @@ export const bulkSaveToMongo = async (leadsData) => {
         store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
 
-      // REMOVED: bookingNo check is no longer primary for duplicate detection
-      // if (normalizedBookingNo !== "") {
-      //   caseInsensitiveQuery.bookingNo = normalizedBookingNo;
-      // }
+      if (normalizedBookingNo !== "") {
+        caseInsensitiveQuery.bookingNo = normalizedBookingNo;
+      }
 
       // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
@@ -352,10 +351,10 @@ export const saveToMongo = async (leadData) => {
       };
 
       // Add bookingNo (id) if it exists - this is critical for booking/return leads
-      // REMOVED: bookingNo check is no longer primary for duplicate detection
-      // if (normalizedBookingNo !== "") {
-      //   duplicateQuery.bookingNo = normalizedBookingNo;
-      // }
+      // CRITICAL: Re-enabled to allow multiple returns/bookings for same customer (repeat business)
+      if (normalizedBookingNo !== "") {
+        duplicateQuery.bookingNo = normalizedBookingNo;
+      }
 
       // Use case-insensitive comparison for name and store to catch case differences
       const caseInsensitiveQuery = {
@@ -365,10 +364,9 @@ export const saveToMongo = async (leadData) => {
         store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
 
-      // REMOVED: bookingNo check is no longer primary for duplicate detection
-      // if (normalizedBookingNo !== "") {
-      //   caseInsensitiveQuery.bookingNo = normalizedBookingNo;
-      // }
+      if (normalizedBookingNo !== "") {
+        caseInsensitiveQuery.bookingNo = normalizedBookingNo;
+      }
 
       // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
@@ -379,9 +377,9 @@ export const saveToMongo = async (leadData) => {
       }
 
       // CRITICAL: Secondary Check - Check by Name + Phone + LeadType + Store (IGNORING bookingNo)
-      // This handles cases where the booking number might have changed or is missing in one record but it is logically the same lead.
-      // We only do this check if the primary check didn't find anything.
-      if (!existing) {
+      // This handles cases where the booking number is missing but it is logically the same lead.
+      // We ONLY do this check if we don't have a booking number to differentiate.
+      if (!existing && normalizedBookingNo === "") {
         const secondaryQuery = {
           name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
           phone: normalizedPhone,
@@ -391,15 +389,14 @@ export const saveToMongo = async (leadData) => {
         };
         existing = await Lead.findOne(secondaryQuery);
         if (existing) {
-          console.log(`   ⚠️  Duplicate detected by Secondary Check (Name+Phone+Type+Store):`);
-          console.log(`      Incoming BookingNo: ${normalizedBookingNo}`);
+          console.log(`   ⚠️  Duplicate detected by Secondary Check (Name+Phone+Type+Store) - BookingNo missing in incoming:`);
           console.log(`      Existing BookingNo: ${existing.bookingNo}`);
         }
       }
 
       if (existing) {
         // Record already exists in Leads - skip it to prevent duplicates
-        const checkFields = `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"`;
+        const checkFields = `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"${normalizedBookingNo ? `, bookingNo="${normalizedBookingNo}"` : ""}`;
         console.log(`   ⏭️  Duplicate detected in Leads - skipped: ${checkFields}`);
         console.log(`      Existing lead ID: ${existing._id}`);
         return {
