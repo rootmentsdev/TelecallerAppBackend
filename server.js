@@ -15,6 +15,7 @@ import csvImportRoutes from './routes/csvImportRoutes.js';
 import csvUploadRoutes from './routes/csvUploadRoutes.js';
 import pageRoutes from './routes/pageRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import healthRoutes from "./routes/healthRoutes.js";
 
 
@@ -49,6 +50,7 @@ app.use('/api/import', csvImportRoutes); // Existing route: /api/import/leads (a
 app.use('/api/import', csvUploadRoutes); // New route: /api/import/csv (admin/super_admin only)
 app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes);
 app.use("/api", healthRoutes);
 
 // Serve static upload UI files
@@ -56,11 +58,11 @@ app.use(express.static('upload-ui'));
 
 // Route specific HTML files
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'upload-ui', 'login.html'));
+  res.sendFile(path.join(__dirname, 'upload-ui', 'login.html'));
 });
 
 app.get('/upload', (req, res) => {
-    res.sendFile(path.join(__dirname, 'upload-ui', 'index.html'));
+  res.sendFile(path.join(__dirname, 'upload-ui', 'index.html'));
 });
 
 
@@ -76,7 +78,7 @@ const checkStartupLocks = async () => {
     console.log("🔍 Checking for expired sync locks on startup...");
     console.log(`🔍 [DIAG] checkStartupLocks: MAX_SYNC_DURATION=${MAX_SYNC_DURATION}ms (${MAX_SYNC_DURATION / 60000} minutes), PID=${process.pid}`);
     const lock = await SyncLock.findOne({ lockName: GLOBAL_LOCK_NAME });
-    
+
     if (!lock) {
       console.log("✅ No sync lock found - system is clean");
       return;
@@ -95,10 +97,10 @@ const checkStartupLocks = async () => {
       console.log(`   Locked by: ${lock.lockedBy}`);
       console.log(`   Status: ${lock.status}`);
       console.log(`   🔓 Auto-clearing expired lock...`);
-      
+
       const deleteResult = await SyncLock.deleteOne({ lockName: GLOBAL_LOCK_NAME });
       console.log(`🔍 [DIAG] Startup deleteOne result: deletedCount=${deleteResult.deletedCount}, acknowledged=${deleteResult.acknowledged}`);
-      
+
       if (deleteResult.deletedCount === 0) {
         console.error(`❌ CRITICAL: Startup lock delete returned deletedCount=0!`);
         console.error(`   Lock document snapshot:`, JSON.stringify(lock.toObject(), null, 2));

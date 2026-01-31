@@ -102,3 +102,21 @@ Interactive API validation and documentation is available at:
 5.  **Strict Store Filtering**: Store lookups MUST use the centralized `buildStoreFilter()` utility. Direct regex construction is forbidden to prevent collisions (e.g., ensuring "Edappal" does not match "Edappally").
 
 ---
+
+## 🔎 Verified Filtering Logic
+**Status as of Jan 31, 2026**
+
+### 1. Date Filtering Behavior
+*   **Leads API (`/api/pages/leads`)**:
+    *   **Return Leads**: When filtering by date, the system prioritizes `returnDate` logic.
+    *   **Other Leads**: Filters primarily by `createdAt` (Lead Creation Date).
+    *   **Note**: Specific date filters (`enquiryDate`, `visitDate`) are currently secondary to creation date in the main listing logic.
+*   **Reports API (`/api/reports`)**:
+    *   **Work Date**: Default date filters (`dateFrom`/`dateTo`) apply to `editedAt` (when the work was done).
+    *   **Creation Date**: Explicit `createdAt` filters apply to the original lead's creation date.
+*   **Call Summary**:
+    *   Aggregates data based on **Work Date** (`editedAt` for Reports, `complaintMarkedAt` for Complaints).
+
+### 2. Store Filtering
+*   **Format**: "Brand - Location" (e.g., "Suitor Guy - Edappally").
+*   **Logic**: Strict regex matching handles Brand ("SG", "Z") and Location independently to ensure data isolation. The same logic (`buildStoreFilter`) is used across all collections.
