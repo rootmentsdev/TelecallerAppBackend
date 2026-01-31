@@ -343,6 +343,20 @@ router.get("/", protect, getReports);
  *           type: string
  *           format: date
  *         description: Filter by Lead Creation Date
+ *       - in: query
+ *         name: createdAtFrom
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by Lead Creation Date (Start)
+ *       - in: query
+ *         name: createdAtTo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Filter by Lead Creation Date (End)
  *     responses:
  *       200:
  *         description: Call summary retrieved successfully
