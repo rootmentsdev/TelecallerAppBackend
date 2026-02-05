@@ -116,7 +116,8 @@ export const getTelecallerSummary = async (req, res) => {
                 {
                     $group: {
                         _id: "$complaintMarkedBy",
-                        totalComplaints: { $sum: 1 }
+                        totalComplaints: { $sum: 1 },
+                        totalComplaintDuration: { $sum: "$callDuration" }
                     }
                 }
             ])
@@ -155,8 +156,11 @@ export const getTelecallerSummary = async (req, res) => {
                 const entry = getEntry(id);
                 entry.totalComplaints = stat.totalComplaints;
 
-                // Complaints are also call interactions and must be counted as calls
+                // Complaints are also call interactions:
+                // 1. Add count to totalCalls
                 entry.totalCalls += stat.totalComplaints;
+                // 2. Add duration to totalCallDuration
+                entry.totalCallDuration += (stat.totalComplaintDuration || 0);
             }
         }
 

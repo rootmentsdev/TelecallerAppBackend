@@ -45,7 +45,7 @@ const Dashboard = () => {
     const stats = useMemo(() => {
         return summaryData.reduce((acc, curr) => ({
             totalCalls: acc.totalCalls + (curr.totalCalls || 0),
-            totalDuration: acc.totalDuration + (curr.totalDuration || 0),
+            totalDuration: acc.totalDuration + (curr.totalCallDuration || 0), // Fix: use totalCallDuration
             totalComplaints: acc.totalComplaints + (curr.totalComplaints || 0)
         }), { totalCalls: 0, totalDuration: 0, totalComplaints: 0 });
     }, [summaryData]);

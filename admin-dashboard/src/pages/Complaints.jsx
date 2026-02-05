@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, Filter } from 'lucide-react';
 import { getComplaintPivot } from '../services/analyticsService';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -39,7 +39,7 @@ const Complaints = () => {
     // --- PIVOT LOGIC ---
     const { pivotData, columns, categories, grandTotal, categoryTotals } = useMemo(() => {
         if (!rawData.length) {
-            return { pivotData: {}, columns: [], categories: [], grandTotal: 0, categoryTotals: {} };
+            return { pivotData: {}, columns: [], categories: [], grandTotal: 0, categoryTotals: [] };
         }
 
         const stores = new Set();
@@ -164,27 +164,7 @@ const Complaints = () => {
                                 ))
                             )}
                         </tbody>
-                        {/* Grand Total Footer Row */}
-                        {!loading && categories.length > 0 && (
-                            <tfoot className="bg-gray-100 text-gray-700 font-bold sticky bottom-0 z-10">
-                                <tr>
-                                    <td className="px-4 py-3 border-r sticky left-0 bg-gray-100 z-20">Grand Total</td>
-                                    {columns.map(store => {
-                                        // Calculate column sum
-                                        let colSum = 0;
-                                        categories.forEach(cat => {
-                                            colSum += pivotData[cat]?.[store] || 0;
-                                        });
-                                        return (
-                                            <td key={store} className="px-4 py-3 text-center">
-                                                {colSum}
-                                            </td>
-                                        );
-                                    })}
-                                    <td className="px-4 py-3 border-l text-center text-blue-700">{grandTotal}</td>
-                                </tr>
-                            </tfoot>
-                        )}
+
                     </table>
                 </div>
             </div>
@@ -194,20 +174,24 @@ const Complaints = () => {
                 <h3 className="text-gray-700 font-semibold mb-6">Complaints by Category (Total)</h3>
                 <div className="min-h-[300px]">
                     <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                            data={categoryTotals}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="value" name="Complaints" fill="#8884d8">
+                        <PieChart>
+                            <Pie
+                                data={categoryTotals}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                            >
                                 {categoryTotals?.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
-                            </Bar>
-                        </BarChart>
+                            </Pie>
+                            <Tooltip formatter={(value, name, props) => [`${value} Complaints`, name]} />
+                            <Legend />
+                        </PieChart>
                     </ResponsiveContainer>
                 </div>
             </div>
