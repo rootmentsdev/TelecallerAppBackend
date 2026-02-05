@@ -1,10 +1,14 @@
 export const formatDuration = (seconds) => {
-    if (!seconds) return '0m';
+    if (!seconds) return '0s'; // Fixed default
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60); // Ensure integer
 
-    if (h > 0) return `${h}h ${m}m`;
+    // < 60 sec -> Xs
+    if (seconds < 60) return `${s}s`;
+
+    // >= 60 sec -> Xm Ys (Hours included if large)
+    if (h > 0) return `${h}h ${m}m ${s}s`;
     return `${m}m ${s}s`;
 };
 
