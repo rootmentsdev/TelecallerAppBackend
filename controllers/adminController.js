@@ -154,6 +154,9 @@ export const getTelecallerSummary = async (req, res) => {
                 const id = String(stat._id);
                 const entry = getEntry(id);
                 entry.totalComplaints = stat.totalComplaints;
+
+                // Complaints are also call interactions and must be counted as calls
+                entry.totalCalls += stat.totalComplaints;
             }
         }
 
