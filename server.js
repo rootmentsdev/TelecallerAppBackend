@@ -43,6 +43,12 @@ app.use(cors({
 
 
 
+
+// Root Entry Point - MUST be before static files to prevent upload-ui/index.html from taking over
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 import adminAuthRoutes from "./routes/adminAuthRoutes.js";
 
 // Routes
@@ -62,10 +68,7 @@ app.use(express.static('upload-ui'));
 // Route specific HTML files
 
 // Root Entry Point
-// Root Entry Point
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+
 
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'upload-ui', 'login.html'));
