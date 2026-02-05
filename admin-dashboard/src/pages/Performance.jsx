@@ -74,7 +74,7 @@ const TelecallerPerformance = () => {
                                 <th className="px-6 py-3">Rank</th>
                                 <th className="px-6 py-3">Name</th>
                                 <th className="px-6 py-3 text-right">Calls</th>
-                                <th className="px-6 py-3 text-right">Hours</th>
+                                <th className="px-6 py-3 text-right">Seconds</th>
                                 <th className="px-6 py-3 text-right">Complaints</th>
                                 <th className="px-6 py-3 text-right">Efficiency</th>
                             </tr>
