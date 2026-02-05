@@ -91,6 +91,40 @@ export const login = async (req, res) => {
 
         console.log(`🔐 Verifying credentials with external API for: ${employeeId}`);
 
+        // DEV BYPASS: Allow 'ADMIN' / 'admin123' to log in without external API
+        if (employeeId === "ADMIN" && password === "admin123") {
+            console.log("⚠️ DEV BYPASS: Logging in as ADMIN");
+
+            // Ensure this user exists in DB for other lookups if needed, or just mock the response
+            let user = await User.findOne({ employeeId: "ADMIN" });
+            if (!user) {
+                user = await User.create({
+                    employeeId: "ADMIN",
+                    name: "Development Admin",
+                    password: await bcrypt.hash("admin123", 10),
+                    store: "Head Office",
+                    role: "admin",
+                    phone: "0000000000",
+                    isActive: true
+                });
+            }
+
+            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+            return res.json({
+                message: "Login successful (Dev Bypass)",
+                success: true,
+                token,
+                user: {
+                    employeeId: user.employeeId,
+                    name: user.name,
+                    store: user.store,
+                    phone: user.phone,
+                    role: user.role,
+                },
+            });
+        }
+
         // Call external API to verify credentials
         // CRITICAL: Login is ONLY allowed if external API verifies credentials successfully
         const apiResponse = await postAPI(
