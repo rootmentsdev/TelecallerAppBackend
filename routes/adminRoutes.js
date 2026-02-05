@@ -1,6 +1,5 @@
 import express from "express";
-import { protect } from "../middlewares/auth.js";
-import { requireAdmin } from "../middlewares/requireAdmin.js";
+import { requireAdminAuth } from "../middlewares/adminAuthMiddleware.js";
 import {
     getAdminHealth,
     getTelecallerSummary,
@@ -36,7 +35,7 @@ const router = express.Router();
  *                 ok:
  *                   type: boolean
  */
-router.get("/health", protect, requireAdmin, getAdminHealth);
+router.get("/health", requireAdminAuth, getAdminHealth);
 
 /**
  * @swagger
@@ -91,7 +90,7 @@ router.get("/health", protect, requireAdmin, getAdminHealth);
  *       403:
  *         description: Forbidden (Non-admin)
  */
-router.get("/telecaller-summary", protect, requireAdmin, getTelecallerSummary);
+router.get("/telecaller-summary", requireAdminAuth, getTelecallerSummary);
 
 /**
  * @swagger
@@ -154,7 +153,7 @@ router.get("/telecaller-summary", protect, requireAdmin, getTelecallerSummary);
  *       403:
  *         description: Forbidden
  */
-router.get("/complaints/pivot", protect, requireAdmin, getComplaintPivot);
+router.get("/complaints/pivot", requireAdminAuth, getComplaintPivot);
 
 /**
  * @swagger
@@ -228,6 +227,6 @@ router.get("/complaints/pivot", protect, requireAdmin, getComplaintPivot);
  *       403:
  *         description: Forbidden
  */
-router.get("/reports", protect, requireAdmin, getAdminReports);
+router.get("/reports", requireAdminAuth, getAdminReports);
 
 export default router;
