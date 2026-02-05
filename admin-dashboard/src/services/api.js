@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:8800/api', // Hardcoded for simplified local dev, ideally strictly env
+    baseURL: 'https://telecallerappbackend.onrender.com', // Hardcoded for simplified local dev, ideally strictly env
     headers: {
         'Content-Type': 'application/json',
     },

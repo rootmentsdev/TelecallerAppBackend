@@ -132,7 +132,7 @@ const Reports = () => {
                                 <th className="px-6 py-4">Date</th>
                                 <th className="px-6 py-4">Store</th>
                                 <th className="px-6 py-4">Telecaller</th>
-                                <th className="px-6 py-4">Lead Status</th>
+                                <th className="px-6 py-4">Lead Type</th>
                                 <th className="px-6 py-4">Duration</th>
                                 <th className="px-6 py-4">Note</th>
                             </tr>
@@ -154,10 +154,8 @@ const Reports = () => {
                                             {row.telecaller?.name || 'Unknown'}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${row.callStatus === 'ANSWERED' ? 'bg-green-100 text-green-800' :
-                                                    row.callStatus === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                {row.callStatus}
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                                {row.leadType || '-'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">{formatDuration(row.callDuration)}</td>
