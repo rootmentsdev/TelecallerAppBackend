@@ -62,40 +62,9 @@ app.use(express.static('upload-ui'));
 // Route specific HTML files
 
 // Root Entry Point
+// Root Entry Point
 app.get('/', (req, res) => {
-  res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Telecaller System</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-      </head>
-      <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
-        <div class="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-          <h1 class="text-3xl font-bold text-gray-800 mb-2">Telecaller System</h1>
-          <p class="text-gray-500 mb-8">Select a portal to continue</p>
-          
-          <div class="space-y-4">
-            <a href="/upload" class="block w-full py-4 px-6 bg-blue-50 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 flex items-center justify-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-              Upload Calls (Telecaller)
-            </a>
-            
-            <a href="http://localhost:5173/admin/login" class="block w-full py-4 px-6 bg-gray-50 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition-colors border border-gray-200 flex items-center justify-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" x2="20" y1="8" y2="14"/><line x1="23" x2="17" y1="11" y2="11"/></svg>
-              Admin Analytics Panel
-            </a>
-          </div>
-
-          <div class="mt-8 text-xs text-gray-400">
-            &copy; 2026 Telecaller System
-          </div>
-        </div>
-      </body>
-      </html>
-    `);
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/login', (req, res) => {
