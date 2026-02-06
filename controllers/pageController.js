@@ -17,7 +17,7 @@ const checkAccess = (lead, user) => {
 };
 
 // Helper function to build query filters based on user role
-const buildLeadQuery = (user, filters = {}) => {
+const buildLeadQuery = (user, filters = {}, allowTelecallerAll = false) => {
   const query = { ...filters };
 
   // Apply role-based filtering
@@ -78,8 +78,10 @@ const buildLeadQuery = (user, filters = {}) => {
       query.store = { $regex: escapeRegex(user.store), $options: 'i' };
     }
   } else if (user.role === "telecaller") {
-    // Telecaller can see only assigned leads
-    query.assignedTo = user._id;
+    // Telecaller can see only assigned leads (unless allowed to see all)
+    if (!allowTelecallerAll) {
+      query.assignedTo = user._id;
+    }
   }
 
   return query;
@@ -856,7 +858,7 @@ export const getLeads = async (req, res) => {
        🔥 CRITICAL CHANGE ENDS HERE
        ============================================================ */
 
-    const query = buildLeadQuery(req.user, filters);
+    const query = buildLeadQuery(req.user, filters, true);
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
