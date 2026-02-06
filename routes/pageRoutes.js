@@ -848,7 +848,7 @@
  *       401:
  *         description: Unauthorized
  *       403:
- *         description: Forbidden (Admin/Team Lead only)
+ *         description: Forbidden (Valid role required)
  *       500:
  *         description: Internal server error
  */
@@ -906,6 +906,13 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *         schema:
  *           type: string
  *         description: Lead id to update
+ *     description: |
+ *       Updates a lead.
+ *       
+ *       **Access Control:**
+ *       - Admin: Can update all leads
+ *       - Team Lead: Can update leads in their store
+ *       - Telecaller: Can update only leads assigned to them
  *     requestBody:
  *       required: true
  *       content:
@@ -982,6 +989,13 @@ router.patch(
  * /api/pages/leads/{id}:
  *   post:
  *     summary: Generic update (POST) for any lead — same behavior as PATCH; moves lead to reports
+ *     description: |
+ *       Updates a lead (alternative to PATCH).
+ *       
+ *       **Access Control:**
+ *       - Admin: Can update all leads
+ *       - Team Lead: Can update leads in their store
+ *       - Telecaller: Can update only leads assigned to them
  *     tags:
  *       - Leads
  *     security:
@@ -1106,11 +1120,11 @@ router.post(
 );
 
 // ==================== Add Lead Page Routes ====================
-// POST /api/pages/add-lead - Create new lead (Admin/Team Lead only)
+// POST /api/pages/add-lead - Create new lead (Admin, Team Lead, Telecaller)
 router.post(
   "/add-lead",
   protect,
-  allowRoles("admin", "teamLead"),
+  allowRoles("admin", "teamLead", "telecaller"),
   addLeadPostValidator,
   handleValidation,
   createAddLead
