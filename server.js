@@ -53,7 +53,7 @@ import adminAuthRoutes from "./routes/adminAuthRoutes.js";
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/admin/auth', adminAuthRoutes);
 app.use('/api/assign', assignmentRoutes);
 app.use('/api/import', csvImportRoutes); // Existing route: /api/import/leads (admin/teamLead only)
 app.use('/api/import', csvUploadRoutes); // New route: /api/import/csv (admin/super_admin only)
