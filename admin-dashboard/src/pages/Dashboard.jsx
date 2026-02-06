@@ -20,18 +20,24 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [summaryData, setSummaryData] = useState([]);
     const [error, setError] = useState(null);
+    const [filters, setFilters] = useState({
+        dateFrom: '',
+        dateTo: ''
+    });
 
-    // Initial load: Fetch summary for "All Time" (or default range)
-    // Future: Add DatePicker to filter this
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [filters]);
 
     const fetchData = async () => {
         setLoading(true);
         setError(null);
         try {
-            const result = await getTelecallerSummary({});
+            const params = {
+                dateFrom: filters.dateFrom || undefined,
+                dateTo: filters.dateTo || undefined
+            };
+            const result = await getTelecallerSummary(params);
             setSummaryData(result.data || []);
         } catch (err) {
             console.error(err);
@@ -39,6 +45,14 @@ const Dashboard = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleToday = () => {
+        const today = new Date().toISOString().split('T')[0];
+        setFilters({
+            dateFrom: today,
+            dateTo: today
+        });
     };
 
     // Aggregate metrics on frontend from the telecaller summary
@@ -60,11 +74,35 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">Dashboard Overview</h1>
-                <button onClick={fetchData} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                    <RefreshCw size={20} />
-                </button>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleToday}
+                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
+                    >
+                        Today
+                    </button>
+                    <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                        <input
+                            type="date"
+                            className="text-sm border-none outline-none text-gray-600"
+                            value={filters.dateFrom}
+                            onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                        />
+                        <span className="text-gray-400">-</span>
+                        <input
+                            type="date"
+                            className="text-sm border-none outline-none text-gray-600"
+                            value={filters.dateTo}
+                            onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                        />
+                    </div>
+                    <button onClick={fetchData} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                        <RefreshCw size={20} />
+                    </button>
+                </div>
             </div>
 
             {/* KPI Grid */}
