@@ -59,7 +59,7 @@ app.use('/api/import', csvImportRoutes); // Existing route: /api/import/leads (a
 app.use('/api/import', csvUploadRoutes); // New route: /api/import/csv (admin/super_admin only)
 app.use('/api/pages', pageRoutes);
 app.use('/api/reports', reportRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
 app.use("/api", healthRoutes);
 
 // Serve static upload UI files
