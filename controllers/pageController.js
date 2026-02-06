@@ -2192,6 +2192,12 @@ export const getComplaints = async (req, res) => {
     } = normalizedQuery;
 
     const filters = {};
+
+    // Auth & Permission Logic (Telecaller Scope)
+    if (req.user.role === 'telecaller') {
+      filters.complaintMarkedBy = req.user._id;
+    }
+
     if (leadType) filters.leadType = leadType;
 
     // Store filtering (using shared reusable logic)
@@ -2295,6 +2301,14 @@ export const getComplaintById = async (req, res) => {
 
     if (!complaint) {
       return res.status(404).json({ message: 'Complaint not found' });
+    }
+
+    // Strict Access Control for Telecallers
+    if (req.user.role === 'telecaller') {
+      const ownerId = complaint.complaintMarkedBy?._id || complaint.complaintMarkedBy;
+      if (!ownerId || ownerId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: "Access denied. You can only view your own complaints." });
+      }
     }
 
     res.json(complaint);

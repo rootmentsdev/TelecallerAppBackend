@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Search, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { getReports } from '../services/analyticsService';
+import { getReports, getTelecallers } from '../services/analyticsService';
 import { formatDuration } from '../utils/formatters';
 
 const Reports = () => {
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState([]);
     const [meta, setMeta] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
+    const [telecallers, setTelecallers] = useState([]);
     const [filters, setFilters] = useState({
         dateFrom: '',
         dateTo: '',
@@ -15,8 +16,21 @@ const Reports = () => {
     });
 
     useEffect(() => {
+        // Fetch telecallers list on mount
+        const loadTelecallers = async () => {
+            try {
+                const list = await getTelecallers();
+                setTelecallers(list);
+            } catch (err) {
+                console.error("Failed to load telecallers", err);
+            }
+        };
+        loadTelecallers();
+    }, []);
+
+    useEffect(() => {
         fetchReports();
-    }, [meta.page, filters.store, filters.dateFrom, filters.dateTo]); // Re-fetch on filter/page change
+    }, [meta.page, filters.store, filters.dateFrom, filters.dateTo, filters.telecaller]); // Re-fetch on filter/page change
 
     const fetchReports = async () => {
         setLoading(true);
@@ -26,8 +40,8 @@ const Reports = () => {
                 limit: meta.limit,
                 store: filters.store || undefined,
                 dateFrom: filters.dateFrom || undefined,
-                dateTo: filters.dateTo || undefined
-                // telecallerId filtering could be added if API supports it by name or we have an ID picker
+                dateTo: filters.dateTo || undefined,
+                telecallerId: filters.telecaller || undefined
             };
             const result = await getReports(params);
             setData(result.rows || []);
@@ -113,6 +127,21 @@ const Reports = () => {
                             onChange={e => setFilters(prev => ({ ...prev, store: e.target.value }))}
                         />
                     </div>
+                </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Telecaller</label>
+                    <select
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 w-[180px]"
+                        value={filters.telecaller}
+                        onChange={e => setFilters(prev => ({ ...prev, telecaller: e.target.value }))}
+                    >
+                        <option value="">All Telecallers</option>
+                        {telecallers.map(t => (
+                            <option key={t._id} value={t._id}>
+                                {t.name} ({t.employeeId})
+                            </option>
+                        ))}
+                    </select>
                 </div>
                 <button
                     onClick={fetchReports}

@@ -4,7 +4,8 @@ import {
     getAdminHealth,
     getTelecallerSummary,
     getComplaintPivot,
-    getAdminReports
+    getAdminReports,
+    getUsers
 } from "../controllers/adminController.js";
 
 const router = express.Router();
@@ -228,5 +229,25 @@ router.get("/complaints/pivot", requireAdminAuth, getComplaintPivot);
  *         description: Forbidden
  */
 router.get("/reports", requireAdminAuth, getAdminReports);
+
+/**
+ * @swagger
+ * /api/admin/users:
+ *   get:
+ *     summary: Get list of users (Admin View)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         description: Filter by role (e.g. telecaller)
+ *     responses:
+ *       200:
+ *         description: List of users
+ */
+router.get("/users", requireAdminAuth, getUsers);
 
 export default router;

@@ -63,7 +63,14 @@ export const getReports = async (req, res) => {
     };
 
     const query = {};
-    if (editedBy) query.editedBy = editedBy;
+
+    // Auth & Permission Logic (Telecaller Scope)
+    if (req.user.role === 'telecaller') {
+      query.editedBy = req.user._id;
+    } else if (editedBy) {
+      query.editedBy = editedBy;
+    }
+
     if (leadType) query.leadType = leadType; // Changed from lead_type to leadType to match DB schema
     if (callStatus) query.call_status = callStatus;
     if (leadStatus) query.lead_status = leadStatus;
@@ -231,6 +238,14 @@ export const getReportById = async (req, res) => {
     const { id } = req.params;
     const report = await Report.findById(id).populate("editedBy", "name employeeId");
     if (!report) return res.status(404).json({ message: "Report not found" });
+
+    // Strict Access Control for Telecallers
+    if (req.user.role === 'telecaller') {
+      const ownerId = report.editedBy?._id || report.editedBy;
+      if (!ownerId || ownerId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: "Access denied. You can only view your own reports." });
+      }
+    }
 
     const obj = report.toObject ? report.toObject() : { ...report };
     const edited_by = report.editedBy ? { id: report.editedBy._id, name: report.editedBy.name, employee_id: report.editedBy.employeeId } : null;

@@ -36,10 +36,10 @@ export const register = async (req, res) => {
 // List of employeeIds that should be admin (can be changed in code)
 // Add or remove employeeIds here to grant/revoke admin access
 const ADMIN_EMPLOYEE_IDS = [
-    "Emp188",  // SHAFNA ISMAIL - Admin
+    // "Emp188",  // SHAFNA ISMAIL - Moved to Telecaller
     "Emp233",  // New Admin
     "Emp345",  // New Admin
-    "Emp410",  // New Admin
+    // "Emp410",  // Moved to Telecaller
     "Emp436",  // New Admin
 ];
 
@@ -53,22 +53,19 @@ const isAdminEmployee = (employeeId) => {
 
 // Helper function to map API role to our role system
 const mapRoleFromAPI = (apiRole, employeeId) => {
-    // First check if this employeeId is designated as admin in code
-    if (isAdminEmployee(employeeId)) {
-        return "admin";
-    }
+    // FORCE TELECALLER/TEAMLEAD ROLE for Telecaller App Auth
+    // "Telecaller auth should never assign admin role"
 
     if (!apiRole) return "telecaller";
 
     const roleLower = apiRole.toLowerCase().trim();
 
-    if (roleLower.includes("admin") || roleLower.includes("director") || roleLower.includes("managing")) {
-        return "admin";
-    } else if (roleLower.includes("lead") || roleLower.includes("team") || roleLower.includes("manager")) {
+    if (roleLower.includes("lead") || roleLower.includes("team") || roleLower.includes("manager")) {
         return "teamLead";
-    } else {
-        return "telecaller";
     }
+
+    // Default everyone else to telecaller (including admins logging in here)
+    return "telecaller";
 };
 
 export const login = async (req, res) => {

@@ -452,3 +452,27 @@ export const getAdminReports = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// GET /api/admin/users
+export const getUsers = async (req, res) => {
+    try {
+        const { role } = req.query;
+        const query = {};
+
+        // If role is provided, filter by it
+        // Note: For "telecaller" dropdown, we might want both 'telecaller' and 'teamLead' 
+        // but for now, strict match is fine, or client can request what they want.
+        if (role) {
+            query.role = role;
+        }
+
+        // Return lightweight user objects
+        const users = await User.find(query)
+            .select('name employeeId role store')
+            .sort({ name: 1 });
+
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
