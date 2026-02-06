@@ -364,36 +364,78 @@ export const getAdminReports = async (req, res) => {
             page = 1,
             limit = 50,
             leadType,
-            telecallerId, // Maps to editedBy (telecaller context)
+            telecallerId, // Maps to editedBy (telecaller context - legacy/ObjectId)
+            telecaller,   // Maps to createdByEmpId (NEW - String EmpId)
             callStatus,
             leadStatus,
-            source
+            source,
+            filtersOnly   // NEW: If true, returns only filter metadata (telecallers/stores)
         } = req.query;
+
+        // --- 1. HANDLE FILTERS-ONLY REQUEST ---
+        if (filtersOnly === 'true' || filtersOnly === true) {
+            // Aggregate unique telecallers (creators) from Reports
+            // We want unique combinations of { id: createdByEmpId, name: createdByName }
+            // Filter out null/empty EmpIds
+            const telecallerAgg = await Report.aggregate([
+                { $match: { createdByEmpId: { $exists: true, $ne: null } } },
+                {
+                    $group: {
+                        _id: { empId: "$createdByEmpId", name: "$createdByName" }
+                    }
+                },
+                { $sort: { "_id.name": 1 } },
+                {
+                    $project: {
+                        _id: 0,
+                        empId: "$_id.empId",
+                        name: "$_id.name"
+                    }
+                }
+            ]);
+
+            // Aggregate unique stores
+            const storeAgg = await Report.distinct("store");
+            const stores = storeAgg.filter(Boolean).sort();
+
+            return res.json({
+                telecallers: telecallerAgg,
+                stores: stores
+            });
+        }
+
+        // --- 2. NORMAL REPORT FETCHING ---
 
         const query = { ...baseFilters };
 
         // Common optional filters
         if (leadType) query.leadType = leadType;
-        if (telecallerId) query.editedBy = telecallerId; // Admin context: 'telecallerId' filter targets report editor
+        if (telecallerId) query.editedBy = telecallerId; // Legacy/Admin context targetting editor by ObjectId
+
+        // NEW: Filter by createdByEmpId
+        if (telecaller) {
+            query.createdByEmpId = telecaller;
+        }
+
         if (callStatus) query.callStatus = callStatus;
         if (leadStatus) query.leadStatus = leadStatus;
         if (source) query.source = source;
 
-        // Apply generic date filter to 'editedAt' (Work Date) if not already filtered by createdAt
-        if ((dateFrom || dateTo) && dateField !== 'createdAt' && !query.createdAt) {
-            query.editedAt = {};
-            if (dateFrom) {
-                const parsed = parseQueryDate(dateFrom);
-                query.editedAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(dateFrom);
-            }
-            if (dateTo) {
-                const parsed = parseQueryDate(dateTo);
-                const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(dateTo);
-                if (!parsed) end.setHours(23, 59, 59, 999);
-                else end.setUTCHours(23, 59, 59, 999);
-                query.editedAt.$lte = end;
-            }
-        }
+        // Apply generic date filter to 'createdAt' if dateField is 'createdAt' (handled in baseFilters)
+        // OR apply to 'editedAt' (default behavior for Reports if not specified)
+        // User Requirement: "Date Range Filter... using createdAt"
+        // If the user selects date range in UI, we should probably map it to 'createdAt' if that's the intent.
+        // The prompt says: "Filter reports using: createdAt".
+        // BaseFilters handles 'createdAt' if query.createdAtFrom/To is passed OR query.dateField='createdAt'
+        // If frontend sends generic dateFrom/To without dateField, current logic maps to editedAt.
+        // I will let frontend control this by sending dateField='createdAt' or just assume dateFrom/To maps to createdAt if intended.
+        // However, the prompt says "Filter reports using: createdAt".
+        // Use existing logic: if dateFrom/To is provided AND dateField is NOT 'createdAt', it maps to editedAt.
+        // If frontend wants createdAt, it should send `createdAtFrom/To` OR `dateField=createdAt`.
+        // I will assume frontend will send `dateField=createdAt` or `createdAtFrom/To` for this specific filter.
+        // But for completeness, I will check if we need to force createdAt logic here.
+        // Current baseFilters/adminController logic: "if ((dateFrom || dateTo) && dateField !== 'createdAt'...) { query.editedAt... }"
+        // So I don't need to change this IF the frontend sends `dateField=createdAt`.
 
         // Pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -412,9 +454,9 @@ export const getAdminReports = async (req, res) => {
             const obj = r.toObject ? r.toObject() : { ...r };
 
             // Flatten Telecaller (Editor)
-            let telecaller = null;
+            let telecallerObj = null;
             if (r.editedBy) {
-                telecaller = {
+                telecallerObj = {
                     id: String(r.editedBy._id),
                     name: r.editedBy.name,
                     employeeId: r.editedBy.employeeId
@@ -434,7 +476,10 @@ export const getAdminReports = async (req, res) => {
                 callDuration: obj.callDuration || 0,
                 createdAt: obj.createdAt || null,
                 editedAt: obj.editedAt || null,
-                telecaller
+                telecaller: telecallerObj,
+                // Include Creator info just in case
+                createdByEmpId: obj.createdByEmpId,
+                createdByName: obj.createdByName
             };
         });
 

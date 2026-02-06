@@ -4,7 +4,14 @@ import mongoose from "mongoose";
 const reportSchema = new mongoose.Schema({
   // Editor metadata
   editedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  editedByEmpId: { type: String }, // NEW
+  editedByName: { type: String }, // NEW
   editedAt: { type: Date, default: Date.now },
+
+  // Creation metadata (first time)
+  createdByEmpId: { type: String }, // NEW
+  createdByName: { type: String }, // NEW
+
   note: { type: String, default: null },
   // Call duration in seconds
   callDuration: { type: Number, default: 0, index: true },

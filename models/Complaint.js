@@ -64,6 +64,13 @@ const complaintSchema = new mongoose.Schema(
     complaintMarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     complaintMarkedAt: { type: Date, default: Date.now },
 
+    // Auditing fields (Consistent across collections)
+    editedByEmpId: { type: String }, // NEW
+    editedByName: { type: String }, // NEW
+    editedAt: { type: Date }, // NEW
+    createdByEmpId: { type: String }, // NEW
+    createdByName: { type: String }, // NEW
+
     // Reference to original lead (for audit trail)
     sourceLeadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead" },
   },
