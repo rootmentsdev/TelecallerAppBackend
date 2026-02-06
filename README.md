@@ -10,7 +10,38 @@ This backend acts as the central hub for Telecalling operations. It balances thr
 2.  **Manual CSV Imports** (for Walk-in & Loss of Sale leads).
 3.  **Direct Telecaller Input** (Call status, remarks, follow-ups).
 
+
 ---
+
+## 🔧 Environment Variables
+Create a `.env` file in the root directory:
+
+```env
+# Server Config
+PORT=8800
+MONGO_URI=mongodb+srv://...
+JWT_SECRET=your_jwt_secret
+
+# External API Sync
+RETURN_API_BASE_URL=https://rentalapi.rootments.live
+RETURN_API_ENDPOINT=/api/Reports/GetReturnReport
+RETURN_API_KEY=your_api_token
+SYNC_CONCURRENCY=5
+API_SYNC_INCREMENTAL_DAYS=7
+```
+
+## 📜 Scripts
+| Script | Description |
+| :--- | :--- |
+| `npm start` | Run server in production mode |
+| `npm run dev` | Run server with nodemon (development) |
+| `npm run sync:api` | Trigger API sync manually (Stores + Returns) |
+| `npm run verify:data` | Verify MongoDB data integrity |
+| `npm run cleanup:duplicates` | Dry-run duplicate cleanup |
+| `npm run cleanup:duplicates:live` | **Execute** duplicate cleanup |
+
+---
+
 
 ## 🏷️ Core Lead Types
 The system strictly supports the following `leadType` enum values:

@@ -27,40 +27,7 @@ export const getReports = async (req, res) => {
       limit = 50,
     } = req.query;
 
-    // Helper to robustly parse date strings (YYYY-MM-DD or DD-MM-YYYY)
-    const parseQueryDate = (dateStr) => {
-      if (!dateStr) return null;
 
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        // Check for YYYY-MM-DD
-        if (parts[0].length === 4) {
-          return {
-            year: parseInt(parts[0], 10),
-            month: parseInt(parts[1], 10) - 1,
-            day: parseInt(parts[2], 10)
-          };
-        }
-        // Check for DD-MM-YYYY
-        if (parts[2].length === 4) {
-          return {
-            year: parseInt(parts[2], 10),
-            month: parseInt(parts[1], 10) - 1,
-            day: parseInt(parts[0], 10)
-          };
-        }
-      }
-      // Fallback for unexpected formats
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        return {
-          year: d.getUTCFullYear(),
-          month: d.getUTCMonth(),
-          day: d.getUTCDate()
-        };
-      }
-      return null;
-    };
 
     const query = {};
 

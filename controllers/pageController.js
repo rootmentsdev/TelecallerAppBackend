@@ -205,7 +205,7 @@ const validateAndNormalizeRemarks = (remarks) => {
 };
 
 // Helper to move a Lead to FollowUp collection
-const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
+const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetadata = {}) => {
   // Normalize lead object - use toObject() to get plain JavaScript object
   const lead = (leadDoc && typeof leadDoc.toObject === 'function')
     ? leadDoc.toObject({ virtuals: false, getters: false })
@@ -278,6 +278,14 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
     // FollowUp-specific fields
     movedToFollowUpAt: new Date(),
     movedToFollowUpBy: userId,
+
+    // Audit Metadata (New Fields)
+    editedByEmpId: auditMetadata.editedByEmpId,
+    editedByName: auditMetadata.editedByName,
+    editedAt: auditMetadata.editedAt || new Date(),
+    // Preserve creation metadata if passed, or from lead if exists
+    createdByEmpId: auditMetadata.createdByEmpId || lead.createdByEmpId,
+    createdByName: auditMetadata.createdByName || lead.createdByName,
   };
 
   // Remove undefined values to avoid Mongoose issues
@@ -333,7 +341,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0) => {
 };
 
 // Helper to create a Report entry from a Lead or FollowUp document using a completely flat structure
-const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0, category = null) => {
+const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0, category = null, auditMetadata = {}) => {
   // Validate and normalize remarks
   const remarksValidation = validateAndNormalizeRemarks(userRemarks);
   if (!remarksValidation.isValid) {
@@ -421,8 +429,15 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
 
   // Metadata
   payload.editedBy = userId;
-  payload.editedAt = new Date();
+  payload.editedAt = auditMetadata.editedAt || new Date();
   payload.note = remarksValidation.normalizedRemarks;
+
+  // New Audit Metadata
+  payload.editedByEmpId = auditMetadata.editedByEmpId;
+  payload.editedByName = auditMetadata.editedByName;
+  // Preserve creation metadata if passed, or from lead if exists
+  payload.createdByEmpId = auditMetadata.createdByEmpId || lead.createdByEmpId;
+  payload.createdByName = auditMetadata.createdByName || lead.createdByName;
 
   // Category field is no longer used - sorting is based on lead_type only
   // Removed category assignment to avoid confusion
@@ -446,7 +461,7 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
 // Helper function to handle lead movement with priority: markAsComplaint > markForFollowUp > Report
 // Returns { type: 'complaint'|'followUp'|'report', data: object, message: string }
 // sourceModel defaults to Lead, can be passed as FollowUp
-const handleLeadMovement = async (updatedLead, req, remarks, changedFields, callDuration, sourceModel = Lead) => {
+const handleLeadMovement = async (updatedLead, req, remarks, changedFields, callDuration, sourceModel = Lead, auditMetadata = {}) => {
   const { mark_as_complaint } = req.body;
   const followUpFlag = updatedLead.followUpFlag;
   const id = updatedLead._id || updatedLead.id;
@@ -463,7 +478,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
     let complaint;
     try {
       console.log(`⭐ Moving Lead to Complaints collection. Lead ID: ${id}`);
-      complaint = await moveLeadToComplaint(updatedLead, req.user._id, remarks, callDuration);
+      complaint = await moveLeadToComplaint(updatedLead, req.user._id, remarks, callDuration, auditMetadata);
 
       if (!complaint || !complaint._id) {
         throw new Error("Complaint creation returned null or invalid Complaint");
@@ -505,7 +520,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
     let followUp;
     try {
       console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-      followUp = await moveLeadToFollowUp(updatedLead, req.user._id, callDuration);
+      followUp = await moveLeadToFollowUp(updatedLead, req.user._id, callDuration, auditMetadata);
 
       if (!followUp || !followUp._id) {
         throw new Error("FollowUp creation returned null or invalid FollowUp");
@@ -542,7 +557,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
   let report;
   try {
     console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-    report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, callDuration);
+    report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, callDuration, null, auditMetadata);
 
     if (!report || !report._id) {
       throw new Error("Report creation returned null or invalid report");
@@ -576,7 +591,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
 };
 
 // Helper to move a lead to Complaints collection
-const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration = 0) => {
+const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration = 0, auditMetadata = {}) => {
   // Get sourceLeadId from original document BEFORE converting to object
   const sourceLeadIdValue = leadDoc._id || leadDoc.id;
 
@@ -648,6 +663,14 @@ const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration
     complaintMarkedBy: userId,
     complaintMarkedAt: new Date(),
     sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
+
+    // Audit Metadata (New Fields)
+    editedByEmpId: auditMetadata.editedByEmpId,
+    editedByName: auditMetadata.editedByName,
+    editedAt: auditMetadata.editedAt || new Date(),
+    // Preserve creation metadata if passed, or from lead if exists
+    createdByEmpId: auditMetadata.createdByEmpId || lead.createdByEmpId,
+    createdByName: auditMetadata.createdByName || lead.createdByName,
   };
 
   // Remove undefined values and excluded fields
@@ -930,7 +953,18 @@ export const getLossOfSaleLead = async (req, res) => {
 export const updateLossOfSaleLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, reason_collected_from_store, remarks, call_duration, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate,
+      mark_as_issue,
+      function_date // Add alias
+    } = req.body;
+
+    // Audit Metadata
+    const auditData = {};
+    if (req.user.role === 'telecaller') {
+      auditData.editedByEmpId = req.user.employeeId || req.user.empId;
+      auditData.editedByName = req.user.name;
+      auditData.editedAt = new Date();
+    }
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1075,7 +1109,15 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor, mark_as_issue, function_date } = req.body;
+
+    // Audit Metadata
+    const auditData = {};
+    if (req.user.role === 'telecaller') {
+      auditData.editedByEmpId = req.user.employeeId || req.user.empId;
+      auditData.editedByName = req.user.name;
+      auditData.editedAt = new Date();
+    }
 
     // Validate remarks input
     const remarksValidation = validateAndNormalizeRemarks(remarks);
@@ -1313,6 +1355,16 @@ export const createAddLead = async (req, res) => {
       ? (storeLocationClean ? `${brandClean} - ${storeLocationClean}` : brandClean)
       : storeLocationClean;
 
+    // Audit Metadata
+    const auditData = {};
+    if (req.user.role === 'telecaller') {
+      auditData.createdByEmpId = req.user.employeeId || req.user.empId;
+      auditData.createdByName = req.user.name;
+      auditData.editedByEmpId = req.user.employeeId || req.user.empId;
+      auditData.editedByName = req.user.name;
+      auditData.editedAt = new Date();
+    }
+
     // Common fields map
     const commonData = {
       name: customer_name || null,
@@ -1332,7 +1384,8 @@ export const createAddLead = async (req, res) => {
       followUpDate: validFollowUpDate || undefined,
       callDuration: call_duration ? Number(call_duration) : 0,
       createdBy: req.user._id,
-      assignedTo: req.user._id // Assign to creator by default? Usually yes for manual entry.
+      assignedTo: req.user._id, // Assign to creator by default? Usually yes for manual entry.
+      ...auditData
     };
 
     // 4. Branching Logic (Routing) ==================================
@@ -1415,6 +1468,14 @@ export const updateGenericLead = async (req, res) => {
       functionDate, // Add functionDate
       function_date // Add alias
     } = req.body;
+
+    // Audit Metadata
+    const auditData = {};
+    if (req.user.role === 'telecaller') {
+      auditData.editedByEmpId = req.user.employeeId || req.user.empId;
+      auditData.editedByName = req.user.name;
+      auditData.editedAt = new Date();
+    }
 
     const lead = await Lead.findById(id);
     if (!lead) return res.status(404).json({ message: 'Lead not found' });
@@ -1590,7 +1651,8 @@ export const updateGenericLead = async (req, res) => {
       let followUp;
       try {
         console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration);
+        // Pass auditData (defined at start of function)
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration, auditData);
 
         // Verify FollowUp was created successfully
         if (!followUp || !followUp._id) {
@@ -1639,7 +1701,8 @@ export const updateGenericLead = async (req, res) => {
       let report;
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration);
+        // Pass auditData (defined at start of function)
+        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration, null, auditData);
 
         // Verify report was created successfully
         if (!report || !report._id) {
@@ -1881,6 +1944,14 @@ export const getFollowUps = async (req, res) => {
     if (leadStatus) filters.leadStatus = leadStatus;
     if (source) filters.source = source;
 
+    // Admin filtering by telecaller
+    if (req.user.role !== 'telecaller') {
+      const targetUser = req.query.telecallerId || req.query.assignedTo;
+      if (targetUser) {
+        filters.assignedTo = targetUser;
+      }
+    }
+
     // Date filtering
     if (enquiryDateFrom || enquiryDateTo) {
       filters.enquiryDate = {};
@@ -2116,6 +2187,18 @@ export const updateFollowUp = async (req, res) => {
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
 
+    // Audit Metadata (New Logic)
+    let auditUpdateData = {};
+    if (req.user.role === 'telecaller') {
+      auditUpdateData = {
+        editedByEmpId: req.user.employeeId || req.user.empId,
+        editedByName: req.user.name,
+        editedAt: new Date()
+      };
+      // Merge into updateData to ensure FollowUp document itself is updated with these fields
+      Object.assign(updateData, auditUpdateData);
+    }
+
     const beforeFollowUp = followUp.toObject();
     const updatedFollowUp = await FollowUp.findByIdAndUpdate(id, updateData, { new: true });
 
@@ -2128,7 +2211,7 @@ export const updateFollowUp = async (req, res) => {
     // Reuse handleLeadMovement for consistency
     try {
       // Pass FollowUp as the source model for deletion
-      const result = await handleLeadMovement(updatedFollowUp, req, remarksValidation.normalizedRemarks, changedFields, call_duration, FollowUp);
+      const result = await handleLeadMovement(updatedFollowUp, req, remarksValidation.normalizedRemarks, changedFields, call_duration, FollowUp, auditUpdateData);
 
       // Handle response based on where the lead moved
       if (result.type === 'complaint') {
@@ -2196,6 +2279,11 @@ export const getComplaints = async (req, res) => {
     // Auth & Permission Logic (Telecaller Scope)
     if (req.user.role === 'telecaller') {
       filters.complaintMarkedBy = req.user._id;
+    } else {
+      // Admin: Allow filtering by telecaller
+      if (normalizedQuery.telecallerId) {
+        filters.complaintMarkedBy = normalizedQuery.telecallerId;
+      }
     }
 
     if (leadType) filters.leadType = leadType;

@@ -62,6 +62,13 @@ const followUpSchema = new mongoose.Schema(
 
     // Track when moved to FollowUp
     movedToFollowUpAt: { type: Date, default: Date.now },
+
+    // Auditing fields (Consistent across collections)
+    editedByEmpId: { type: String }, // NEW
+    editedByName: { type: String }, // NEW
+    editedAt: { type: Date }, // NEW
+    createdByEmpId: { type: String }, // NEW
+    createdByName: { type: String }, // NEW
     movedToFollowUpBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }

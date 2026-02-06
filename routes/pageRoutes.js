@@ -581,25 +581,34 @@
  *               type: object
  *               properties:
  *                 message: { type: string }
- *                 report: { type: object }
- *                 followUp: { type: object }
- *                 complaint: { type: object }
+ *                 report: 
+ *                   type: object
+ *                   properties:
+ *                     editedBy: { type: string, description: "ID of user who created the report" }
+ *                 followUp: 
+ *                   type: object
+ *                   properties:
+ *                     movedToFollowUpBy: { type: string, description: "ID of user who moved lead to follow-up" }
+ *                 complaint: 
+ *                   type: object
+ *                   properties:
+ *                     complaintMarkedBy: { type: string, description: "ID of user who marked lead as complaint" }
  *             examples:
  *               movedToReport:
  *                 summary: Moved to Reports (Default)
  *                 value:
  *                   message: "Loss of Sale lead updated and moved to reports"
- *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "lossOfSale" }
+ *                   report: { _id: "65a123...", lead_name: "John Doe", lead_type: "lossOfSale", editedBy: "65f..." }
  *               movedToFollowUp:
  *                 summary: Moved to FollowUps
  *                 value:
  *                   message: "Loss of Sale lead updated and moved to follow-ups"
- *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-01T10:00:00Z" }
+ *                   followUp: { _id: "65b456...", lead_name: "John Doe", follow_up_date: "2024-03-01T10:00:00Z", movedToFollowUpBy: "65f..." }
  *               movedToComplaint:
  *                 summary: Moved to Complaints
  *                 value:
  *                   message: "Loss of Sale lead updated and moved to complaints"
- *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Serious issue reported" }
+ *                   complaint: { _id: "65c789...", lead_name: "John Doe", remarks: "Serious issue reported", complaintMarkedBy: "65f..." }
  *       400:
  *         description: Validation error
  *       401:

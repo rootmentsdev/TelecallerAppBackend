@@ -24,3 +24,8 @@ export const getTelecallers = async () => {
     const response = await api.get('/admin/users', { params: { role: 'telecaller' } });
     return response.data; // [ { _id, name, ... }, ... ]
 };
+// Fetches unique telecallers and stores from Reports collection metadata
+export const getReportFilters = async () => {
+    const response = await api.get('/admin/reports', { params: { filtersOnly: true } });
+    return response.data; // { telecallers: [{empId, name}], stores: [string] }
+};

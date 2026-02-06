@@ -80,7 +80,11 @@ const Dashboard = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={handleToday}
-                        className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${filters.dateFrom === new Date().toISOString().split('T')[0] &&
+                                filters.dateTo === new Date().toISOString().split('T')[0]
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-transparent text-gray-500 hover:bg-gray-100'
+                            }`}
                     >
                         Today
                     </button>
