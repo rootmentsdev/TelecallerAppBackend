@@ -118,18 +118,18 @@ const Reports = () => {
     };
 
     const handleExport = () => {
-        const headers = ["Date", "Store", "Lead Name", "Telecaller", "Created By", "Status", "Duration", "Note"];
+        const headers = ["Created Date", "Store", "Lead Name", "Phone", "Created By", "Duration", "Lead Type", "Note"];
         const csvContent = [
             headers.join(","),
             ...data.map(row => [
                 new Date(row.createdAt).toLocaleDateString(),
                 `"${row.store || ''}"`,
                 `"${row.leadName || ''}"`,
-                `"${row.telecaller?.name || ''}"`, // Edited By
+                `"${row.phone || ''}"`,
                 `"${row.createdByName || ''}"`,   // Created By
-                row.callStatus,
                 row.callDuration,
-                `"${row.remarks || ''}"` // Note: row.note might be deprecated, row.remarks is standard
+                `"${row.leadType || row.lead_type || ''}"`,
+                `"${row.remarks || ''}"`
             ].join(","))
         ].join("\n");
 
@@ -242,16 +242,15 @@ const Reports = () => {
                                 <th className="px-6 py-4">Lead Name</th>
                                 <th className="px-6 py-4">Phone</th>
                                 <th className="px-6 py-4">Created By</th>
-                                <th className="px-6 py-4">Edited By</th>
-                                <th className="px-6 py-4">Status</th>
                                 <th className="px-6 py-4">Duration</th>
+                                <th className="px-6 py-4">Lead Type</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {loading ? (
-                                <tr><td colSpan="8" className="px-6 py-8 text-center text-gray-500">Loading reports...</td></tr>
+                                <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Loading reports...</td></tr>
                             ) : data.length === 0 ? (
-                                <tr><td colSpan="8" className="px-6 py-8 text-center text-gray-500">No reports found</td></tr>
+                                <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">No reports found</td></tr>
                             ) : (
                                 data.map((row, i) => (
                                     <tr key={row.reportId || i} className="hover:bg-gray-50">
@@ -263,7 +262,7 @@ const Reports = () => {
                                         <td className="px-6 py-4 text-gray-900">{row.leadName}</td>
                                         <td className="px-6 py-4 text-gray-600">{row.phone}</td>
 
-                                        {/* Created By (Telecaller) */}
+                                        {/* Created By */}
                                         <td className="px-6 py-4 text-gray-600">
                                             {row.createdByName ? (
                                                 <>
@@ -273,22 +272,13 @@ const Reports = () => {
                                             ) : '-'}
                                         </td>
 
-                                        {/* Edited By */}
-                                        <td className="px-6 py-4 text-gray-600">
-                                            {row.telecaller?.name || 'Unknown'}
-                                            {row.editedAt && (
-                                                <span className="block text-xs text-gray-400">
-                                                    {new Date(row.editedAt).toLocaleDateString()}
-                                                </span>
-                                            )}
-                                        </td>
+                                        <td className="px-6 py-4 text-gray-600">{formatDuration(row.callDuration)}</td>
 
                                         <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                                                {row.callStatus || '-'}
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 capitalize">
+                                                {row.leadType || row.lead_type || '-'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-gray-600">{formatDuration(row.callDuration)}</td>
                                     </tr>
                                 ))
                             )}
