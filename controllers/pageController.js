@@ -8,10 +8,10 @@ import { normalizeQueryParams, parseQueryDate, buildStoreFilter } from "./filter
 const checkAccess = (lead, user, allowViewAll = false) => {
   if (user.role === "admin") return true;
   if (user.role === "telecaller") {
-    // If viewing is allowed for all leads (read-only access), bypass assignment check
-    if (allowViewAll) return true;
+    // If viewing is allowed for all leads (read-only access), OR it is a return lead, bypass assignment check
+    if (allowViewAll || lead.leadType === 'return') return true;
 
-    // Otherwise (for updates), enforce assignment check
+    // Otherwise (for updates on non-return leads), enforce assignment check
     if (lead.assignedTo?.toString() !== user._id.toString()) {
       return false;
     }
