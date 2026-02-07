@@ -5,10 +5,16 @@ import Complaint from "../models/Complaint.js";
 import { normalizeQueryParams, parseQueryDate, buildStoreFilter } from "./filterUtils.js";
 
 // Helper function to check access permissions
-const checkAccess = (lead, user) => {
+const checkAccess = (lead, user, allowViewAll = false) => {
   if (user.role === "admin") return true;
-  if (user.role === "telecaller" && lead.assignedTo?.toString() !== user._id.toString()) {
-    return false;
+  if (user.role === "telecaller") {
+    // If viewing is allowed for all leads (read-only access), bypass assignment check
+    if (allowViewAll) return true;
+
+    // Otherwise (for updates), enforce assignment check
+    if (lead.assignedTo?.toString() !== user._id.toString()) {
+      return false;
+    }
   }
   if (user.role === "teamLead" && lead.store !== user.store) {
     return false;
@@ -1758,7 +1764,8 @@ export const getLeadById = async (req, res) => {
     const lead = await Lead.findById(id).populate('assignedTo', 'name employeeId');
     if (!lead) return res.status(404).json({ message: 'Lead not found' });
 
-    if (!checkAccess(lead, req.user)) {
+    // For getLeadById, allow telecallers to view ALL leads (just like getLeads)
+    if (!checkAccess(lead, req.user, true)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
