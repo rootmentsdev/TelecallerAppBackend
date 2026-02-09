@@ -1112,6 +1112,68 @@ router.get(
   getReturnLead
 );
 
+/**
+ * @swagger
+ * /api/pages/return/{id}:
+ *   post:
+ *     summary: Update Return lead and move to next stage
+ *     tags:
+ *       - Return
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Updates a Return lead and moves it to the next stage in the lifecycle.
+ *       
+ *       **Identity Tracking:**
+ *       - Captures `editedBy` (Telecaller) automatically.
+ *       - **Crucially**, it backfills `createdBy` field with the current telecaller's identity for the generated Report, 
+ *         since Return leads are originally created by system sync and lack telecaller ownership.
+ *       
+ *       **Lifecycle:**
+ *       - **Leads (Return)** → Edited → **Reports** (Default)
+ *       - **Leads (Return)** → `mark_as_complaint=true` → **Complaints**
+ *       - **Leads (Return)** → `follow_up_flag=true` → **FollowUps**
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Return Lead ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               call_status: { type: string }
+ *               lead_status: { type: string }
+ *               follow_up_flag: { type: boolean }
+ *               follow_up_date: { type: string, format: date-time }
+ *               remarks: { type: string }
+ *               call_duration: { type: number }
+ *               rating: { type: integer, description: "1-5 Star Rating" }
+ *               mark_as_complaint: { type: boolean }
+ *               subCategory: { type: string }
+ *               itemCategory: { type: string }
+ *               closingAction: { type: string }
+ *               service: { type: string }
+ *               nooffunction: { type: number }
+ *               noofattires: { type: number }
+ *               competitor: { type: string }
+ *               securityamount: { type: string }
+ *     responses:
+ *       200:
+ *         description: Return lead updated and moved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 report: { type: object }
+ * */
 // POST /api/pages/return/:id - Update Return lead data
 router.post(
   "/return/:id",
