@@ -284,7 +284,7 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store]
+ *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store, leadType]
  *           default: createdAt
  *         description: |
  *           Field to sort results by.
@@ -292,9 +292,10 @@
  *           - `createdAt` (default) - Sort by creation date
  *           - `enquiryDate` - Sort by enquiry date
  *           - `functionDate` - Sort by function/event date
- *           - `visitDate` - Sort by visit date
+  *           - `visitDate` - Sort by visit date
  *           - `name` - Sort by lead name
  *           - `store` - Sort by store name
+ *           - `leadType` - Sort by lead type
  *           Example: `?sortBy=createdAt&sortOrder=desc`
  *       - in: query
  *         name: sortOrder
@@ -1313,7 +1314,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store]
+ *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store, leadType]
  *           default: createdAt
  *         description: Field to sort results by.
  *       - in: query
@@ -1862,6 +1863,28 @@ router.post(
  *         schema:
  *           type: integer
  *           default: 100
+ *       - in: query
+ *         name: sortBy
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [complaintMarkedAt, createdAt, name, store, leadType]
+ *           default: complaintMarkedAt
+ *         description: |
+ *           Field to sort results by.
+ *           - `complaintMarkedAt` (default) - Sort by when complaint was marked
+ *           - `createdAt` - Sort by lead creation date
+ *           - `name` - Sort by lead name
+ *           - `store` - Sort by store name
+ *           - `leadType` - Sort by lead type
+ *       - in: query
+ *         name: sortOrder
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: desc
+ *         description: Sort order (asc/desc).
  *     responses:
  *       200:
  *         description: List of complaints retrieved successfully.

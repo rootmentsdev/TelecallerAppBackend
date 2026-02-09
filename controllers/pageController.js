@@ -874,7 +874,7 @@ export const getLeads = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const allowedSortFields = ['createdAt', 'enquiryDate', 'functionDate', 'visitDate', 'name', 'store'];
+    const allowedSortFields = ['createdAt', 'enquiryDate', 'functionDate', 'visitDate', 'name', 'store', 'leadType'];
     const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
@@ -2023,7 +2023,7 @@ export const getFollowUps = async (req, res) => {
 
     // Sorting
     const sortOptions = {};
-    const validSortFields = ["createdAt", "enquiryDate", "functionDate", "visitDate", "name", "store"];
+    const validSortFields = ["createdAt", "enquiryDate", "functionDate", "visitDate", "name", "store", "leadType"];
     const sortField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
     sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
 
@@ -2358,7 +2358,7 @@ export const getComplaints = async (req, res) => {
 
     // Build sort object
     const sortOptions = {};
-    const validSortFields = ["complaintMarkedAt", "createdAt", "name", "store"];
+    const validSortFields = ["complaintMarkedAt", "createdAt", "name", "store", "leadType"];
     // Default to complaintMarkedAt, fallback to issueMarkedAt if legacy, but here we strictly use complaintMarkedAt
     const sortField = validSortFields.includes(sortBy) ? sortBy : "complaintMarkedAt";
     sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
