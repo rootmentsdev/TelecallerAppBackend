@@ -972,12 +972,14 @@ export const updateLossOfSaleLead = async (req, res) => {
       function_date // Add alias
     } = req.body;
 
-    // Audit Metadata
+    // Audit Metadata - ensures telecaller/createdBy is mapped when lead moves to Report
     const auditData = {};
-    if (req.user.role === 'telecaller') {
+    if (req.user) {
       auditData.editedByEmpId = req.user.employeeId || req.user.empId;
       auditData.editedByName = req.user.name;
       auditData.editedAt = new Date();
+      auditData.createdByEmpId = req.user.employeeId || req.user.empId;
+      auditData.createdByName = req.user.name;
     }
 
     // Validate remarks input
@@ -1068,7 +1070,7 @@ export const updateLossOfSaleLead = async (req, res) => {
 
     // Handle lead movement with priority: markAsComplaint > markForFollowUp > Report
     try {
-      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration, Lead, auditData);
 
       if (result.type === 'complaint') {
         res.json({ message: "Loss of Sale lead updated and moved to complaints", complaint: result.data });
@@ -1125,12 +1127,15 @@ export const updateReturnLead = async (req, res) => {
     const { id } = req.params;
     const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor, mark_as_issue, function_date } = req.body;
 
-    // Audit Metadata
+    // Audit Metadata - ensures telecaller/createdBy is mapped when Return lead moves to Report
+    // Return leads come from sync and lack createdByEmpId; we attribute to current user
     const auditData = {};
-    if (req.user.role === 'telecaller') {
+    if (req.user) {
       auditData.editedByEmpId = req.user.employeeId || req.user.empId;
       auditData.editedByName = req.user.name;
       auditData.editedAt = new Date();
+      auditData.createdByEmpId = req.user.employeeId || req.user.empId;
+      auditData.createdByName = req.user.name;
     }
 
     // Validate remarks input
@@ -1239,7 +1244,8 @@ export const updateReturnLead = async (req, res) => {
 
     // Handle lead movement with priority: markAsComplaint > markForFollowUp > Report
     try {
-      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration);
+      // Pass Lead and auditData to ensure correct report generation
+      const result = await handleLeadMovement(updatedLead, req, remarksValidation.normalizedRemarks, changedFields, call_duration, Lead, auditData);
 
       if (result.type === 'complaint') {
         res.json({ message: "Return lead updated and moved to complaints", complaint: result.data });
@@ -1890,6 +1896,17 @@ export const updateLead = async (req, res) => {
       changedFields[key] = { before: beforeLead[key], after: updatedLead[key] };
     });
 
+    // Audit Metadata - ensures telecaller/createdBy is mapped when lead moves to Report
+    // Critical for return leads (synced from external source) which lack createdByEmpId on the Lead
+    const auditData = {};
+    if (req.user) {
+      auditData.editedByEmpId = req.user.employeeId || req.user.empId;
+      auditData.editedByName = req.user.name;
+      auditData.editedAt = new Date();
+      auditData.createdByEmpId = req.user.employeeId || req.user.empId;
+      auditData.createdByName = req.user.name;
+    }
+
     // Handle lead movement with priority: markAsComplaint > markForFollowUp > Report
     try {
       // Pass the normalized remarks
@@ -1897,7 +1914,7 @@ export const updateLead = async (req, res) => {
         ? remarksValidation.normalizedRemarks
         : lead.remarks; // Use existing remarks if not updated
 
-      const result = await handleLeadMovement(updatedLead, req, remarksToUse, changedFields, call_duration);
+      const result = await handleLeadMovement(updatedLead, req, remarksToUse, changedFields, call_duration, Lead, auditData);
 
       if (result.type === 'complaint') {
         res.json({ message: "Lead updated and moved to complaints", complaint: result.data });
@@ -2202,13 +2219,15 @@ export const updateFollowUp = async (req, res) => {
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
 
-    // Audit Metadata (New Logic)
+    // Audit Metadata - ensures telecaller/createdBy is mapped when FollowUp moves to Report
     let auditUpdateData = {};
-    if (req.user.role === 'telecaller') {
+    if (req.user) {
       auditUpdateData = {
         editedByEmpId: req.user.employeeId || req.user.empId,
         editedByName: req.user.name,
-        editedAt: new Date()
+        editedAt: new Date(),
+        createdByEmpId: req.user.employeeId || req.user.empId,
+        createdByName: req.user.name
       };
       // Merge into updateData to ensure FollowUp document itself is updated with these fields
       Object.assign(updateData, auditUpdateData);

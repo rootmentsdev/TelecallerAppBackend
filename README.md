@@ -161,3 +161,18 @@ Interactive API validation and documentation is available at:
 ### 2. Store Filtering
 *   **Format**: "Brand - Location" (e.g., "Suitor Guy - Edappally").
 *   **Logic**: Strict regex matching handles Brand ("SG", "Z") and Location independently to ensure data isolation. The same logic (`buildStoreFilter`) is used across all collections.
+
+---
+
+## 🆔 Identity & Attribution
+The system tracks **who** created and **who** worked on a lead.
+
+### 1. Created By (`createdByEmpId`, `createdByName`)
+*   **Enquiry / Booked**: Set to the telecaller who manually added the lead via `POST /add-lead`.
+*   **Return (Sync)**: Since these are system-generated, the "Creator" is backfilled as the **first telecaller** to process the return lead (calls it and moves it to Report/Complaint). This ensures every Report has an owner for attribution.
+
+### 2. Edited By (`editedBy`, `editedByEmpId`)
+*   **All Leads**: Always set to the telecaller who performed the last action (call, update, move).
+*   **Admin Reports**: Uses these identity fields to generate per-telecaller performance metrics.
+
+---

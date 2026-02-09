@@ -468,17 +468,17 @@ export const getAdminReports = async (req, res) => {
 
             return {
                 reportId: String(obj._id),
-                leadName: obj.leadName || obj.name || null, // Handle naming variants if any
-                phone: obj.phone || null,
+                leadName: obj.leadName || obj.name || obj.lead_name || null, // Handle naming variants if any
+                phone: obj.phone || obj.phone_number || obj.phoneNumber || null,
                 store: obj.store || null,
-                leadType: obj.leadType || null,
-                callStatus: obj.callStatus || null,
-                leadStatus: obj.leadStatus || null,
-                closingAction: obj.closingAction || null,
+                leadType: obj.leadType || obj.lead_type || null,
+                callStatus: obj.callStatus || obj.call_status || null,
+                leadStatus: obj.leadStatus || obj.lead_status || null,
+                closingAction: obj.closingAction || obj.closing_action || null,
                 remarks: obj.remarks || null,
-                callDuration: obj.callDuration || 0,
-                createdAt: obj.createdAt || null,
-                editedAt: obj.editedAt || null,
+                callDuration: obj.callDuration || obj.call_duration || 0,
+                createdAt: obj.createdAt || obj.created_at || null,
+                editedAt: obj.editedAt || obj.edited_at || null,
                 telecaller: telecallerObj,
                 // Include Creator info just in case
                 createdByEmpId: obj.createdByEmpId,
