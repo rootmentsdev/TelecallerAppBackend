@@ -2,7 +2,7 @@
 
 ## Overview
 
-This system provides **automatic, incremental API syncing every 5 minutes** while keeping CSV imports strictly manual. The system is designed to:
+This system provides **automatic, incremental API syncing every 20 minutes** while keeping CSV imports strictly manual. The system is designed to:
 
 - ✅ Sync ONLY external APIs automatically
 - ✅ Add ONLY new or updated records (incremental)
@@ -10,7 +10,7 @@ This system provides **automatic, incremental API syncing every 5 minutes** whil
 - ✅ Keep CSV imports strictly manual
 - ✅ Preserve all existing workflows
 
-## 🕐 Automatic Sync (Every 5 Minutes)
+## 🕐 Automatic Sync (Every 20 Minutes)
 
 ### What Gets Synced Automatically
 - **Stores API** - External store list
@@ -34,6 +34,29 @@ Each API uses unique keys to prevent duplicates:
 - Key: `phone + name + store + leadType + date`
 - **Behavior:** Update existing records (keep data fresh)
 
+## 🧠 Sync Logic Deep Dive
+
+### 1. First Run (Initial Sync)
+When the system runs for the very first time (or if `SyncLog` is empty):
+- **Condition:** No successful `SyncLog` entry found for the specific API (e.g., 'return').
+- **Action:** 
+  - If `API_SYNC_INCREMENTAL_DAYS` is set (default: 7), it fetches data from **X days ago** to **Today**.
+  - If no configuration is present, it defaults to fetching the **last 12 months** of data to populate the database.
+- **Goal:** Establish a baseline dataset without overwhelming the external API.
+
+### 2. Incremental Sync (Routine Operation)
+For all subsequent runs:
+- **Condition:** A valid `lastSyncAt` timestamp exists in `SyncLog`.
+- **Action:** The system fetches a **Rolling Window** of data (Default: **Last 7 Days**).
+- **Logic:** `dateFrom = Today - 7 Days`, `dateTo = Today`.
+- **Benefit:** Ensures that any recent updates (e.g., return date modifications) are captured, even if they happened days after creation.
+- **Safety:** The robust deduplication logic (`bookingNo` / `phone+store`) ensures we only save what's new or changed.
+
+### 3. Fallback Mechanism
+If the API call fails or returns ambiguous data:
+- **Action:** The system logs the error and retries in the next cycle (20 mins later).
+- **Safety:** It does **NOT** advance the `lastSyncAt` timestamp, ensuring no data is skipped during the downtime.
+
 ## 📁 File Structure
 
 ```
@@ -41,13 +64,13 @@ sync/
 ├── apiOnly.js              # API-only sync (used by scheduler)
 ├── runAll.js               # Full sync including CSV (manual)
 ├── api/
-│   ├── sync_return.js      # Return API sync
-│   ├── sync_booking.js     # Booking API sync
-│   └── sync_storelist.js   # Store API sync
+├── sync_return.js      # Return API sync
+├── sync_booking.js     # Booking API sync
+└── sync_storelist.js   # Store API sync
 └── csv/                    # CSV imports (manual only)
 
 scheduler/
-└── apiSyncScheduler.js     # 5-minute scheduler
+└── apiSyncScheduler.js     # 20-minute scheduler
 ```
 
 ## 🎛️ Configuration
@@ -56,8 +79,11 @@ scheduler/
 ```bash
 # Scheduler Configuration
 API_SYNC_ENABLED=true           # Enable/disable automatic sync
-API_SYNC_TIME=*/5 * * * *       # Every 5 minutes
-API_SYNC_TIMEZONE=UTC           # Timezone
+API_SYNC_TIME=*/20 * * * *      # Every 20 minutes (Default)
+API_SYNC_TIMEZONE=Asia/Kolkata  # Timezone
+
+# Sync Logic Config
+API_SYNC_INCREMENTAL_DAYS=7     # Days to look back if no history exists
 
 # Return API Configuration
 RETURN_API_BASE_URL=https://rentalapi.rootments.live
@@ -66,15 +92,15 @@ RETURN_API_KEY=your-return-api-token
 
 ### Cron Schedule Examples
 ```bash
-*/5 * * * *     # Every 5 minutes
-*/10 * * * *    # Every 10 minutes
+*/20 * * * *    # Every 20 minutes (Recommended)
+*/5 * * * *     # Every 5 minutes (Aggressive)
 0 */1 * * *     # Every hour
 0 9-17 * * *    # Every hour from 9 AM to 5 PM
 ```
 
 ## 🚀 Usage Commands
 
-### Automatic Sync (Runs Every 5 Minutes)
+### Automatic Sync (Runs Every 20 Minutes)
 ```bash
 # Starts automatically when server starts
 npm start
@@ -113,7 +139,7 @@ npm run verify:data
 📦 Step 3/3: Syncing Returns...
 ✅ Automatic API sync completed successfully
 ⏱️  Duration: 12.3 seconds
-📅 Next sync: 2024-12-22T10:10:00.000Z
+📅 Next sync: 2024-12-22T10:25:00.000Z
 ```
 
 ### Incremental Sync Results
@@ -214,7 +240,7 @@ npm run verify:data
 ## 🎯 Success Criteria
 
 ### ✅ Verification Checklist
-- [ ] External APIs auto-sync every 5 minutes
+- [ ] External APIs auto-sync every 20 minutes
 - [ ] Only new data is added (no duplicates)
 - [ ] CSV imports remain manual
 - [ ] `npm run sync:all` still works
@@ -224,7 +250,7 @@ npm run verify:data
 - [ ] System handles API failures gracefully
 
 ### 📊 Expected Results
-- **New Records:** Added automatically every 5 minutes
+- **New Records:** Added automatically every 20 minutes
 - **Duplicates:** 0 (prevented by deduplication logic)
 - **Performance:** < 30 seconds per sync cycle
 - **Reliability:** 99%+ success rate
@@ -246,6 +272,6 @@ npm run verify:data
 
 ---
 
-**Last Updated:** December 22, 2024  
-**Version:** 1.0  
+**Last Updated:** February 09, 2026
+**Version:** 1.1
 **Status:** Production Ready 🚀

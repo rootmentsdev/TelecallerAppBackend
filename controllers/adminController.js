@@ -117,7 +117,10 @@ export const getTelecallerSummary = async (req, res) => {
                     $group: {
                         _id: "$complaintMarkedBy",
                         totalComplaints: { $sum: 1 },
-                        totalComplaintDuration: { $sum: "$callDuration" }
+                        // Sum total duration (prefer total_complaint_call_duration if > 0, else initial callDuration)
+                        totalComplaintDuration: { $sum: { $cond: [{ $gt: ["$total_complaint_call_duration", 0] }, "$total_complaint_call_duration", "$callDuration"] } },
+                        // Sum number of re-calls
+                        totalReCalls: { $sum: { $size: { $ifNull: ["$complaint_call_history", []] } } }
                     }
                 }
             ])
@@ -144,7 +147,7 @@ export const getTelecallerSummary = async (req, res) => {
             if (stat._id) {
                 const id = String(stat._id);
                 const entry = getEntry(id);
-                entry.totalCalls = stat.totalCalls;
+                entry.totalCalls = stat.totalCalls; // Initial calls from reports
                 entry.totalCallDuration = stat.totalCallDuration;
             }
         }
@@ -157,8 +160,8 @@ export const getTelecallerSummary = async (req, res) => {
                 entry.totalComplaints = stat.totalComplaints;
 
                 // Complaints are also call interactions:
-                // 1. Add count to totalCalls
-                entry.totalCalls += stat.totalComplaints;
+                // 1. Add count to totalCalls (Initial Complaints + Re-Calls)
+                entry.totalCalls += (stat.totalComplaints + (stat.totalReCalls || 0));
                 // 2. Add duration to totalCallDuration
                 entry.totalCallDuration += (stat.totalComplaintDuration || 0);
             }

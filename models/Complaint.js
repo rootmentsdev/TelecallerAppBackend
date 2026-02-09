@@ -60,6 +60,18 @@ const complaintSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     assignedAt: { type: Date },
 
+    // Re-Call / Follow-up History on Complaint
+    complaint_call_history: [{
+      calledAt: { type: Date, default: Date.now },
+      callDuration: { type: Number, default: 0 },
+      remarks: { type: String },
+      calledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+    }],
+    total_complaint_call_duration: { type: Number, default: 0 },
+    last_called_at: { type: Date },
+    last_call_duration: { type: Number },
+    last_complaint_remarks: { type: String },
+
     // Complaint-specific fields
     complaintMarkedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     complaintMarkedAt: { type: Date, default: Date.now },
