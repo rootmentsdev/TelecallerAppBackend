@@ -8,28 +8,26 @@ export const getTodayRange = () => {
     return { dateFrom: str, dateTo: str };
 };
 
+// Last 7 days including today
 export const getWeeklyRange = () => {
     const today = new Date();
-    const day = today.getDay(); // 0 (Sun) to 6 (Sat)
-    // Start of week (Monday)
-    // If today is Sunday (0), Monday is -6 days away. If Mon (1), 0 days away.
-    // Logic: diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today);
-    monday.setDate(diff);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(today.getDate() - 6); // Today + 6 days back = 7 days
 
     return {
-        dateFrom: formatDate(monday),
+        dateFrom: formatDate(lastWeek),
         dateTo: formatDate(today)
     };
 };
 
+// Last 30 days including today
 export const getMonthlyRange = () => {
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastMonth = new Date(today);
+    lastMonth.setDate(today.getDate() - 29); // Today + 29 days back = 30 days
 
     return {
-        dateFrom: formatDate(firstDay),
+        dateFrom: formatDate(lastMonth),
         dateTo: formatDate(today)
     };
 };
