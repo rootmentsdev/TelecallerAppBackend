@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Phone, CheckCircle, Clock, AlertOctagon, RefreshCw } from 'lucide-react';
+import { Phone, CheckCircle, Clock, AlertOctagon, RefreshCw, Calendar } from 'lucide-react';
 import { nFormatter, formatDuration } from '../utils/formatters';
 import { getTelecallerSummary } from '../services/analyticsService';
+import { getTodayRange, getWeeklyRange, getMonthlyRange } from '../utils/dateUtils';
 
 const KpiCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-start justify-between">
@@ -20,10 +21,10 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [summaryData, setSummaryData] = useState([]);
     const [error, setError] = useState(null);
-    const [filters, setFilters] = useState({
-        dateFrom: '',
-        dateTo: ''
-    });
+
+    // Filters State
+    const [activeFilter, setActiveFilter] = useState('today');
+    const [filters, setFilters] = useState(getTodayRange());
 
     useEffect(() => {
         fetchData();
@@ -47,24 +48,40 @@ const Dashboard = () => {
         }
     };
 
-    const handleToday = () => {
-        const today = new Date().toISOString().split('T')[0];
-        setFilters({
-            dateFrom: today,
-            dateTo: today
-        });
+    const handleFilterChange = (filterType) => {
+        setActiveFilter(filterType);
+        let newRange;
+        switch (filterType) {
+            case 'today':
+                newRange = getTodayRange();
+                break;
+            case 'weekly':
+                newRange = getWeeklyRange();
+                break;
+            case 'monthly':
+                newRange = getMonthlyRange();
+                break;
+            default:
+                return;
+        }
+        setFilters(newRange);
+    };
+
+    const handleCustomDateChange = (field, value) => {
+        setActiveFilter('custom');
+        setFilters(prev => ({ ...prev, [field]: value }));
     };
 
     // Aggregate metrics on frontend from the telecaller summary
     const stats = useMemo(() => {
         return summaryData.reduce((acc, curr) => ({
             totalCalls: acc.totalCalls + (curr.totalCalls || 0),
-            totalDuration: acc.totalDuration + (curr.totalCallDuration || 0), // Fix: use totalCallDuration
+            totalDuration: acc.totalDuration + (curr.totalCallDuration || 0),
             totalComplaints: acc.totalComplaints + (curr.totalComplaints || 0)
         }), { totalCalls: 0, totalDuration: 0, totalComplaints: 0 });
     }, [summaryData]);
 
-    if (loading) return <div className="p-10 text-center text-gray-500">Loading metrics...</div>;
+    if (loading && summaryData.length === 0) return <div className="p-10 text-center text-gray-500">Loading metrics...</div>;
     if (error) return (
         <div className="p-10 text-center">
             <p className="text-red-500 mb-4">{error}</p>
@@ -77,34 +94,44 @@ const Dashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">Dashboard Overview</h1>
 
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={handleToday}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${filters.dateFrom === new Date().toISOString().split('T')[0] &&
-                                filters.dateTo === new Date().toISOString().split('T')[0]
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'bg-transparent text-gray-500 hover:bg-gray-100'
-                            }`}
-                    >
-                        Today
-                    </button>
-                    <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Time Toggles */}
+                    <div className="bg-gray-100 p-1 rounded-lg flex text-sm">
+                        {['today', 'weekly', 'monthly'].map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => handleFilterChange(filter)}
+                                className={`px-3 py-1.5 rounded-md capitalize transition-all ${activeFilter === filter
+                                        ? 'bg-white text-blue-600 shadow-sm font-medium'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                {filter}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Custom Date Inputs */}
+                    <div className={`flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border transition-colors ${activeFilter === 'custom' ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200'
+                        }`}>
+                        <Calendar size={16} className="text-gray-400" />
                         <input
                             type="date"
-                            className="text-sm border-none outline-none text-gray-600"
+                            className="text-sm border-none outline-none text-gray-600 w-32"
                             value={filters.dateFrom}
-                            onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                            onChange={(e) => handleCustomDateChange('dateFrom', e.target.value)}
                         />
                         <span className="text-gray-400">-</span>
                         <input
                             type="date"
-                            className="text-sm border-none outline-none text-gray-600"
+                            className="text-sm border-none outline-none text-gray-600 w-32"
                             value={filters.dateTo}
-                            onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                            onChange={(e) => handleCustomDateChange('dateTo', e.target.value)}
                         />
                     </div>
-                    <button onClick={fetchData} className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                        <RefreshCw size={20} />
+
+                    <button onClick={fetchData} className="p-2 text-gray-400 hover:text-blue-600 transition-colors bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
                     </button>
                 </div>
             </div>
@@ -118,7 +145,6 @@ const Dashboard = () => {
                     colorClass="bg-blue-50 text-blue-600"
                 />
 
-                {/* Note: 'Completed' isn't explicitly in summary yet, showing duration instead for now */}
                 <KpiCard
                     title="Total Duration"
                     value={formatDuration(stats.totalDuration)}
@@ -134,7 +160,7 @@ const Dashboard = () => {
                 />
 
                 <KpiCard
-                    title="Complaints"
+                    title="Total Complaints"
                     value={stats.totalComplaints}
                     icon={AlertOctagon}
                     colorClass="bg-red-50 text-red-600"

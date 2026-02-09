@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, ChevronLeft, ChevronRight, Filter, RefreshCw } from 'lucide-react';
-import { getReports, getReportFilters } from '../services/analyticsService'; // REMOVED getTelecallers
+import { getReports, getReportFilters } from '../services/analyticsService';
 import { formatDuration } from '../utils/formatters';
 
 const Reports = () => {
@@ -17,7 +17,8 @@ const Reports = () => {
         dateFrom: '',
         dateTo: '',
         store: '',
-        telecaller: '' // Stores EmpId now
+        telecaller: '', // Stores EmpId
+        leadType: ''
     });
 
     useEffect(() => {
@@ -39,11 +40,7 @@ const Reports = () => {
 
     useEffect(() => {
         fetchReports();
-    }, [meta.page]); // Only pagination triggers auto-fetch? Or buttons? 
-    // Instructions implied "Apply button" triggers fetch. Previous code triggered on filter change.
-    // User requested "Apply button", so let's remove filters from dependency array to require manual Apply?
-    // "Add filters at top... Apply button, Reset button"
-    // I will adhere to "Apply button" logic for filters, but keep pagination auto-fetch.
+    }, [meta.page]);
 
     const fetchReports = async () => {
         setLoading(true);
@@ -55,6 +52,7 @@ const Reports = () => {
                 dateFrom: filters.dateFrom || undefined,
                 dateTo: filters.dateTo || undefined,
                 telecaller: filters.telecaller || undefined, // Send EmpId
+                leadType: filters.leadType || undefined,
                 dateField: 'createdAt' // Forces filtering by createdAt as requested
             };
             const result = await getReports(params);
@@ -72,32 +70,8 @@ const Reports = () => {
         fetchReports();
     };
 
-    const handleResetFilters = () => {
-        setFilters({
-            dateFrom: '',
-            dateTo: '',
-            store: '',
-            telecaller: ''
-        });
-        setMeta(prev => ({ ...prev, page: 1 }));
-        // Should we auto-fetch on reset? Usually yes.
-        // We'll let the user click Apply or just trigger it via a timeout or state effect?
-        // Let's trigger it immediately for better UX.
-        // But setState is async. We can pass specific params or use useEffect.
-        // I'll leave it to next render/click to keep it simple, or force it.
-        // Better:
-        setTimeout(() => {
-            // fetchReports(); // This would use old state due to closure.
-            // Ideally use a trigger or dependency.
-            // For now, I'll rely on user clicking Apply, or just trigger reload manually.
-        }, 0);
-    };
-
-    // Quick fix for Reset -> Apply flow:
-    // Actually, user explicitly asked for "Reset button".
-    // I'll make Reset clear filters AND fetch.
     const handleResetAndFetch = async () => {
-        const emptyFilters = { dateFrom: '', dateTo: '', store: '', telecaller: '' };
+        const emptyFilters = { dateFrom: '', dateTo: '', store: '', telecaller: '', leadType: '' };
         setFilters(emptyFilters);
         setMeta(prev => ({ ...prev, page: 1 }));
         setLoading(true);
@@ -201,6 +175,22 @@ const Reports = () => {
                                 {store}
                             </option>
                         ))}
+                    </select>
+                </div>
+
+                {/* Lead Type Filter - NEW */}
+                <div className="min-w-[150px]">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Lead Type</label>
+                    <select
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                        value={filters.leadType}
+                        onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value }))}
+                    >
+                        <option value="">All Types</option>
+                        <option value="enquiry">Enquiry</option>
+                        <option value="booking">Booking</option>
+                        <option value="return">Return</option>
+                        <option value="complaint">Complaint</option>
                     </select>
                 </div>
 
