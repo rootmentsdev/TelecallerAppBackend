@@ -188,9 +188,8 @@ const Reports = () => {
                     >
                         <option value="">All Types</option>
                         <option value="enquiry">Enquiry</option>
-                        <option value="booking">Booking</option>
+                        <option value="booked">Booked</option>
                         <option value="return">Return</option>
-                        <option value="complaint">Complaint</option>
                     </select>
                 </div>
 

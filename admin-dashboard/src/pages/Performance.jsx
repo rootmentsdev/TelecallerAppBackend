@@ -79,8 +79,8 @@ const TelecallerPerformance = () => {
                                 key={filter}
                                 onClick={() => handleFilterChange(filter)}
                                 className={`px-3 py-1.5 rounded-md capitalize transition-all ${activeFilter === filter
-                                        ? 'bg-white text-blue-600 shadow-sm font-medium'
-                                        : 'text-gray-500 hover:text-gray-700'
+                                    ? 'bg-white text-blue-600 shadow-sm font-medium'
+                                    : 'text-gray-500 hover:text-gray-700'
                                     }`}
                             >
                                 {filter}
@@ -126,27 +126,33 @@ const TelecallerPerformance = () => {
                     </span>
                 </div>
 
-                {data.length === 0 && !loading ? (
+                {loading ? (
+                    <div className="h-[300px] flex items-center justify-center text-gray-400">
+                        Loading performance data...
+                    </div>
+                ) : data.length === 0 ? (
                     <div className="h-[300px] flex items-center justify-center text-gray-400">
                         No performance data for this period
                     </div>
                 ) : (
-                    <ResponsiveContainer width="100%" height={350}>
-                        <BarChart
-                            data={data}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            barSize={40}
-                        >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="name" />
-                            <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                            <YAxis yAxisId="right" orientation="right" stroke="#ff8042" />
-                            <Tooltip />
-                            <Legend />
-                            <Bar yAxisId="left" dataKey="calls" name="Total Calls" fill="#8884d8" radius={[4, 4, 0, 0]} />
-                            <Bar yAxisId="right" dataKey="complaints" name="Complaints" fill="#ff8042" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                    <div style={{ width: '100%', height: 350 }}>
+                        <ResponsiveContainer>
+                            <BarChart
+                                data={data}
+                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                barSize={40}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" />
+                                <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                                <YAxis yAxisId="right" orientation="right" stroke="#ff8042" />
+                                <Tooltip cursor={{ fill: 'transparent' }} />
+                                <Legend />
+                                <Bar yAxisId="left" dataKey="calls" name="Total Calls" fill="#8884d8" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="right" dataKey="complaints" name="Complaints" fill="#ff8042" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 )}
             </div>
 
