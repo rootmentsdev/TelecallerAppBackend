@@ -7,6 +7,7 @@ import Complaints from './pages/Complaints';
 import Performance from './pages/Performance';
 import AdminLayout from './layouts/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   return (
@@ -20,7 +21,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="reports" element={<Reports />} />
           <Route path="complaints" element={<Complaints />} />
-          <Route path="telecaller-performance" element={<Performance />} />
+          <Route path="telecaller-performance" element={<ErrorBoundary><Performance /></ErrorBoundary>} />
         </Route>
       </Route>
 
