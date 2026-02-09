@@ -873,6 +873,7 @@ import {
   getComplaints,
   getComplaintById,
 } from "../controllers/pageController.js";
+import { updateComplaintCall } from "../controllers/complaintCallController.js";
 import {
   lossOfSaleGetValidator,
   lossOfSalePostValidator,
@@ -1922,6 +1923,68 @@ router.get("/complaints", protect, getComplaints);
  *         description: Internal server error.
  */
 router.get("/complaints/:id", protect, getComplaintById);
+
+/**
+ * @swagger
+ * /api/pages/complaints/{id}/call:
+ *   patch:
+ *     summary: Log a re-call for a complaint
+ *     tags:
+ *       - Complaints
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Logs a new call made to a complaint lead.
+ *       Updates the complaint's call history, total call duration, and last called summary fields.
+ *       Does not create a new lead or report.
+ *       
+ *       **Access Control:**
+ *       - **Telecaller**: Can only log calls for complaints they marked or are assigned to.
+ *       - **Admin**: Can log calls for any complaint.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Complaint ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - call_duration
+ *             properties:
+ *               call_duration:
+ *                 type: integer
+ *                 description: Duration of the call in seconds
+ *                 example: 120
+ *               complaint_remarks:
+ *                 type: string
+ *                 description: Remarks for this specific call
+ *                 example: "explained delay"
+ *     responses:
+ *       200:
+ *         description: Call logged successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 complaint: { $ref: '#/components/schemas/Complaint' }
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Complaint not found
+ *       500:
+ *         description: Internal server error
+ */
+router.patch("/complaints/:id/call", protect, updateComplaintCall);
 
 /**
  * @swagger

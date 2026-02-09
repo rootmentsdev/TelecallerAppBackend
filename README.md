@@ -73,6 +73,11 @@ The system enforces a strict lifecycle to ensure data integrity. A lead exists i
     *   Can remain in **FollowUps** (Priority 2, new date set).
     *   Can move to **Report** (Priority 3, completed).
 
+4.  **Complaints** (In `Complaints` Collection)
+    *   High priority issues.
+    *   Telecaller acts on them and logs **Re-Calls** via `PATCH /api/pages/complaints/:id/call`.
+    *   Re-calls do NOT move the lead; they update the complaint's history and aggregate metrics.
+
 ---
 
 ## 🗄️ Collections Used
@@ -100,6 +105,10 @@ The system enforces a strict lifecycle to ensure data integrity. A lead exists i
 *   `GET /api/pages/follow-ups` - List pending follow-ups.
 *   `POST /api/pages/follow-ups/:id` - Process a follow-up.
 
+### Complaints
+*   `GET /api/pages/complaints` - List complaints.
+*   `PATCH /api/pages/complaints/:id/call` - Log a re-call (updates history & duration).
+
 ### Reports
 *   `GET /api/reports` - View processed history.
 
@@ -109,8 +118,9 @@ The system enforces a strict lifecycle to ensure data integrity. A lead exists i
 
 ### Incremental Sync
 *   **Frequency**: Every 20 minutes (`node-cron`).
-*   **Targets**: `Return` leads and `Stores`.
-*   **Logic**: Updates existing records or creates new ones. Locked to prevent overlaps.
+*   **Targets**: `Stores`, `Booking` (Confirmations), and `Return` leads.
+*   **Logic**: Fetches a **Rolling Window** (default 7 days) of data to capture new records and updates to recent records. Deduplicates automatically.
+*   **First Run / Fallback**: Defaults to `API_SYNC_INCREMENTAL_DAYS` (7 days) if no sync history is found, to prevent overloading the system.
 *   **Performance**: Fetches data for multiple locations in parallel (Default Concurrency: 5, Configurable via `SYNC_CONCURRENCY`).
 
 ### CSV Upload

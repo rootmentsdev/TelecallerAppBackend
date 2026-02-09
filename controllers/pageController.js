@@ -855,10 +855,16 @@ export const getLeads = async (req, res) => {
         }
       }
 
-      filters.$or = [
-        { leadType: 'return', returnDate: returnFilter },
-        { leadType: { $ne: 'return' }, createdAt: createdFilter }
-      ];
+      if (dbLeadType === 'return') {
+        filters.returnDate = returnFilter;
+      } else if (dbLeadType) {
+        filters.createdAt = createdFilter;
+      } else {
+        filters.$or = [
+          { leadType: 'return', returnDate: returnFilter },
+          { leadType: { $ne: 'return' }, createdAt: createdFilter }
+        ];
+      }
     }
     /* ============================================================
        🔥 CRITICAL CHANGE ENDS HERE

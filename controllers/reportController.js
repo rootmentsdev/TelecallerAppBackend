@@ -372,15 +372,35 @@ export const getCallStatusSummary = async (req, res) => {
       }
     ]);
 
-    // 2. Total Complaints Marked by User
-    const totalComplaints = await Complaint.countDocuments(complaintMatch);
+    // 2. Complaint Stats (Count + Duration + Re-Calls)
+    const complaintStatsResult = await Complaint.aggregate([
+      { $match: complaintMatch },
+      {
+        $group: {
+          _id: null,
+          totalComplaints: { $sum: 1 },
+          // Sum total duration (prefer total_complaint_call_duration if > 0, else initial callDuration)
+          totalComplaintDuration: { $sum: { $cond: [{ $gt: ["$total_complaint_call_duration", 0] }, "$total_complaint_call_duration", "$callDuration"] } },
+          // Sum number of re-calls
+          totalReCalls: { $sum: { $size: { $ifNull: ["$complaint_call_history", []] } } }
+        }
+      }
+    ]);
 
+    const compStats = complaintStatsResult[0] || { totalComplaints: 0, totalComplaintDuration: 0, totalReCalls: 0 };
     const stats = reportStats[0] || { totalCalls: 0, totalCallDuration: 0 };
 
+    // Combine Reports and Complaints
+    // Total Calls = Report Calls + Initial Complaint Calls + Re-Calls
+    const finalTotalCalls = (stats.totalCalls || 0) + (compStats.totalComplaints || 0) + (compStats.totalReCalls || 0);
+
+    // Total Duration = Report Duration + Complaint Duration (Initial + Re-Calls)
+    const finalTotalDuration = (stats.totalCallDuration || 0) + (compStats.totalComplaintDuration || 0);
+
     return res.json({
-      totalCalls: stats.totalCalls || 0,
-      totalCallDuration: stats.totalCallDuration || 0,
-      totalComplaints: totalComplaints || 0
+      totalCalls: finalTotalCalls,
+      totalCallDuration: finalTotalDuration,
+      totalComplaints: compStats.totalComplaints || 0
     });
 
   } catch (err) {
