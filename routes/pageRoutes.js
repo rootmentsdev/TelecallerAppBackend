@@ -2070,6 +2070,7 @@ router.get("/complaints/:id", protect, getComplaintById);
  *         description: Internal server error
  */
 router.patch("/complaints/:id/call", protect, updateComplaintCall);
+router.post("/complaints/:id/call", protect, updateComplaintCall); // Alias for clients that send POST
 
 /**
  * @swagger

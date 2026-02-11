@@ -1,14 +1,33 @@
 import Complaint from '../models/Complaint.js';
 import mongoose from 'mongoose';
 
-// PATCH - Update Complaint Call (Re-Call)
+// Map common request body keys to Complaint schema fields
+const COMPLAINT_FIELD_MAP = {
+    customer_name: 'name',
+    name: 'name',
+    phone_number: 'phone',
+    phone: 'phone',
+    store_location: 'store',
+    store: 'store',
+    call_status: 'callStatus',
+    lead_status: 'leadStatus',
+    remarks: 'remarks',
+    subCategory: 'subCategory',
+    sub_category: 'subCategory',
+    itemCategory: 'itemCategory',
+    item_category: 'itemCategory',
+    closingAction: 'closingAction',
+    closing_action: 'closingAction',
+};
+
+// PATCH - Update Complaint Call (Re-Call) and optionally update complaint fields (name, phone, store, etc.)
 export const updateComplaintCall = async (req, res) => {
     try {
         const { id } = req.params;
-        const { call_duration, complaint_remarks } = req.body;
+        const { call_duration, complaint_remarks, remarks: remarksAlias, ...restBody } = req.body;
+        const complaint_remarks_val = complaint_remarks ?? remarksAlias ?? "";
 
-        // Validate inputs
-        // Allow 0 duration calls (maybe just logging attempts), but usually > 0
+        // Validate inputs - call_duration required for logging a re-call
         if (call_duration === undefined || call_duration === null) {
             return res.status(400).json({ message: "call_duration is required" });
         }
@@ -19,13 +38,10 @@ export const updateComplaintCall = async (req, res) => {
         }
 
         // Access Control
-        // Telecallers can only call their own complaints OR complaints assigned to them
         if (req.user.role === 'telecaller') {
             const userIdStr = req.user._id.toString();
-
             const ownerId = complaint.complaintMarkedBy?._id || complaint.complaintMarkedBy;
             const ownerIdStr = ownerId ? ownerId.toString() : null;
-
             const assignedId = complaint.assignedTo?._id || complaint.assignedTo;
             const assignedIdStr = assignedId ? assignedId.toString() : null;
 
@@ -34,27 +50,30 @@ export const updateComplaintCall = async (req, res) => {
             }
         }
 
+        // Update complaint document fields if sent (customer_name, phone_number, store_location, etc.)
+        Object.keys(COMPLAINT_FIELD_MAP).forEach((key) => {
+            if (restBody[key] !== undefined && restBody[key] !== null) {
+                const schemaKey = COMPLAINT_FIELD_MAP[key];
+                complaint[schemaKey] = restBody[key];
+            }
+        });
+
         const callEntry = {
             calledAt: new Date(),
             callDuration: parseInt(call_duration) || 0,
-            remarks: complaint_remarks || "",
+            remarks: complaint_remarks_val,
             calledBy: req.user._id
         };
 
-        // Update Complaint History
         if (!complaint.complaint_call_history) complaint.complaint_call_history = [];
         complaint.complaint_call_history.push(callEntry);
 
-        // Accumulate total duration
         const currentTotal = (complaint.total_complaint_call_duration || complaint.callDuration || 0);
         complaint.total_complaint_call_duration = currentTotal + callEntry.callDuration;
 
-        // Update Summary Fields
         complaint.last_called_at = callEntry.calledAt;
         complaint.last_call_duration = callEntry.callDuration;
-        complaint.last_complaint_remarks = callEntry.remarks || complaint.last_complaint_remarks; // Keep old remarks if new is empty? Or overwrite? 
-        // Requirement: "store... remarks". Assuming overwrite with latest call remarks.
-        if (callEntry.remarks) complaint.last_complaint_remarks = callEntry.remarks;
+        if (callEntry.remarks) complaint.last_complaint_remarks = String(callEntry.remarks);
 
         await complaint.save();
 
