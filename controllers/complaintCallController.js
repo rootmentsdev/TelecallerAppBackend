@@ -58,22 +58,9 @@ export const updateComplaintCall = async (req, res) => {
             }
         });
 
-        const callEntry = {
-            calledAt: new Date(),
-            callDuration: parseInt(call_duration) || 0,
-            remarks: complaint_remarks_val,
-            calledBy: req.user._id
-        };
-
-        if (!complaint.complaint_call_history) complaint.complaint_call_history = [];
-        complaint.complaint_call_history.push(callEntry);
-
-        const currentTotal = (complaint.total_complaint_call_duration || complaint.callDuration || 0);
-        complaint.total_complaint_call_duration = currentTotal + callEntry.callDuration;
-
-        complaint.last_called_at = callEntry.calledAt;
-        complaint.last_call_duration = callEntry.callDuration;
-        if (callEntry.remarks) complaint.last_complaint_remarks = String(callEntry.remarks);
+        // Re-call: overwrite callDuration with new value and set complaint_remarks
+        complaint.callDuration = parseInt(call_duration, 10) || 0;
+        complaint.complaint_remarks = complaint_remarks_val ? String(complaint_remarks_val) : "";
 
         await complaint.save();
 

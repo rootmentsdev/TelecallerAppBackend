@@ -117,10 +117,8 @@ export const getTelecallerSummary = async (req, res) => {
                     $group: {
                         _id: "$complaintMarkedBy",
                         totalComplaints: { $sum: 1 },
-                        // Sum total duration (prefer total_complaint_call_duration if > 0, else initial callDuration)
-                        totalComplaintDuration: { $sum: { $cond: [{ $gt: ["$total_complaint_call_duration", 0] }, "$total_complaint_call_duration", "$callDuration"] } },
-                        // Sum number of re-calls
-                        totalReCalls: { $sum: { $size: { $ifNull: ["$complaint_call_history", []] } } }
+                        totalComplaintDuration: { $sum: "$callDuration" },
+                        totalReCalls: { $sum: 0 }
                     }
                 }
             ])
