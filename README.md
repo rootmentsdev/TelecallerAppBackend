@@ -5,174 +5,215 @@
 ---
 
 ## 📖 Project Overview
-This backend acts as the central hub for Telecalling operations. It balances three critical sources of data:
-1.  **Automated API Syncs** (for Return leads & Stores).
-2.  **Manual CSV Imports** (for Walk-in & Loss of Sale leads).
-3.  **Direct Telecaller Input** (Call status, remarks, follow-ups).
 
+This backend is the central hub for telecalling operations. It balances three sources of data:
+
+1. **Automated API sync** — Return leads and Stores (from external ERP).
+2. **Manual CSV import** — Walk-in and Loss of Sale leads.
+3. **Direct telecaller input** — Call status, remarks, follow-ups, and manual add-lead.
 
 ---
 
 ## 🔧 Environment Variables
-Create a `.env` file in the root directory:
+
+Create a `.env` file in the project root:
 
 ```env
-# Server Config
+# Server
 PORT=8800
 MONGO_URI=mongodb+srv://...
 JWT_SECRET=your_jwt_secret
 
-# External API Sync
+# External API sync (Return leads)
 RETURN_API_BASE_URL=https://rentalapi.rootments.live
 RETURN_API_ENDPOINT=/api/Reports/GetReturnReport
 RETURN_API_KEY=your_api_token
 SYNC_CONCURRENCY=5
 API_SYNC_INCREMENTAL_DAYS=7
-```
 
-## 📜 Scripts
-| Script | Description |
-| :--- | :--- |
-| `npm start` | Run server in production mode |
-| `npm run dev` | Run server with nodemon (development) |
-| `npm run sync:api` | Trigger API sync manually (Stores + Returns) |
-| `npm run verify:data` | Verify MongoDB data integrity |
-| `npm run cleanup:duplicates` | Dry-run duplicate cleanup |
-| `npm run cleanup:duplicates:live` | **Execute** duplicate cleanup |
+# Optional: Scheduler
+API_SYNC_ENABLED=true
+API_SYNC_TIME=*/20 * * * *
+API_SYNC_TIMEZONE=Asia/Kolkata
+```
 
 ---
 
+## 📜 Scripts
 
-## 🏷️ Core Lead Types
-The system strictly supports the following `leadType` enum values:
+| Script | Description |
+|--------|-------------|
+| `npm start` | Run server (production) |
+| `npm run dev` | Run server with nodemon |
+| `npm run sync:api` | Run API sync manually (Stores + Return leads) |
+| `npm run sync:all` | Full sync (API + CSV flow) |
+| `npm run verify:data` | Verify MongoDB data |
+| `npm run verify:sync` | Verify sync system state |
+| `npm run check:duplicates` | Dry-run duplicate check |
+| `npm run cleanup:duplicates` | Dry-run duplicate cleanup |
+| `npm run cleanup:duplicates:live` | Run duplicate cleanup |
+| `npm run unlock:sync` | Clear global sync lock |
+| `npm run backfill:report-telecaller` | Dry-run: backfill report telecaller mapping |
+| `npm run backfill:report-telecaller:live` | Backfill report `createdByEmpId`/`createdByName` from `editedBy` |
+
+CSV import scripts (manual): `import:walkin`, `import:lossofsale`, `import:all:walkin`, `import:all:lossofsale`.
+
+---
+
+## 🏷️ Lead Types
 
 | Type | Source | Description |
-| :--- | :--- | :--- |
-| **`enquiry`** | Manual / Walk-in | Default type for general leads. |
-| **`return`** | API Sync | Automatically synced from external ERP. |
-| **`lossOfSale`** | CSV Import | Leads marked as lost sales. |
-| **`booked`** | Manual | Leads marked as booked (Manual entry). |
+|------|--------|-------------|
+| **enquiry** | Manual / Walk-in | Default for general leads. |
+| **return** | API sync | Synced from external ERP. |
+| **lossOfSale** | CSV | Lost-sale leads. |
+| **booked** | Manual | Booked leads (e.g. Add Lead). |
 
 ---
 
 ## ♻️ Lead Lifecycle
-The system enforces a strict lifecycle to ensure data integrity. A lead exists in **exactly one** active collection at a time.
 
-1.  **New Leads** (In `Leads` Collection)
-    *   Sourced from Sync, CSV, or Manual Entry.
-    *   Telecaller calls the lead.
+A lead exists in **exactly one** active collection at a time.
 
-2.  **Processing / Outcome**
-    *   **Complaint:** If `mark_as_complaint: true` → Moves to **Complaints**.
-    *   **Follow-Up:** If `follow_up_flag: true` → Moves to **FollowUps**.
-    *   **Report:** If neither above → Moves to **Reports** (Archive).
+1. **Leads** — New leads (sync, CSV, or manual). Telecaller calls and then:
+   - **Complaint** — `mark_as_complaint: true` → move to **Complaints** (lead deleted).
+   - **Follow-up** — `follow_up_flag: true` + `follow_up_date` → move to **FollowUps** (lead deleted).
+   - **Report** — Otherwise → move to **Reports** (lead deleted).
 
-3.  **Follow-Ups** (In `FollowUps` Collection)
-    *   Telecaller eventually calls the follow-up.
-    *   Can move to **Complaint** (Priority 1).
-    *   Can remain in **FollowUps** (Priority 2, new date set).
-    *   Can move to **Report** (Priority 3, completed).
+2. **FollowUps** — Call again; then:
+   - Can move to **Complaint**, stay in **FollowUps** (new date), or move to **Report**.
 
-4.  **Complaints** (In `Complaints` Collection)
-    *   High priority issues.
-    *   Telecaller acts on them and logs **Re-Calls** via `PATCH /api/pages/complaints/:id/call`.
-    *   Re-calls do NOT move the lead; they update the complaint's history and aggregate metrics.
+3. **Complaints** — Re-calls do **not** move the record. Use **PATCH** or **POST** `/api/pages/complaints/:id/call` with `call_duration` and optional `complaint_remarks` (or `remarks`). The complaint’s `callDuration` is overwritten and `complaint_remarks` is set. No history array or extra aggregate fields.
+
+4. **Reports** — Final archive; no further moves.
 
 ---
 
-## 🗄️ Collections Used
-*   **`Leads`**: The active working pool.
-*   **`FollowUps`**: Leads awaiting a callback.
-*   **`Complaints`**: High-priority issues requiring admin attention.
-*   **`Reports`**: The final archive of all processed interactions.
-*   **`SyncLock`**: Audit log and locking mechanism for the sync engine.
+## 🗄️ Collections
+
+| Collection | Purpose |
+|------------|---------|
+| **Leads** | Active working pool. |
+| **FollowUps** | Callback queue. |
+| **Complaints** | Issues (re-call updates same document). |
+| **Reports** | Processed interactions archive. |
+| **SyncLock** | Sync locking. |
+| **Users** | Telecallers, team leads, admins. |
 
 ---
 
 ## 📡 API Overview
 
+**Base paths:**  
+- Telecaller app: `/api` (auth, pages, reports, assign, import).  
+- Admin dashboard: `/admin` (auth, reports, telecaller-summary, etc.).
+
 ### Authentication
-*   **Login**: Validates against external API first, then local DB (`employeeId` + `password`).
 
-### Leads
-*   `POST /api/pages/add-lead` - Manually create a lead (Any type).
-*   `GET /api/pages/leads` - List active leads with filtering.
-*   `POST /api/pages/leads/:id` - Process a lead (Move to next stage).
-*   `GET /api/pages/return/:id` - View Return lead details.
-*   `GET /api/pages/loss-of-sale/:id` - View Loss of Sale lead details.
+- **Telecaller app:** `POST /api/auth/login` (employeeId + password; external API then local DB). `POST /api/auth/register` (create telecaller). `GET /api/auth/profile` (protected).
+- **Admin dashboard:** `POST /admin/auth/login` (separate admin auth).
 
-### Follow-Ups
-*   `GET /api/pages/follow-ups` - List pending follow-ups.
-*   `POST /api/pages/follow-ups/:id` - Process a follow-up.
+### Leads (`/api/pages`)
 
-### Complaints
-*   `GET /api/pages/complaints` - List complaints.
-*   `PATCH /api/pages/complaints/:id/call` - Log a re-call (updates history & duration).
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/leads` | List leads (filters: leadType, store, dates, etc.) |
+| GET | `/leads/:id` | Get lead by id |
+| PATCH / POST | `/leads/:id` | Update lead and move (complaint / follow-up / report) |
+| GET | `/return/:id` | Get return lead |
+| POST | `/return/:id` | Update return lead and move |
+| GET | `/loss-of-sale/:id` | Get loss-of-sale lead |
+| POST | `/loss-of-sale/:id` | Update loss-of-sale lead and move |
+| POST | `/add-lead` | Create lead (admin, teamLead, telecaller) |
+
+### Follow-ups (`/api/pages`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/follow-ups` | List follow-ups |
+| GET | `/follow-ups/:id` | Get follow-up by id |
+| POST | `/follow-ups/:id` | Update follow-up and move (complaint / follow-up / report) |
+
+### Complaints (`/api/pages`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/complaints` | List complaints |
+| GET | `/complaints/:id` | Get complaint by id |
+| PATCH / POST | `/complaints/:id/call` | Re-call: set `call_duration` (required) and `complaint_remarks` or `remarks`; optionally update name, phone, store, etc. |
 
 ### Reports
-*   `GET /api/reports` - View processed history.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/reports` | List reports (filters) |
+| GET | `/api/reports/call-summary` | Call summary for current user |
+| GET | `/api/reports/:id` | Get report by id |
+
+### Assignment (`/api/assign`)
+
+- `POST /single` — Assign one lead (admin, teamLead).
+- `POST /bulk` — Assign many leads (admin, teamLead).
+
+### Import
+
+- `POST /api/import/leads` — CSV import (admin, teamLead); field `csvFile`.
+- `POST /api/import/csv` — CSV/Excel upload (admin, super_admin); field `file`.
+
+### Admin (`/admin`)
+
+- `GET /health` — Admin API health.
+- `GET /telecaller-summary` — Aggregated telecaller performance (dateFrom, dateTo).
+- `GET /complaints/pivot` — Complaints pivot (groupBy, filters).
+- `GET /reports` — Admin reports list (filters, pagination, filtersOnly for dropdowns).
+- `GET /users` — List users (optional role filter).
+
+### Health
+
+- `GET /api/health` — Public health check.
 
 ---
 
 ## 🔄 Sync & CSV
 
-### Incremental Sync
-*   **Frequency**: Every 20 minutes (`node-cron`).
-*   **Targets**: `Stores`, `Booking` (Confirmations), and `Return` leads.
-*   **Logic**: Fetches a **Rolling Window** (default 7 days) of data to capture new records and updates to recent records. Deduplicates automatically.
-*   **First Run / Fallback**: Defaults to `API_SYNC_INCREMENTAL_DAYS` (7 days) if no sync history is found, to prevent overloading the system.
-*   **Performance**: Fetches data for multiple locations in parallel (Default Concurrency: 5, Configurable via `SYNC_CONCURRENCY`).
+### API sync (Return + Stores)
 
-### CSV Upload
-*   **Target**: `LossOfSale` and `Enquiry` (Walk-ins).
-*   **Logic**: Manual upload via `/api/upload/csv`. Deduplicates based on phone number.
+- **Schedule:** Every 20 minutes (node-cron; configurable via `API_SYNC_TIME`).
+- **Scope:** Stores list and Return leads (rolling window, e.g. `API_SYNC_INCREMENTAL_DAYS`).
+- **Lock:** Global sync lock to avoid overlapping runs; auto-cleared if expired (~15 min).
+- **Concurrency:** Configurable (`SYNC_CONCURRENCY`).
 
----
+### CSV
 
-## 📘 Swagger Documentation
-Interactive API validation and documentation is available at:
-`GET /api-docs`
+- **Walk-in / Loss of Sale:** Manual upload via `/api/import/leads` or `/api/import/csv` (see Import above). Deduplication by phone (and other keys as per implementation).
 
 ---
 
-## ⚠️ Strict Notes
-1.  **Optional Fields**: Fields like `subCategory`, `closingAction`, `remarks` are optional. If not provided, they remain null/unchanged.
-2.  **No Nested Snapshots**: Responses are flattened for easier mobile consumption.
-3.  **Single Source of Truth**: A lead is **deleted** from its source collection immediately upon successful movement to a destination collection.
-4.  **Snake Case Support**: The API accepts snake_case inputs (e.g., `closing_action`) for compatibility but normalizes them to camelCase (`closingAction`) for storage.
-5.  **Strict Store Filtering**: Store lookups MUST use the centralized `buildStoreFilter()` utility. Direct regex construction is forbidden to prevent collisions (e.g., ensuring "Edappal" does not match "Edappally").
+## 📘 Swagger
+
+Interactive API docs: **GET /api-docs**
 
 ---
 
-## 🔎 Verified Filtering Logic
-**Status as of Jan 31, 2026**
+## 🆔 Identity & attribution
 
-### 1. Date Filtering Behavior
-*   **Leads API (`/api/pages/leads`)**:
-    *   **Return Leads**: When filtering by date, the system prioritizes `returnDate` logic.
-    *   **Other Leads**: Filters primarily by `createdAt` (Lead Creation Date).
-    *   **Note**: Specific date filters (`enquiryDate`, `visitDate`) are currently secondary to creation date in the main listing logic.
-*   **Reports API (`/api/reports`)**:
-    *   **Work Date**: Default date filters (`dateFrom`/`dateTo`) apply to `editedAt` (when the work was done).
-    *   **Creation Date**: Explicit `createdAt` filters apply to the original lead's creation date.
-*   **Call Summary**:
-    *   Aggregates data based on **Work Date** (`editedAt` for Reports, `complaintMarkedAt` for Complaints).
-
-### 2. Store Filtering
-*   **Format**: "Brand - Location" (e.g., "Suitor Guy - Edappally").
-*   **Logic**: Strict regex matching handles Brand ("SG", "Z") and Location independently to ensure data isolation. The same logic (`buildStoreFilter`) is used across all collections.
+- **createdByEmpId / createdByName** — Set when a lead is created (e.g. Add Lead) or, for **return** leads (no creator from sync), backfilled when a telecaller first processes the lead and it is moved to Report/Complaint.
+- **editedBy / editedByEmpId / editedByName** — Last user who updated the record. Used for reports and admin telecaller performance.
 
 ---
 
-## 🆔 Identity & Attribution
-The system tracks **who** created and **who** worked on a lead.
+## 🔎 Filtering (summary)
 
-### 1. Created By (`createdByEmpId`, `createdByName`)
-*   **Enquiry / Booked**: Set to the telecaller who manually added the lead via `POST /add-lead`.
-*   **Return (Sync)**: Since these are system-generated, the "Creator" is backfilled as the **first telecaller** to process the return lead (calls it and moves it to Report/Complaint). This ensures every Report has an owner for attribution.
-
-### 2. Edited By (`editedBy`, `editedByEmpId`)
-*   **All Leads**: Always set to the telecaller who performed the last action (call, update, move).
-*   **Admin Reports**: Uses these identity fields to generate per-telecaller performance metrics.
+- **Leads:** Return leads use `returnDate` for date filters; others use `createdAt`. Store format: `"Brand - Location"`; use centralized store logic (e.g. Edappal vs Edappally).
+- **Reports:** `dateFrom`/`dateTo` apply to `editedAt` by default; optional `createdAt` filters for lead creation date.
+- **Admin telecaller summary:** Work date = `editedAt` (reports), `complaintMarkedAt` (complaints).
 
 ---
+
+## ⚠️ Notes
+
+1. **Optional fields** — `subCategory`, `closingAction`, `remarks`, etc. can be omitted; stored as null or unchanged.
+2. **Flat responses** — No nested snapshots; responses are flat for clients.
+3. **Single copy** — On move (e.g. Lead → Complaint), the lead is **deleted** from the source after the destination document is created.
+4. **Snake_case** — API accepts snake_case (e.g. `closing_action`); stored as camelCase.
+5. **Store filtering** — Use the shared store-filter utility; avoid ad-hoc regex (e.g. Edappal vs Edappally).
