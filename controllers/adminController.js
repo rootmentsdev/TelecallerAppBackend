@@ -28,6 +28,9 @@ const buildBaseFilters = (query) => {
     }
 
     // 2. Lead Creation Date (createdAt) - Applies to original lead creation
+    const fromForCreatedAt = createdAtFrom || (dateField === 'createdAt' && dateFrom ? dateFrom : null);
+    const toForCreatedAt = createdAtTo || (dateField === 'createdAt' && dateTo ? dateTo : null);
+
     if (createdAt) {
         const parsed = parseQueryDate(createdAt);
         if (parsed) {
@@ -35,15 +38,15 @@ const buildBaseFilters = (query) => {
             const endOfDay = new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999));
             baseFilters.createdAt = { $gte: startOfDay, $lte: endOfDay };
         }
-    } else if (createdAtFrom || createdAtTo) {
+    } else if (fromForCreatedAt || toForCreatedAt) {
         baseFilters.createdAt = {};
-        if (createdAtFrom) {
-            const parsed = parseQueryDate(createdAtFrom);
-            baseFilters.createdAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(createdAtFrom);
+        if (fromForCreatedAt) {
+            const parsed = parseQueryDate(fromForCreatedAt);
+            baseFilters.createdAt.$gte = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day)) : new Date(fromForCreatedAt);
         }
-        if (createdAtTo) {
-            const parsed = parseQueryDate(createdAtTo);
-            const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(createdAtTo);
+        if (toForCreatedAt) {
+            const parsed = parseQueryDate(toForCreatedAt);
+            const end = parsed ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day, 23, 59, 59, 999)) : new Date(toForCreatedAt);
             if (!parsed) end.setHours(23, 59, 59, 999);
             else end.setUTCHours(23, 59, 59, 999);
             baseFilters.createdAt.$lte = end;
