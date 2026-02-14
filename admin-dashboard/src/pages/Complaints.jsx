@@ -3,7 +3,12 @@ import { RefreshCw, Filter } from 'lucide-react';
 import { getComplaintPivot } from '../services/analyticsService';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+// Distinct colors for pie slices (avoid similar shades)
+const COLORS = [
+    '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+    '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+    '#a855f7', '#06b6d4'
+];
 
 const Complaints = () => {
     const [loading, setLoading] = useState(false);
@@ -69,6 +74,33 @@ const Complaints = () => {
         const sortedStores = Array.from(stores).sort();
         const sortedCats = Array.from(cats).sort();
 
+        // Build chart data with percentages that sum to 100% (largest-remainder method)
+        const categoryTotalsRaw = Object.entries(rowTotals)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+        const chartTotal = categoryTotalsRaw.reduce((s, d) => s + d.value, 0);
+        const categoryTotals = chartTotal === 0
+            ? categoryTotalsRaw.map(d => ({ ...d, percent: 0 }))
+            : (() => {
+                const withFrac = categoryTotalsRaw.map(d => ({
+                    ...d,
+                    percentFrac: (d.value / chartTotal) * 100
+                }));
+                const rounded = withFrac.map(d => ({
+                    ...d,
+                    percent: Math.floor(d.percentFrac)
+                }));
+                let remainder = 100 - rounded.reduce((s, d) => s + d.percent, 0);
+                const byRemainder = withFrac
+                    .map((d, i) => ({ i, rem: d.percentFrac - Math.floor(d.percentFrac) }))
+                    .sort((a, b) => b.rem - a.rem);
+                for (let k = 0; remainder > 0 && k < byRemainder.length; k++) {
+                    rounded[byRemainder[k].i].percent += 1;
+                    remainder -= 1;
+                }
+                return rounded.map(({ name, value, percent }) => ({ name, value, percent }));
+            })();
+
         return {
             pivotData: pivot,
             columns: sortedStores,
@@ -76,7 +108,7 @@ const Complaints = () => {
             grandTotal: total,
             colTotals,
             rowTotals: rowTotals,
-            categoryTotals: Object.entries(rowTotals).map(([name, value]) => ({ name, value })) // For chart
+            categoryTotals
         };
     }, [rawData]);
 
@@ -169,28 +201,53 @@ const Complaints = () => {
                 </div>
             </div>
 
-            {/* Category Chart (Below Table) */}
+            {/* Category Chart (Below Table) - Percentages sum to 100%, clean layout */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 className="text-gray-700 font-semibold mb-6">Complaints by Category (Total)</h3>
-                <div className="min-h-[300px]">
-                    <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
+                <h3 className="text-gray-700 font-semibold mb-2">Complaints by Category (Total)</h3>
+                <p className="text-sm text-gray-500 mb-6">Total: {grandTotal} complaints · Percentages sum to 100%</p>
+                <div className="min-h-[380px] w-full">
+                    <ResponsiveContainer width="100%" height={380}>
+                        <PieChart margin={{ top: 12, right: 12, bottom: 80, left: 12 }}>
                             <Pie
                                 data={categoryTotals}
                                 cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                outerRadius={100}
-                                fill="#8884d8"
+                                cy="42%"
+                                innerRadius={60}
+                                outerRadius={120}
+                                paddingAngle={2}
                                 dataKey="value"
+                                label={({ name, percent }) => (percent > 0 ? `${percent}%` : '')}
+                                labelLine={false}
                             >
                                 {categoryTotals?.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    <Cell key={`cell-${entry.name}-${index}`} fill={COLORS[index % COLORS.length]} stroke="#fff" strokeWidth={1} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value, name, props) => [`${value} Complaints`, name]} />
-                            <Legend />
+                            <Tooltip
+                                content={({ active, payload }) => {
+                                    if (!active || !payload?.length) return null;
+                                    const d = payload[0].payload;
+                                    return (
+                                        <div className="bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm">
+                                            <div className="font-medium text-gray-900">{d.name}</div>
+                                            <div className="text-gray-600">{d.value} complaints · {d.percent}%</div>
+                                        </div>
+                                    );
+                                }}
+                            />
+                            <Legend
+                                layout="horizontal"
+                                align="center"
+                                verticalAlign="bottom"
+                                wrapperStyle={{ paddingTop: 16 }}
+                                formatter={(value, entry) => {
+                                    const item = categoryTotals.find(c => c.name === value);
+                                    const pct = item ? item.percent : 0;
+                                    return <span className="text-sm text-gray-700">{value} ({pct}%)</span>;
+                                }}
+                                iconSize={10}
+                                iconType="circle"
+                            />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
