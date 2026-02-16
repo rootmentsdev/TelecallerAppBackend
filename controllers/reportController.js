@@ -149,8 +149,7 @@ export const getReports = async (req, res) => {
     const [reports, total] = await Promise.all([
       Report.find(query)
         .populate("editedBy", "name employeeId")
-        .collation({ locale: "en", strength: 2 })
-        .sort({ lead_name: 1, createdAt: -1 })
+        .sort({ editedAt: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
       Report.countDocuments(query),

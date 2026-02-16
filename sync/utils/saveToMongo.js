@@ -278,14 +278,6 @@ export const saveToMongo = async (leadData) => {
   try {
     await connectDB();
 
-    // Debug Logging for Identity Matching (Development Mode)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`\n🔍 Checking Lead: ${leadData.name}`);
-      console.log(`   Expected Brand: ${leadData.brand || 'Unknown'}`);
-      console.log(`   Store: ${leadData.store}`);
-      console.log(`   Booking: ${leadData.bookingNo || 'Missing'}`);
-    }
-
     // Validate required fields
     if (!leadData.name || !leadData.phone || !leadData.store) {
       console.warn("Skipping lead - missing required fields:", leadData);
@@ -341,24 +333,16 @@ export const saveToMongo = async (leadData) => {
 
     // DUPLICATE CHECK FOR BOOKING/RETURN: Skip if duplicate (don't update to preserve user edits)
     // These come from API and should only add new records (incremental sync)
-    // ALWAYS check: name, phone, leadType, store, brand
+    // ALWAYS check: name, phone, leadType, store
     // CRITICAL: Normalize and trim all fields for accurate comparison
     if (leadData.leadType === "booked" || leadData.leadType === "return") {
-      // Normalize fields
+      // Normalize fields: trim and ensure consistent format
       const normalizedName = (leadData.name || "").trim();
       const normalizedPhone = (leadData.phone || "").trim();
       const normalizedStore = (leadData.store || "").trim();
-      const normalizedBrand = (leadData.brand || "").trim();
       const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
 
-      // Safety Validation: Brand is required for uniqueness
-      if (!normalizedBrand && leadData.leadType === "return") {
-        console.warn(`⚠️  Skipping return lead - missing brand (Identity Risk): ${normalizedStore}`);
-        return { skipped: true, reason: "Missing brand identity" };
-      }
-
-      // Build comprehensive duplicate check query
-      // Identity: Brand + Store + BookingNo (or Phone)
+      // Build comprehensive duplicate check query with normalized fields
       const duplicateQuery = {
         name: normalizedName,
         phone: normalizedPhone,
@@ -366,58 +350,62 @@ export const saveToMongo = async (leadData) => {
         store: normalizedStore,
       };
 
-      // Add brand to query if available (should be for returns)
-      if (normalizedBrand) {
-        duplicateQuery.brand = normalizedBrand;
-      }
-
+      // Add bookingNo (id) if it exists - this is critical for booking/return leads
+      // CRITICAL: Re-enabled to allow multiple returns/bookings for same customer (repeat business)
       if (normalizedBookingNo !== "") {
         duplicateQuery.bookingNo = normalizedBookingNo;
       }
 
-      // Case-insensitive query
-      // Escape special characters in brand/store/name
-      const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
+      // Use case-insensitive comparison for name and store to catch case differences
       const caseInsensitiveQuery = {
-        name: { $regex: new RegExp(`^${escapeRegex(normalizedName)}$`, 'i') },
+        name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
         phone: normalizedPhone,
         leadType: leadData.leadType,
-        store: { $regex: new RegExp(`^${escapeRegex(normalizedStore)}$`, 'i') },
+        store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       };
-
-      if (normalizedBrand) {
-        caseInsensitiveQuery.brand = { $regex: new RegExp(`^${escapeRegex(normalizedBrand)}$`, 'i') };
-      }
 
       if (normalizedBookingNo !== "") {
         caseInsensitiveQuery.bookingNo = normalizedBookingNo;
       }
 
-      // Try exact match first
+      // Try exact match first (faster)
       let existing = await Lead.findOne(duplicateQuery);
 
-      // If not found, try case-insensitive match
+      // If not found, try case-insensitive match (catches case differences)
       if (!existing && normalizedName && normalizedStore) {
         existing = await Lead.findOne(caseInsensitiveQuery);
       }
 
-      // Secondary Check - Check by Name + Phone + LeadType + Store + Brand (IGNORING bookingNo)
+      // CRITICAL: Secondary Check - Check by Name + Phone + LeadType + Store (IGNORING bookingNo)
+      // This handles cases where the booking number is missing but it is logically the same lead.
+      // We ONLY do this check if we don't have a booking number to differentiate.
       if (!existing && normalizedBookingNo === "") {
-        const secondaryQuery = { ...caseInsensitiveQuery };
-        // Do NOT include bookingNo in secondary check
-        delete secondaryQuery.bookingNo;
+        const secondaryQuery = {
+          name: { $regex: new RegExp(`^${normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          phone: normalizedPhone,
+          leadType: leadData.leadType,
+          store: { $regex: new RegExp(`^${normalizedStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          // Do NOT include bookingNo
+        };
         existing = await Lead.findOne(secondaryQuery);
+        if (existing) {
+          console.log(`   ⚠️  Duplicate detected by Secondary Check (Name+Phone+Type+Store) - BookingNo missing in incoming:`);
+          console.log(`      Existing BookingNo: ${existing.bookingNo}`);
+        }
       }
 
       if (existing) {
-        // Record already exists - skip
-        const checkFields = `brand="${normalizedBrand}", store="${normalizedStore}", bookingNo="${normalizedBookingNo}"`;
-        console.log(`   ⏭️  Duplicate detected - skipped: ${checkFields}`);
+        // Record already exists in Leads - skip it to prevent duplicates
+        const checkFields = `name="${normalizedName}", phone="${normalizedPhone}", leadType="${leadData.leadType}", store="${normalizedStore}"${normalizedBookingNo ? `, bookingNo="${normalizedBookingNo}"` : ""}`;
+        console.log(`   ⏭️  Duplicate detected in Leads - skipped: ${checkFields}`);
+        console.log(`      Existing lead ID: ${existing._id}`);
         return {
           skipped: true,
           leadId: existing._id,
-          reason: "Duplicate detected: " + checkFields
+          name: existing.name,
+          phone: existing.phone,
+          bookingNo: existing.bookingNo,
+          reason: "Duplicate detected in Leads collection: matching " + checkFields
         };
       }
     }

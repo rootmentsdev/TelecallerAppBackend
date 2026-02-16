@@ -42,8 +42,6 @@ const complaintSchema = new mongoose.Schema(
     closingStatus: { type: String }, // For Just Dial page (Legacy support if needed, or remove? Keeping for schema compat)
     closingAction: { type: String, default: null },
 
-    refund_status: { type: String, default: null },
-
     // Follow-up
     followUpFlag: { type: Boolean, default: false },
 
@@ -89,11 +87,5 @@ complaintSchema.index({ store: 1 });
 complaintSchema.index({ complaintMarkedBy: 1 });
 complaintSchema.index({ complaintMarkedAt: -1 });
 complaintSchema.index({ createdAt: -1 });
-
-// Global Sorting Index (Name A-Z, CreatedAt Newest)
-complaintSchema.index(
-  { name: 1, createdAt: -1 },
-  { collation: { locale: "en", strength: 2 } }
-);
 
 export default mongoose.model("Complaint", complaintSchema);

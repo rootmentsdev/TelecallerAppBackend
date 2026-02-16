@@ -368,7 +368,6 @@ export const getAdminReports = async (req, res) => {
             page = 1,
             limit = 50,
             leadType,
-            refund_status, // Optional; only meaningful when leadType === 'return'
             telecallerId, // Maps to editedBy (telecaller context - legacy/ObjectId)
             telecaller,   // Maps to createdByEmpId (NEW - String EmpId)
             callStatus,
@@ -415,7 +414,6 @@ export const getAdminReports = async (req, res) => {
 
         // Common optional filters
         if (leadType) query.leadType = leadType;
-        if (refund_status != null && refund_status !== '' && leadType === 'return') query.refund_status = refund_status;
         if (telecallerId) query.editedBy = telecallerId; // Legacy/Admin context targetting editor by ObjectId
 
         // NEW: Filter by createdByEmpId
@@ -449,8 +447,7 @@ export const getAdminReports = async (req, res) => {
         const [reports, total] = await Promise.all([
             Report.find(query)
                 .populate("editedBy", "name employeeId")
-                .collation({ locale: "en", strength: 2 })
-                .sort({ lead_name: 1, createdAt: -1 })
+                .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(parseInt(limit)),
             Report.countDocuments(query),
@@ -486,8 +483,7 @@ export const getAdminReports = async (req, res) => {
                 telecaller: telecallerObj,
                 // Include Creator info just in case
                 createdByEmpId: obj.createdByEmpId,
-                createdByName: obj.createdByName,
-                refund_status: obj.refund_status ?? null
+                createdByName: obj.createdByName
             };
         });
 

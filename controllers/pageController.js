@@ -93,8 +93,7 @@ const buildLeadQuery = (user, filters = {}, allowTelecallerAll = false) => {
   return query;
 };
 
-// Helper to build a single flat list-item object for lead/followUp (no nested arrays or snapshots).
-// Used by getLeadById, getFollowUpById, and getFollowUps list. Same flat shape as getLeads.
+// Helper to build flattened lead object matching the leads list API format
 const buildListSnapshot = (lead) => {
   return {
     id: lead._id,
@@ -120,14 +119,16 @@ const buildListSnapshot = (lead) => {
     follow_up_date: lead.followUpDate || null,
     security_amount: lead.securityAmount || null,
 
+    // Add missing fields for detailed view
     source: lead.source || null,
     brand: lead.brand || null,
     remarks: lead.remarks || null,
     call_duration: lead.callDuration || 0,
     rating: lead.rating || null,
 
+    // Categorization fields (snake_case for frontend compatibility)
     sub_category: lead.subCategory || null,
-    subCategory: lead.subCategory || null,
+    subCategory: lead.subCategory || null, // Provide both for safety
 
     item_category: lead.itemCategory || null,
     itemCategory: lead.itemCategory || null,
@@ -135,14 +136,13 @@ const buildListSnapshot = (lead) => {
     closing_action: lead.closingAction || null,
     closingAction: lead.closingAction || null,
 
+    // New Fields (2026-01-23)
     service: lead.service || null,
     number_of_functions: lead.numberOfFunctions || null,
     numberOfFunctions: lead.numberOfFunctions || null,
     number_of_attires: lead.numberOfAttires || null,
     numberOfAttires: lead.numberOfAttires || null,
-    competitor: lead.competitor || null,
-
-    refund_status: lead.refund_status ?? null,
+    competitor: lead.competitor || null
   };
 };
 
@@ -275,8 +275,6 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetada
     itemCategory: lead.itemCategory || undefined,
     closingAction: lead.closingAction || undefined,
 
-    refund_status: (lead.leadType === "return" || lead.lead_type === "return") ? (lead.refund_status ?? null) : null,
-
     // Call Duration
     callDuration: (callDuration !== undefined && callDuration !== null) ? callDuration : (lead.callDuration || lead.call_duration || 0),
 
@@ -406,12 +404,9 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.competitor = lead.competitor ?? null;
   payload.securityAmount = lead.securityAmount ?? lead.security_amount ?? null;
 
-  const isReturnLead = (lead.leadType ?? lead.lead_type) === "return";
-  payload.refund_status = isReturnLead ? (lead.refund_status ?? null) : null;
-
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'reason', 'editedBy', 'editedAt', 'edited_by', 'edited_at', 'refund_status'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'reason', 'editedBy', 'editedAt', 'edited_by', 'edited_at'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -673,10 +668,9 @@ const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration
     subCategory: lead.subCategory,
     itemCategory: lead.itemCategory,
     closingAction: lead.closingAction,
-    refund_status: (lead.leadType === "return" || lead.lead_type === "return") ? (lead.refund_status ?? null) : null,
     complaintMarkedBy: userId,
     complaintMarkedAt: new Date(),
-    sourceLeadId: sourceLeadIdValue,
+    sourceLeadId: sourceLeadIdValue, // Use original _id from document (ObjectId or string)
 
     // Audit Metadata (New Fields)
     editedByEmpId: auditMetadata.editedByEmpId,
@@ -880,16 +874,13 @@ export const getLeads = async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Sorting
-    // Strict Sorting Policy: Name (A-Z) -> CreatedAt (Newest)
-    // Overrides any dynamic sorting to ensure consistent stable order
-    const sortOptions = { name: 1, createdAt: -1 };
-    const collation = { locale: "en", strength: 2 };
+    const allowedSortFields = ['createdAt', 'enquiryDate', 'functionDate', 'visitDate', 'name', 'store', 'leadType'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
     const leads = await Lead.find(query)
       .populate("assignedTo", "name employeeId")
-      .collation(collation)
-      .sort(sortOptions)
+      .sort({ [sortField]: sortDirection })
       .skip(skip)
       .limit(parseInt(limit));
 
@@ -911,8 +902,7 @@ export const getLeads = async (req, res) => {
           id: lead.assignedTo._id,
           name: lead.assignedTo.name,
           employee_id: lead.assignedTo.employeeId
-        } : null,
-        refund_status: lead.refund_status ?? null,
+        } : null
       };
 
       if (lead.leadType === 'return' || lead.leadType === 'booked') {
@@ -1123,9 +1113,8 @@ export const getReturnLead = async (req, res) => {
       lead_name: lead.name,
       phone_number: lead.phone,
       booking_number: lead.bookingNo,
-      return_date: lead.returnDate || null,
-      attended_by: lead.attendedBy || null,
-      refund_status: lead.refund_status ?? null,
+      return_date: lead.returnDate || null, // null is valid for items not yet returned
+      attended_by: lead.attendedBy || null, // Optional field, may be empty
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1136,7 +1125,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor, mark_as_issue, function_date, refund_status } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor, mark_as_issue, function_date } = req.body;
 
     // Audit Metadata - ensures telecaller/createdBy is mapped when Return lead moves to Report
     // Return leads come from sync and lack createdByEmpId; we attribute to current user
@@ -1240,7 +1229,6 @@ export const updateReturnLead = async (req, res) => {
     // ADDITIONAL FIELDS (Requested 2nd batch)
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
-    if (refund_status !== undefined) updateData.refund_status = refund_status;
 
     if (!lead.leadType) {
       updateData.leadType = "return";
@@ -1304,7 +1292,6 @@ export const createAddLead = async (req, res) => {
       closing_action, // Handle snake_case input
       remarks,
       call_duration,
-      refund_status,
 
       mark_as_complaint
     } = req.body;
@@ -1398,8 +1385,7 @@ export const createAddLead = async (req, res) => {
       auditData.editedAt = new Date();
     }
 
-    const effectiveLeadType = leadType || lead_type || "enquiry";
-    const isReturn = effectiveLeadType === "return";
+    // Common fields map
     const commonData = {
       name: customer_name || null,
       phone: phoneClean,
@@ -1407,19 +1393,18 @@ export const createAddLead = async (req, res) => {
       store: storeValue,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
-      leadType: effectiveLeadType,
+      leadType: leadType || lead_type || "enquiry", // Default to enquiry
       source: "Manual Entry",
       subCategory: subCategory || sub_category || undefined,
       itemCategory: itemCategory || item_category || undefined,
       closingAction: closingAction || closing_action || undefined,
       remarks: remarks ? String(remarks).trim() : undefined,
-      refund_status: isReturn ? (refund_status ?? null) : null,
 
       functionDate: validFunctionDate || undefined,
       followUpDate: validFollowUpDate || undefined,
       callDuration: call_duration ? Number(call_duration) : 0,
       createdBy: req.user._id,
-      assignedTo: req.user._id,
+      assignedTo: req.user._id, // Assign to creator by default? Usually yes for manual entry.
       ...auditData
     };
 
@@ -1821,8 +1806,7 @@ export const updateLead = async (req, res) => {
       rating,
       call_duration,
       mark_as_complaint, // REMOVED mark_as_issue
-      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate,
-      refund_status
+      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1898,10 +1882,6 @@ export const updateLead = async (req, res) => {
 
     if (leadType !== undefined) updateData.leadType = leadType;
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
-    if (refund_status !== undefined) {
-      const effectiveType = updateData.leadType ?? lead.leadType;
-      updateData.refund_status = (effectiveType === "return") ? refund_status : null;
-    }
 
     // Ensure leadType is set to enquiry if missing (default for generic update if undefined in doc and update)
     if (!lead.leadType && !updateData.leadType) {
@@ -2059,9 +2039,10 @@ export const getFollowUps = async (req, res) => {
     const query = buildLeadQuery(req.user, filters);
 
     // Sorting
-    // Strict Sorting Policy: Name (A-Z) -> CreatedAt (Newest)
-    const sortOptions = { name: 1, createdAt: -1 };
-    const collation = { locale: "en", strength: 2 };
+    const sortOptions = {};
+    const validSortFields = ["createdAt", "enquiryDate", "functionDate", "visitDate", "name", "store", "leadType"];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+    sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
 
     // Pagination
     const pageNum = parseInt(page, 10) || 1;
@@ -2070,13 +2051,7 @@ export const getFollowUps = async (req, res) => {
 
     // Execute query
     const [followUps, total] = await Promise.all([
-      FollowUp.find(query)
-        .collation(collation)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limitNum)
-        .populate("assignedTo", "name employeeId")
-        .lean(),
+      FollowUp.find(query).sort(sortOptions).skip(skip).limit(limitNum).populate("assignedTo", "name employeeId").lean(),
       FollowUp.countDocuments(query),
     ]);
 
@@ -2130,9 +2105,8 @@ export const updateFollowUp = async (req, res) => {
       call_duration,
       rating,
       mark_as_complaint, // Extract mark_as_complaint
-      subCategory, sub_category, itemCategory, item_category, closingAction, closing_action, leadType, functionDate,
-      sectionAmount, securityamount, service, nooffunction, noofattires, competitor,
-      refund_status
+      subCategory, sub_category, itemCategory, item_category, closingAction, closing_action, leadType, functionDate, // Extract new fields + aliases
+      sectionAmount, securityamount, service, nooffunction, noofattires, competitor // New requested fields (2026-01-23)
     } = req.body;
 
     // Validate remarks input
@@ -2244,10 +2218,6 @@ export const updateFollowUp = async (req, res) => {
     if (nooffunction !== undefined) updateData.numberOfFunctions = nooffunction;
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
-    if (refund_status !== undefined) {
-      const effectiveType = updateData.leadType ?? followUp.leadType;
-      updateData.refund_status = (effectiveType === "return") ? refund_status : null;
-    }
 
     // Audit Metadata - ensures telecaller/createdBy is mapped when FollowUp moves to Report
     let auditUpdateData = {};
@@ -2406,9 +2376,11 @@ export const getComplaints = async (req, res) => {
     }
 
     // Build sort object
-    // Strict Sorting Policy: Name (A-Z) -> CreatedAt (Newest)
-    const sortOptions = { name: 1, createdAt: -1 };
-    const collation = { locale: "en", strength: 2 };
+    const sortOptions = {};
+    const validSortFields = ["complaintMarkedAt", "createdAt", "name", "store", "leadType"];
+    // Default to complaintMarkedAt, fallback to issueMarkedAt if legacy, but here we strictly use complaintMarkedAt
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "complaintMarkedAt";
+    sortOptions[sortField] = sortOrder === "asc" ? 1 : -1;
 
     // Calculate pagination
     const pageNum = parseInt(page, 10) || 1;
@@ -2419,7 +2391,6 @@ export const getComplaints = async (req, res) => {
     const [complaints, total] = await Promise.all([
       Complaint.find(filters)
         .populate('complaintMarkedBy', 'name employeeId')
-        .collation(collation)
         .sort(sortOptions)
         .skip(skip)
         .limit(limitNum)
