@@ -201,22 +201,22 @@ const Complaints = () => {
                 </div>
             </div>
 
-            {/* Category Chart (Below Table) - Percentages sum to 100%, clean layout */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            {/* Pie chart card: no horizontal scroll, bigger chart, vertical legend */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-hidden min-w-0">
                 <h3 className="text-gray-700 font-semibold mb-2">Complaints by Category (Total)</h3>
                 <p className="text-sm text-gray-500 mb-6">Total: {grandTotal} complaints · Percentages sum to 100%</p>
-                <div className="min-h-[380px] w-full">
-                    <ResponsiveContainer width="100%" height={380}>
-                        <PieChart margin={{ top: 12, right: 12, bottom: 80, left: 12 }}>
+                <div className="min-h-[520px] w-full" style={{ maxWidth: '100%' }}>
+                    <ResponsiveContainer width="100%" height={520}>
+                        <PieChart margin={{ top: 20, right: 220, bottom: 20, left: 20 }}>
                             <Pie
                                 data={categoryTotals}
-                                cx="50%"
-                                cy="42%"
-                                innerRadius={60}
-                                outerRadius={120}
+                                cx="35%"
+                                cy="50%"
+                                innerRadius={80}
+                                outerRadius={160}
                                 paddingAngle={2}
                                 dataKey="value"
-                                label={({ name, percent }) => (percent > 0 ? `${percent}%` : '')}
+                                label={({ percent }) => (percent > 0 ? `${percent}%` : '')}
                                 labelLine={false}
                             >
                                 {categoryTotals?.map((entry, index) => (
@@ -236,11 +236,11 @@ const Complaints = () => {
                                 }}
                             />
                             <Legend
-                                layout="horizontal"
-                                align="center"
-                                verticalAlign="bottom"
-                                wrapperStyle={{ paddingTop: 16 }}
-                                formatter={(value, entry) => {
+                                layout="vertical"
+                                align="right"
+                                verticalAlign="middle"
+                                wrapperStyle={{ paddingLeft: 24 }}
+                                formatter={(value) => {
                                     const item = categoryTotals.find(c => c.name === value);
                                     const pct = item ? item.percent : 0;
                                     return <span className="text-sm text-gray-700">{value} ({pct}%)</span>;
