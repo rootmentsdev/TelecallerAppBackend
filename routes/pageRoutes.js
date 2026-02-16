@@ -704,6 +704,9 @@
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
+ *               refund_status:
+ *                 type: string
+ *                 description: "Optional. Snake_case. Only for return leads. Preserved across Report/Complaint/FollowUp."
  *               securityamount:
  *                 type: string
  *                 description: "Security amount deposit (String or Number)"
@@ -827,6 +830,9 @@
  *                 type: string
  *                 format: date-time
  *                 description: "Alias for functionDate (snake_case)"
+ *               refund_status:
+ *                 type: string
+ *                 description: "Optional. Snake_case string. Only applicable for leadType=return. Preserved across Lead → Report/Complaint/FollowUp."
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Priority 1. If true, creates a Complaint directly (bypassing Leads/FollowUps). Cannot be used with follow_up_flag."
@@ -956,7 +962,9 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *                 type: string
  *               closingAction:
  *                 type: string
-
+ *               refund_status:
+ *                 type: string
+ *                 description: "Optional. Only for return leads. Preserved when moving to Report/Complaint/FollowUp."
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
@@ -1163,6 +1171,7 @@ router.get(
  *               noofattires: { type: number }
  *               competitor: { type: string }
  *               securityamount: { type: string }
+ *               refund_status: { type: string, description: "Optional. Only for return leads. Preserved across workflow." }
  *     responses:
  *       200:
  *         description: Return lead updated and moved
@@ -1714,6 +1723,9 @@ router.get(
  *               competitor:
  *                 type: string
  *                 description: "Competitor name"
+ *               refund_status:
+ *                 type: string
+ *                 description: "Optional. Only for return leads. Preserved when moving to Report/Complaint."
  *           required:
  *             - call_status
  *             - lead_status

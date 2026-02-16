@@ -11,6 +11,7 @@ const Reports = () => {
     // Filter Options State
     const [telecallerOptions, setTelecallerOptions] = useState([]);
     const [storeOptions, setStoreOptions] = useState([]);
+    const [refundStatusOptions, setRefundStatusOptions] = useState([]);
     const [filtersLoading, setFiltersLoading] = useState(false);
 
     const [filters, setFilters] = useState({
@@ -18,7 +19,8 @@ const Reports = () => {
         dateTo: '',
         store: '',
         telecaller: '', // Stores EmpId
-        leadType: ''
+        leadType: '',
+        refundStatus: ''
     });
 
     useEffect(() => {
@@ -26,9 +28,10 @@ const Reports = () => {
         const loadFilters = async () => {
             setFiltersLoading(true);
             try {
-                const { telecallers, stores } = await getReportFilters();
+                const { telecallers, stores, refundStatuses } = await getReportFilters();
                 setTelecallerOptions(telecallers || []);
                 setStoreOptions(stores || []);
+                setRefundStatusOptions(refundStatuses || []);
             } catch (err) {
                 console.error("Failed to load report filters", err);
             } finally {
@@ -53,6 +56,7 @@ const Reports = () => {
                 dateTo: filters.dateTo || undefined,
                 telecaller: filters.telecaller || undefined, // Send EmpId
                 leadType: filters.leadType || undefined,
+                refund_status: filters.leadType === 'return' && filters.refundStatus ? filters.refundStatus : undefined,
                 dateField: 'createdAt' // Forces filtering by createdAt as requested
             };
             const result = await getReports(params);
@@ -71,7 +75,7 @@ const Reports = () => {
     };
 
     const handleResetAndFetch = async () => {
-        const emptyFilters = { dateFrom: '', dateTo: '', store: '', telecaller: '', leadType: '' };
+        const emptyFilters = { dateFrom: '', dateTo: '', store: '', telecaller: '', leadType: '', refundStatus: '' };
         setFilters(emptyFilters);
         setMeta(prev => ({ ...prev, page: 1 }));
         setLoading(true);
@@ -92,7 +96,7 @@ const Reports = () => {
     };
 
     const handleExport = () => {
-        const headers = ["Created Date", "Store", "Lead Name", "Phone", "Created By", "Duration", "Lead Type", "Note"];
+        const headers = ["Created Date", "Store", "Lead Name", "Phone", "Created By", "Duration", "Lead Type", "Refund Status", "Note"];
         const csvContent = [
             headers.join(","),
             ...data.map(row => [
@@ -103,6 +107,7 @@ const Reports = () => {
                 `"${row.createdByName || ''}"`,   // Created By
                 row.callDuration,
                 `"${row.leadType || row.lead_type || ''}"`,
+                (row.leadType || row.lead_type) === 'return' ? `"${row.refund_status || ''}"` : '"-"',
                 `"${row.remarks || ''}"`
             ].join(","))
         ].join("\n");
@@ -184,7 +189,7 @@ const Reports = () => {
                     <select
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         value={filters.leadType}
-                        onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value }))}
+                        onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value, refundStatus: e.target.value !== 'return' ? '' : prev.refundStatus }))}
                     >
                         <option value="">All Types</option>
                         <option value="enquiry">Enquiry</option>
@@ -192,6 +197,23 @@ const Reports = () => {
                         <option value="return">Return</option>
                     </select>
                 </div>
+
+                {/* Refund Status Filter - only when leadType = return */}
+                {filters.leadType === 'return' && (
+                    <div className="min-w-[150px]">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Refund Status</label>
+                        <select
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                            value={filters.refundStatus}
+                            onChange={e => setFilters(prev => ({ ...prev, refundStatus: e.target.value }))}
+                        >
+                            <option value="">All</option>
+                            {refundStatusOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Telecaller Filter */}
                 <div className="min-w-[200px]">
@@ -233,13 +255,14 @@ const Reports = () => {
                                 <th className="px-6 py-4">Created By</th>
                                 <th className="px-6 py-4">Duration</th>
                                 <th className="px-6 py-4">Lead Type</th>
+                                <th className="px-6 py-4">Refund Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {loading ? (
-                                <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">Loading reports...</td></tr>
+                                <tr><td colSpan="8" className="px-6 py-8 text-center text-gray-500">Loading reports...</td></tr>
                             ) : data.length === 0 ? (
-                                <tr><td colSpan="7" className="px-6 py-8 text-center text-gray-500">No reports found</td></tr>
+                                <tr><td colSpan="8" className="px-6 py-8 text-center text-gray-500">No reports found</td></tr>
                             ) : (
                                 data.map((row, i) => (
                                     <tr key={row.reportId || i} className="hover:bg-gray-50">
@@ -267,6 +290,11 @@ const Reports = () => {
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 capitalize">
                                                 {row.leadType || row.lead_type || '-'}
                                             </span>
+                                        </td>
+
+                                        {/* Refund Status: only meaningful for return type */}
+                                        <td className="px-6 py-4 text-gray-600">
+                                            {(row.leadType || row.lead_type) === 'return' ? (row.refund_status || '-') : '-'}
                                         </td>
                                     </tr>
                                 ))

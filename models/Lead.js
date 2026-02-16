@@ -57,6 +57,9 @@ const leadSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     assignedAt: { type: Date },
+
+    // Return-lead only: refund status (snake_case from frontend)
+    refund_status: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -76,6 +76,9 @@ const complaintSchema = new mongoose.Schema(
 
     // Reference to original lead (for audit trail)
     sourceLeadId: { type: mongoose.Schema.Types.ObjectId, ref: "Lead" },
+
+    // Return-lead only: refund status (preserved across workflow)
+    refund_status: { type: String, default: null },
   },
   { timestamps: true }
 );

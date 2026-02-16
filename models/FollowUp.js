@@ -70,6 +70,9 @@ const followUpSchema = new mongoose.Schema(
     createdByEmpId: { type: String }, // NEW
     createdByName: { type: String }, // NEW
     movedToFollowUpBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    // Return-lead only: refund status (preserved across workflow)
+    refund_status: { type: String, default: null },
   },
   { timestamps: true }
 );

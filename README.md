@@ -202,6 +202,18 @@ Interactive API docs: **GET /api-docs**
 
 ---
 
+## Refund Status Field (Return Leads Only)
+
+- **Applicable only to** `lead_type: return`.
+- Passed from frontend in **snake_case** (`refund_status`).
+- **Optional**; default is `null`.
+- **Preserved across workflow:** Lead → Report, Lead → Complaint, Lead → FollowUp, and when FollowUp/Complaint moves to Report.
+- **Visible** in Admin Dashboard under **Calls Report** for return-type rows (column "Refund Status"); non-return rows show "-".
+- **Filtering:** Admin report filter includes an optional **Refund Status** dropdown when Lead Type is "Return".
+- If `lead_type` is not `"return"`, `refund_status` is forced to `null` to avoid data pollution.
+
+---
+
 ## 🔎 Filtering (summary)
 
 - **Leads:** Return leads use `returnDate` for date filters; others use `createdAt`. Store format: `"Brand - Location"`; use centralized store logic (e.g. Edappal vs Edappally).

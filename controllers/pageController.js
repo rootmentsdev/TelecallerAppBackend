@@ -142,7 +142,10 @@ const buildListSnapshot = (lead) => {
     numberOfFunctions: lead.numberOfFunctions || null,
     number_of_attires: lead.numberOfAttires || null,
     numberOfAttires: lead.numberOfAttires || null,
-    competitor: lead.competitor || null
+    competitor: lead.competitor || null,
+
+    // Return-lead only
+    refund_status: lead.refund_status ?? lead.refundStatus ?? null,
   };
 };
 
@@ -213,7 +216,7 @@ const validateAndNormalizeRemarks = (remarks) => {
 };
 
 // Helper to move a Lead to FollowUp collection
-const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetadata = {}) => {
+const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetadata = {}, refundStatusOverride = undefined) => {
   // Normalize lead object - use toObject() to get plain JavaScript object
   const lead = (leadDoc && typeof leadDoc.toObject === 'function')
     ? leadDoc.toObject({ virtuals: false, getters: false })
@@ -294,6 +297,9 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetada
     // Preserve creation metadata if passed, or from lead if exists
     createdByEmpId: auditMetadata.createdByEmpId || lead.createdByEmpId,
     createdByName: auditMetadata.createdByName || lead.createdByName,
+
+    // Return-lead only: carry forward refund_status (frontend can override)
+    refund_status: refundStatusOverride ?? lead.refund_status ?? lead.refundStatus ?? null,
   };
 
   // Remove undefined values to avoid Mongoose issues
@@ -349,7 +355,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetada
 };
 
 // Helper to create a Report entry from a Lead or FollowUp document using a completely flat structure
-const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0, category = null, auditMetadata = {}) => {
+const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedFields = null, callDuration = 0, category = null, auditMetadata = {}, refundStatusOverride = undefined) => {
   // Validate and normalize remarks
   const remarksValidation = validateAndNormalizeRemarks(userRemarks);
   if (!remarksValidation.isValid) {
@@ -404,9 +410,12 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.competitor = lead.competitor ?? null;
   payload.securityAmount = lead.securityAmount ?? lead.security_amount ?? null;
 
+  // Return-lead only: carry forward refund_status (frontend can override)
+  payload.refund_status = refundStatusOverride ?? lead.refund_status ?? lead.refundStatus ?? null;
+
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
-    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'reason', 'editedBy', 'editedAt', 'edited_by', 'edited_at'].includes(k)) return;
+    if (['id', '_id', 'name', 'phone', 'store', 'leadType', 'lead_type', 'callStatus', 'call_status', 'leadStatus', 'lead_status', 'functionDate', 'function_date', 'enquiryDate', 'enquiry_date', 'visitDate', 'visit_date', 'returnDate', 'return_date', 'followUpDate', 'follow_up_date', 'createdAt', 'created_at', 'assignedTo', 'assigned_to', 'attendedBy', 'attended_by', 'bookingNo', 'booking_number', 'securityAmount', 'security_amount', 'rating', 'remarks', 'reasonCollectedFromStore', 'reason_collected_from_store', 'callDuration', 'call_duration', 'movedToFollowUpAt', 'movedToFollowUpBy', 'subCategory', 'sub_category', 'itemCategory', 'item_category', 'closingAction', 'closing_action', 'reasons', 'reason', 'editedBy', 'editedAt', 'edited_by', 'edited_at', 'refund_status', 'refundStatus'].includes(k)) return;
     const snake = toSnake(k);
     // Only set if not already set by core mappings
     if (payload[snake] === undefined) payload[snake] = lead[k];
@@ -486,7 +495,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
     let complaint;
     try {
       console.log(`⭐ Moving Lead to Complaints collection. Lead ID: ${id}`);
-      complaint = await moveLeadToComplaint(updatedLead, req.user._id, remarks, callDuration, auditMetadata);
+      complaint = await moveLeadToComplaint(updatedLead, req.user._id, remarks, callDuration, auditMetadata, req.body.refund_status);
 
       if (!complaint || !complaint._id) {
         throw new Error("Complaint creation returned null or invalid Complaint");
@@ -528,7 +537,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
     let followUp;
     try {
       console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
-      followUp = await moveLeadToFollowUp(updatedLead, req.user._id, callDuration, auditMetadata);
+      followUp = await moveLeadToFollowUp(updatedLead, req.user._id, callDuration, auditMetadata, req.body.refund_status);
 
       if (!followUp || !followUp._id) {
         throw new Error("FollowUp creation returned null or invalid FollowUp");
@@ -565,7 +574,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
   let report;
   try {
     console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
-    report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, callDuration, null, auditMetadata);
+    report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, callDuration, null, auditMetadata, req.body.refund_status);
 
     if (!report || !report._id) {
       throw new Error("Report creation returned null or invalid report");
@@ -599,7 +608,7 @@ const handleLeadMovement = async (updatedLead, req, remarks, changedFields, call
 };
 
 // Helper to move a lead to Complaints collection
-const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration = 0, auditMetadata = {}) => {
+const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration = 0, auditMetadata = {}, refundStatusOverride = undefined) => {
   // Get sourceLeadId from original document BEFORE converting to object
   const sourceLeadIdValue = leadDoc._id || leadDoc.id;
 
@@ -679,6 +688,9 @@ const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration
     // Preserve creation metadata if passed, or from lead if exists
     createdByEmpId: auditMetadata.createdByEmpId || lead.createdByEmpId,
     createdByName: auditMetadata.createdByName || lead.createdByName,
+
+    // Return-lead only: carry forward refund_status (frontend can override)
+    refund_status: refundStatusOverride ?? lead.refund_status ?? lead.refundStatus ?? null,
   };
 
   // Remove undefined values and excluded fields
@@ -909,6 +921,7 @@ export const getLeads = async (req, res) => {
         base.booking_number = lead.bookingNo;
         if (lead.leadType === 'return') {
           base.return_date = lead.returnDate;
+          base.refund_status = lead.refund_status ?? null;
         }
       } else if (lead.leadType === 'lossOfSale') {
         base.visit_date = lead.visitDate;
@@ -1115,6 +1128,7 @@ export const getReturnLead = async (req, res) => {
       booking_number: lead.bookingNo,
       return_date: lead.returnDate || null, // null is valid for items not yet returned
       attended_by: lead.attendedBy || null, // Optional field, may be empty
+      refund_status: lead.refund_status ?? null,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -1125,7 +1139,7 @@ export const getReturnLead = async (req, res) => {
 export const updateReturnLead = async (req, res) => {
   try {
     const { id } = req.params;
-    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor, mark_as_issue, function_date } = req.body;
+    const { call_status, lead_status, follow_up_flag, follow_up_date, remarks, call_duration, rating, mark_as_complaint, subCategory, sub_category, itemCategory, closingAction, leadType, functionDate, securityamount, sectionAmount, service, nooffunction, noofattires, competitor, mark_as_issue, function_date, refund_status } = req.body;
 
     // Audit Metadata - ensures telecaller/createdBy is mapped when Return lead moves to Report
     // Return leads come from sync and lack createdByEmpId; we attribute to current user
@@ -1230,6 +1244,11 @@ export const updateReturnLead = async (req, res) => {
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
 
+    // refund_status: only for return type; do not overwrite with undefined
+    if (refund_status !== undefined) updateData.refund_status = refund_status;
+    const effectiveLeadType = leadType ?? lead.leadType;
+    if (effectiveLeadType && effectiveLeadType !== "return") updateData.refund_status = null;
+
     if (!lead.leadType) {
       updateData.leadType = "return";
     }
@@ -1292,6 +1311,7 @@ export const createAddLead = async (req, res) => {
       closing_action, // Handle snake_case input
       remarks,
       call_duration,
+      refund_status,
 
       mark_as_complaint
     } = req.body;
@@ -1385,6 +1405,10 @@ export const createAddLead = async (req, res) => {
       auditData.editedAt = new Date();
     }
 
+    const resolvedLeadType = leadType || lead_type || "enquiry";
+    // refund_status only meaningful for return leads; prevent data pollution for other types
+    const resolvedRefundStatus = resolvedLeadType === "return" ? (refund_status ?? null) : null;
+
     // Common fields map
     const commonData = {
       name: customer_name || null,
@@ -1393,7 +1417,7 @@ export const createAddLead = async (req, res) => {
       store: storeValue,
       leadStatus: lead_status || "No Status",
       callStatus: call_status || "Not Called",
-      leadType: leadType || lead_type || "enquiry", // Default to enquiry
+      leadType: resolvedLeadType,
       source: "Manual Entry",
       subCategory: subCategory || sub_category || undefined,
       itemCategory: itemCategory || item_category || undefined,
@@ -1405,6 +1429,7 @@ export const createAddLead = async (req, res) => {
       callDuration: call_duration ? Number(call_duration) : 0,
       createdBy: req.user._id,
       assignedTo: req.user._id, // Assign to creator by default? Usually yes for manual entry.
+      refund_status: resolvedRefundStatus,
       ...auditData
     };
 
@@ -1486,7 +1511,8 @@ export const updateGenericLead = async (req, res) => {
       call_duration,
       mark_as_issue,
       functionDate, // Add functionDate
-      function_date // Add alias
+      function_date, // Add alias
+      refund_status,
     } = req.body;
 
     // Audit Metadata
@@ -1586,7 +1612,10 @@ export const updateGenericLead = async (req, res) => {
     if (rating !== undefined) updateData.rating = rating;
     if (call_duration !== undefined && call_duration !== null) updateData.callDuration = call_duration;
 
-
+    // refund_status: only for return type; do not overwrite with undefined
+    if (refund_status !== undefined) updateData.refund_status = refund_status;
+    const effectiveLeadType = lead.leadType;
+    if (effectiveLeadType && effectiveLeadType !== "return") updateData.refund_status = null;
 
     // Capture before snapshot
     const beforeLead = lead.toObject();
@@ -1672,7 +1701,7 @@ export const updateGenericLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead to FollowUps collection. Lead ID: ${id}`);
         // Pass auditData (defined at start of function)
-        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration, auditData);
+        followUp = await moveLeadToFollowUp(updatedLead, req.user._id, call_duration, auditData, req.body.refund_status);
 
         // Verify FollowUp was created successfully
         if (!followUp || !followUp._id) {
@@ -1722,7 +1751,7 @@ export const updateGenericLead = async (req, res) => {
       try {
         console.log(`📝 Moving Lead directly to Reports collection. Lead ID: ${id}`);
         // Pass auditData (defined at start of function)
-        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration, null, auditData);
+        report = await createReportFromLead(updatedLead, req.user._id, remarks, changedFields, call_duration, null, auditData, req.body.refund_status);
 
         // Verify report was created successfully
         if (!report || !report._id) {
@@ -1806,7 +1835,8 @@ export const updateLead = async (req, res) => {
       rating,
       call_duration,
       mark_as_complaint, // REMOVED mark_as_issue
-      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate
+      subCategory, sub_category, itemCategory, closingAction, leadType, functionDate,
+      refund_status,
     } = req.body;
 
     const lead = await Lead.findById(id);
@@ -1882,6 +1912,11 @@ export const updateLead = async (req, res) => {
 
     if (leadType !== undefined) updateData.leadType = leadType;
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
+
+    // refund_status: only for return type; do not overwrite with undefined
+    if (refund_status !== undefined) updateData.refund_status = refund_status;
+    const effectiveLeadType = leadType ?? lead.leadType;
+    if (effectiveLeadType && effectiveLeadType !== "return") updateData.refund_status = null;
 
     // Ensure leadType is set to enquiry if missing (default for generic update if undefined in doc and update)
     if (!lead.leadType && !updateData.leadType) {
@@ -2106,7 +2141,8 @@ export const updateFollowUp = async (req, res) => {
       rating,
       mark_as_complaint, // Extract mark_as_complaint
       subCategory, sub_category, itemCategory, item_category, closingAction, closing_action, leadType, functionDate, // Extract new fields + aliases
-      sectionAmount, securityamount, service, nooffunction, noofattires, competitor // New requested fields (2026-01-23)
+      sectionAmount, securityamount, service, nooffunction, noofattires, competitor, // New requested fields (2026-01-23)
+      refund_status,
     } = req.body;
 
     // Validate remarks input
@@ -2218,6 +2254,11 @@ export const updateFollowUp = async (req, res) => {
     if (nooffunction !== undefined) updateData.numberOfFunctions = nooffunction;
     if (noofattires !== undefined) updateData.numberOfAttires = noofattires;
     if (competitor !== undefined) updateData.competitor = competitor;
+
+    // refund_status: only for return type; do not overwrite with undefined
+    if (refund_status !== undefined) updateData.refund_status = refund_status;
+    const effectiveLeadType = leadType ?? followUp.leadType;
+    if (effectiveLeadType && effectiveLeadType !== "return") updateData.refund_status = null;
 
     // Audit Metadata - ensures telecaller/createdBy is mapped when FollowUp moves to Report
     let auditUpdateData = {};
