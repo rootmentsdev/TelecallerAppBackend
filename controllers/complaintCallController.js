@@ -58,6 +58,11 @@ export const updateComplaintCall = async (req, res) => {
             }
         });
 
+        if (restBody.refund_status !== undefined) {
+            const isReturn = (complaint.leadType === 'return' || complaint.lead_type === 'return');
+            complaint.refund_status = isReturn ? restBody.refund_status : null;
+        }
+
         // Re-call: overwrite callDuration with new value and set complaint_remarks
         complaint.callDuration = parseInt(call_duration, 10) || 0;
         complaint.complaint_remarks = complaint_remarks_val ? String(complaint_remarks_val) : "";

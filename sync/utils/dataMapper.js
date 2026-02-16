@@ -649,6 +649,14 @@ export const mapReturn = (row) => {
     // Remarks
     remarks: (row.remarks || row.feedback || row.notes || row.Remarks || "").trim(),
 
+    // strict brand extraction for uniqueness
+    brand: (function () {
+      const s = (row.store || row.Store || row.storeName || row.StoreName || row.location || row.Location || "").trim();
+      if (s.toLowerCase().includes("zorucci") || s.toLowerCase().startsWith("z-")) return "Zorucci";
+      if (s.toLowerCase().includes("suitor") || s.toLowerCase().startsWith("sg-")) return "Suitor Guy";
+      return "";
+    })(),
+
     // Strict Cleanup: Ensure undefined fields are not included
   };
 

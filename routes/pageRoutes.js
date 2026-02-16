@@ -284,31 +284,17 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [createdAt, enquiryDate, functionDate, visitDate, name, store, leadType]
- *           default: createdAt
  *         description: |
- *           Field to sort results by.
- *           Options:
- *           - `createdAt` (default) - Sort by creation date
- *           - `enquiryDate` - Sort by enquiry date
- *           - `functionDate` - Sort by function/event date
-  *           - `visitDate` - Sort by visit date
- *           - `name` - Sort by lead name
- *           - `store` - Sort by store name
- *           - `leadType` - Sort by lead type
- *           Example: `?sortBy=createdAt&sortOrder=desc`
+ *           **IGNORED**. The system enforces strict sorting: `Name (A-Z)` -> `CreatedAt (Newest)`.
+ *           This parameter is kept for backward compatibility but has no effect.
  *       - in: query
  *         name: sortOrder
  *         required: false
  *         schema:
  *           type: string
- *           enum: [asc, desc]
- *           default: desc
  *         description: |
- *           "Sort order: ascending (asc) or descending (desc)."
- *           Default is desc (newest first for dates).
- *           Example: ?sortBy=createdAt&sortOrder=desc (newest first)
- *           Example: ?sortBy=createdAt&sortOrder=asc (oldest first)
+ *           **IGNORED**. The system enforces strict sorting.
+ *           This parameter is kept for backward compatibility but has no effect.
  *
  *     responses:
  *       200:
@@ -722,6 +708,10 @@
  *               competitor:
  *                 type: string
  *                 description: "Competitor name"
+ *               refund_status:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Optional. Only for return leads. Preserved across Lead → Report/Complaint/FollowUp."
  *     responses:
  *       200:
  *         description: |
@@ -837,6 +827,10 @@
  *                 type: string
  *                 format: date-time
  *                 description: "Required if follow_up_flag is true."
+ *               refund_status:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Optional. Snake_case string. Only applicable for lead_type=return. Preserved across Lead → Report/Complaint/FollowUp."
  *     responses:
  *       201:
  *         description: |
@@ -956,7 +950,15 @@ router.get("/leads", protect, leadsListValidator, handleValidation, getLeads);
  *                 type: string
  *               closingAction:
  *                 type: string
-
+ *               leadType:
+ *                 type: string
+ *               functionDate:
+ *                 type: string
+ *                 format: date-time
+ *               refund_status:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Optional. Only for lead_type=return. Preserved across Report/Complaint/FollowUp."
  *               mark_as_complaint:
  *                 type: boolean
  *                 description: "Mark lead as complaint (highest priority). If true, lead moves to Complaints collection. Cannot be true if follow_up_flag is true."
@@ -1714,6 +1716,10 @@ router.get(
  *               competitor:
  *                 type: string
  *                 description: "Competitor name"
+ *               refund_status:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Optional. Only for return-type FollowUps. Preserved when moving to Report/Complaint."
  *           required:
  *             - call_status
  *             - lead_status
@@ -2050,6 +2056,10 @@ router.get("/complaints/:id", protect, getComplaintById);
  *                 type: string
  *                 description: Remarks for this specific call
  *                 example: "explained delay"
+ *               refund_status:
+ *                 type: string
+ *                 nullable: true
+ *                 description: "Optional. Only for return-type complaints. Preserved across workflow."
  *     responses:
  *       200:
  *         description: Call logged successfully
