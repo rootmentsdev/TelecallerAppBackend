@@ -42,6 +42,8 @@ const followUpSchema = new mongoose.Schema(
     closingStatus: { type: String },
     closingAction: { type: String, default: null },
 
+    refund_status: { type: String, default: null },
+
     // Follow-up - same as Lead
     followUpFlag: { type: Boolean, default: false },
 
@@ -81,5 +83,12 @@ followUpSchema.index({ store: 1 });
 followUpSchema.index({ assignedTo: 1 });
 followUpSchema.index({ phone: 1, name: 1, leadType: 1, store: 1 });
 followUpSchema.index({ bookingNo: 1, phone: 1, leadType: 1 });
+
+
+// Global Sorting Index (Name A-Z, CreatedAt Newest)
+followUpSchema.index(
+  { name: 1, createdAt: -1 },
+  { collation: { locale: "en", strength: 2 } }
+);
 
 export default mongoose.model("FollowUp", followUpSchema);

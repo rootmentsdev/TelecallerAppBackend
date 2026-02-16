@@ -89,6 +89,23 @@ A lead exists in **exactly one** active collection at a time.
 
 ---
 
+## Refund Status Field (Return Leads Only)
+
+- **Applicable only to** `lead_type: "return"`.
+- Passed from the frontend in **snake_case** (`refund_status`).
+- **Optional**; default is `null` if not provided.
+- **Preserved across** workflow transitions:
+  - **Lead** → **Report** / **Complaint** / **FollowUp** (value is carried forward; if the client sends a new value on that action, it is used).
+- **Updatable** via:
+  - PATCH/POST `/api/pages/leads/:id`
+  - POST `/api/pages/return/:id`
+  - POST `/api/pages/follow-ups/:id`
+  - PATCH/POST `/api/pages/complaints/:id/call`
+- **Visible** in the Admin Dashboard under **Calls Report** for return-type reports (column “Refund Status”; “-” for non-return).
+- For non-return leads, `refund_status` is forced to `null` to avoid data pollution.
+
+---
+
 ## 🗄️ Collections
 
 | Collection | Purpose |
@@ -207,6 +224,21 @@ Interactive API docs: **GET /api-docs**
 - **Leads:** Return leads use `returnDate` for date filters; others use `createdAt`. Store format: `"Brand - Location"`; use centralized store logic (e.g. Edappal vs Edappally).
 - **Reports:** `dateFrom`/`dateTo` apply to `editedAt` by default; optional `createdAt` filters for lead creation date.
 - **Admin telecaller summary:** Work date = `editedAt` (reports), `complaintMarkedAt` (complaints).
+
+### Global Sorting Policy
+
+All list-based GET APIs (Leads, FollowUps, Complaints, Reports) strictly enforce:
+1. **Primary Sort:** `Lead Name` (A-Z, case-insensitive collation).
+2. **Secondary Sort:** `Creation Time` (Newest first).
+
+This overrides dynamic sort parameters to ensure stable, consistent operator views.
+
+### Lead Identity Policy
+Lead uniqueness during incremental sync is determined by:
+**`brand` + `store` + `bookingNo`**
+(or `brand` + `store` + `phone` if booking number is missing).
+
+This prevents cross-brand data mixing in shared locations (e.g. Perinthalmanna).
 
 ---
 
