@@ -233,26 +233,23 @@ Interactive API docs: **GET /api-docs**
 
 ---
 
+## Refund Status Field (Return Leads Only)
+
+- **Applicable only to** `lead_type: return`.
+- Passed from frontend in **snake_case** (`refund_status`).
+- **Optional**; default is `null`.
+- **Preserved across workflow:** Lead → Report, Lead → Complaint, Lead → FollowUp, and when FollowUp/Complaint moves to Report.
+- **Visible** in Admin Dashboard under **Calls Report** for return-type rows (column "Refund Status"); non-return rows show "-".
+- **Filtering:** Admin report filter includes an optional **Refund Status** dropdown when Lead Type is "Return".
+- If `lead_type` is not `"return"`, `refund_status` is forced to `null` to avoid data pollution.
+
+---
+
 ## 🔎 Filtering (summary)
 
 - **Leads:** Return leads use `returnDate` for date filters; others use `createdAt`. Store format: `"Brand - Location"`; use centralized store logic (e.g. Edappal vs Edappally).
 - **Reports:** `dateFrom`/`dateTo` apply to `editedAt` by default; optional `createdAt` filters for lead creation date.
 - **Admin telecaller summary:** Work date = `editedAt` (reports), `complaintMarkedAt` (complaints).
-
-### Global Sorting Policy
-
-All list-based GET APIs (Leads, FollowUps, Complaints, Reports) strictly enforce:
-1. **Primary Sort:** `Lead Name` (A-Z, case-insensitive collation).
-2. **Secondary Sort:** `Creation Time` (Newest first).
-
-This overrides dynamic sort parameters to ensure stable, consistent operator views.
-
-### Lead Identity Policy
-Lead uniqueness during incremental sync is determined by:
-**`brand` + `store` + `bookingNo`**
-(or `brand` + `store` + `phone` if booking number is missing).
-
-This prevents cross-brand data mixing in shared locations (e.g. Perinthalmanna).
 
 ---
 

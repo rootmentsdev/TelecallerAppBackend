@@ -368,12 +368,12 @@ export const getAdminReports = async (req, res) => {
             page = 1,
             limit = 50,
             leadType,
-            refund_status, // Optional; only meaningful when leadType === 'return'
             telecallerId, // Maps to editedBy (telecaller context - legacy/ObjectId)
             telecaller,   // Maps to createdByEmpId (NEW - String EmpId)
             callStatus,
             leadStatus,
             source,
+            refund_status, // Only applies when leadType = return
             filtersOnly   // NEW: If true, returns only filter metadata (telecallers/stores)
         } = req.query;
 
@@ -403,9 +403,14 @@ export const getAdminReports = async (req, res) => {
             const storeAgg = await Report.distinct("store");
             const stores = storeAgg.filter(Boolean).sort();
 
+            // Refund status options (return leads only) for filter dropdown
+            const refundStatusOptions = await Report.distinct("refund_status", { leadType: "return" });
+            const refundStatuses = refundStatusOptions.filter(Boolean).sort();
+
             return res.json({
                 telecallers: telecallerAgg,
-                stores: stores
+                stores: stores,
+                refundStatuses: refundStatuses
             });
         }
 
@@ -426,6 +431,7 @@ export const getAdminReports = async (req, res) => {
         if (callStatus) query.callStatus = callStatus;
         if (leadStatus) query.leadStatus = leadStatus;
         if (source) query.source = source;
+        if (leadType === 'return' && refund_status !== undefined && refund_status !== '') query.refund_status = refund_status;
 
         // Apply generic date filter to 'createdAt' if dateField is 'createdAt' (handled in baseFilters)
         // OR apply to 'editedAt' (default behavior for Reports if not specified)
@@ -449,8 +455,7 @@ export const getAdminReports = async (req, res) => {
         const [reports, total] = await Promise.all([
             Report.find(query)
                 .populate("editedBy", "name employeeId")
-                .collation({ locale: "en", strength: 2 })
-                .sort({ lead_name: 1, createdAt: -1 })
+                .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(parseInt(limit)),
             Report.countDocuments(query),
@@ -487,7 +492,8 @@ export const getAdminReports = async (req, res) => {
                 // Include Creator info just in case
                 createdByEmpId: obj.createdByEmpId,
                 createdByName: obj.createdByName,
-                refund_status: obj.refund_status ?? null
+                // Return-lead only: refund status (visible in admin when leadType = return)
+                refund_status: obj.refund_status ?? null,
             };
         });
 

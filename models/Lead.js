@@ -41,9 +41,6 @@ const leadSchema = new mongoose.Schema(
     closingStatus: { type: String },
     closingAction: { type: String, default: null },
 
-    // Return-lead only: refund status (snake_case from frontend)
-    refund_status: { type: String, default: null },
-
     // Follow-up
     followUpFlag: { type: Boolean, default: false },
 
@@ -61,6 +58,9 @@ const leadSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     assignedAt: { type: Date },
+
+    // Return-lead only: refund status (snake_case from frontend)
+    refund_status: { type: String, default: null },
   },
   { timestamps: true }
 );
@@ -78,15 +78,16 @@ leadSchema.index({ bookingNo: 1, phone: 1, leadType: 1 });
 // Prevents duplicates at database level, even under concurrent syncs
 // Only applies to return/bookingconfirmation leads with bookingNo
 // UPDATED: Now includes brand and store to allow same BookingNo across different brands/stores
+// Only applies to return leads with bookingNo
 leadSchema.index(
-  { bookingNo: 1, phone: 1, leadType: 1, brand: 1, store: 1 },
+  { bookingNo: 1, phone: 1, leadType: 1 },
   {
     unique: true,
     partialFilterExpression: {
       leadType: { $in: ["return", "bookingconfirmation"] },
       bookingNo: { $exists: true, $ne: "" }
     },
-    name: "unique_booking_return_v2_index" // Updated name to force re-indexing
+    name: "unique_booking_return_index"
   }
 );
 
@@ -95,32 +96,14 @@ leadSchema.index(
 // Only applies to lossOfSale and enquiry leads
 // Index on: name, phone, leadType, store (base duplicate criteria)
 leadSchema.index(
+  { name: 1, phone: 1, leadType: 1, store: 1 },
   {
     unique: true,
     partialFilterExpression: {
       leadType: { $in: ["lossOfSale", "enquiry"] }
     },
-    name: "unique_lossOfSale_general_index"
+    name: "unique_lossOfSale_general_index" // Keeping name for compatibility or rename if safe? Let's keep name but comment
   }
-);
-
-// Safety Index for Brand/Store Lookups (Requested Fix)
-leadSchema.index(
-  { brand: 1, store: 1, bookingNo: 1 },
-  { unique: false }
-);
-
-// Fallback Safety Index (if bookingNo missing)
-leadSchema.index(
-  { brand: 1, store: 1, phone: 1, functionDate: 1 },
-  { unique: false }
-);
-
-// Global Sorting Index (Name A-Z, CreatedAt Newest)
-// Supports the strict sorting policy for GET APIs
-leadSchema.index(
-  { name: 1, createdAt: -1 },
-  { collation: { locale: "en", strength: 2 } }
 );
 
 export default mongoose.model("Lead", leadSchema);

@@ -18,6 +18,7 @@ const COMPLAINT_FIELD_MAP = {
     item_category: 'itemCategory',
     closingAction: 'closingAction',
     closing_action: 'closingAction',
+    refund_status: 'refund_status',
 };
 
 // PATCH - Update Complaint Call (Re-Call) and optionally update complaint fields (name, phone, store, etc.)
@@ -65,6 +66,10 @@ export const updateComplaintCall = async (req, res) => {
         // Re-call: overwrite callDuration with new value and set complaint_remarks
         complaint.callDuration = parseInt(call_duration, 10) || 0;
         complaint.complaint_remarks = complaint_remarks_val ? String(complaint_remarks_val) : "";
+
+        // refund_status: only for return type; do not overwrite with undefined
+        if (restBody.refund_status !== undefined) complaint.refund_status = restBody.refund_status;
+        if (complaint.leadType !== 'return') complaint.refund_status = null;
 
         await complaint.save();
 

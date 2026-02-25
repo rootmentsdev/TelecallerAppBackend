@@ -11,6 +11,7 @@ const Reports = () => {
     // Filter Options State
     const [telecallerOptions, setTelecallerOptions] = useState([]);
     const [storeOptions, setStoreOptions] = useState([]);
+    const [refundStatusOptions, setRefundStatusOptions] = useState([]);
     const [filtersLoading, setFiltersLoading] = useState(false);
 
     const [filters, setFilters] = useState({
@@ -19,7 +20,7 @@ const Reports = () => {
         store: '',
         telecaller: '', // Stores EmpId
         leadType: '',
-        refundStatus: '' // Only active when leadType === 'return'
+        refundStatus: ''
     });
 
     useEffect(() => {
@@ -27,9 +28,10 @@ const Reports = () => {
         const loadFilters = async () => {
             setFiltersLoading(true);
             try {
-                const { telecallers, stores } = await getReportFilters();
+                const { telecallers, stores, refundStatuses } = await getReportFilters();
                 setTelecallerOptions(telecallers || []);
                 setStoreOptions(stores || []);
+                setRefundStatusOptions(refundStatuses || []);
             } catch (err) {
                 console.error("Failed to load report filters", err);
             } finally {
@@ -52,10 +54,12 @@ const Reports = () => {
                 store: filters.store || undefined,
                 dateFrom: filters.dateFrom || undefined,
                 dateTo: filters.dateTo || undefined,
-                telecaller: filters.telecaller || undefined,
+                telecaller: filters.telecaller || undefined, // Send EmpId
                 leadType: filters.leadType || undefined,
                 refund_status: (filters.leadType === 'return' || filters.leadType === 'bookingconfirmation') && filters.refundStatus ? filters.refundStatus : undefined,
                 dateField: 'createdAt'
+                refund_status: filters.leadType === 'return' && filters.refundStatus ? filters.refundStatus : undefined,
+                dateField: 'createdAt' // Forces filtering by createdAt as requested
             };
             const result = await getReports(params);
             setData(result.rows || []);
@@ -102,7 +106,7 @@ const Reports = () => {
                 `"${row.store || ''}"`,
                 `"${row.leadName || ''}"`,
                 `"${row.phone || ''}"`,
-                `"${row.createdByName || ''}"`,
+                `"${row.createdByName || ''}"`,   // Created By
                 row.callDuration,
                 `"${row.leadType || row.lead_type || ''}"`,
                 ((row.leadType || row.lead_type) === 'return' || (row.leadType || row.lead_type) === 'bookingconfirmation') ? `"${row.refund_status || ''}"` : '"-"',
@@ -188,6 +192,7 @@ const Reports = () => {
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         value={filters.leadType}
                         onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value, refundStatus: (e.target.value === 'return' || e.target.value === 'bookingconfirmation') ? prev.refundStatus : '' }))}
+                        onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value, refundStatus: e.target.value !== 'return' ? '' : prev.refundStatus }))}
                     >
                         <option value="">All Types</option>
                         <option value="enquiry">Enquiry</option>
@@ -199,6 +204,8 @@ const Reports = () => {
 
                 {/* Refund Status Filter - when Lead Type is Return or Booking Confirmation */}
                 {(filters.leadType === 'return' || filters.leadType === 'bookingconfirmation') && (
+                {/* Refund Status Filter - only when leadType = return */}
+                {filters.leadType === 'return' && (
                     <div className="min-w-[150px]">
                         <label className="block text-xs font-medium text-gray-500 mb-1">Refund Status</label>
                         <select
@@ -207,10 +214,9 @@ const Reports = () => {
                             onChange={e => setFilters(prev => ({ ...prev, refundStatus: e.target.value }))}
                         >
                             <option value="">All</option>
-                            <option value="pending">Pending</option>
-                            <option value="processed">Processed</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="na">N/A</option>
+                            {refundStatusOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
                         </select>
                     </div>
                 )}
@@ -292,10 +298,12 @@ const Reports = () => {
                                             </span>
                                         </td>
 
+                                        {/* Refund Status: only meaningful for return type */}
                                         <td className="px-6 py-4 text-gray-600">
                                             {(row.leadType || row.lead_type) === 'return' || (row.leadType || row.lead_type) === 'bookingconfirmation'
                                                 ? (row.refund_status || '-')
                                                 : '-'}
+                                            {(row.leadType || row.lead_type) === 'return' ? (row.refund_status || '-') : '-'}
                                         </td>
                                     </tr>
                                 ))

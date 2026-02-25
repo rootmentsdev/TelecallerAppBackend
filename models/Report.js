@@ -30,7 +30,9 @@ const reportSchema = new mongoose.Schema({
   remarks: { type: String, default: "" },
   lead_status: { type: String, default: "" },
   call_status: { type: String, default: "" },
-  refund_status: { type: String, default: null }
+
+  // Return-lead only: refund status (preserved across workflow)
+  refund_status: { type: String, default: null },
 }, { timestamps: true, strict: false });
 
 export default mongoose.model("Report", reportSchema);
