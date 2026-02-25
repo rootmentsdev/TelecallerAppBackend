@@ -286,6 +286,8 @@ export const saveToMongo = async (leadData) => {
 
     // Normalize fields for consistent checking
     const normalized = normalizeForDuplicateCheck(leadData);
+    const normalizedBrand = leadData.brand ? leadData.brand.trim() : "";
+    const normalizedStore = leadData.store ? leadData.store.trim() : "";
 
     // IMPORTANT: Check if lead already exists in Report or FollowUp collection (moved after edit)
     // New Report schema stores flattened lead in `leadData`. Support both old snapshot fields and new leadData fields.
@@ -335,10 +337,9 @@ export const saveToMongo = async (leadData) => {
     // leadType is always part of the query: "booked" (manual) and "bookingconfirmation" (API) stay separate.
     // ALWAYS check: name, phone, leadType, store, brand
     if (leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") {
-      // Normalize fields: trim and ensure consistent format
+      // Normalize fields: trim and ensure consistent format (normalizedBrand, normalizedStore defined at top of function)
       const normalizedName = (leadData.name || "").trim();
       const normalizedPhone = (leadData.phone || "").trim();
-      const normalizedStore = (leadData.store || "").trim();
       const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
 
       // Safety Validation: Brand is required for uniqueness
