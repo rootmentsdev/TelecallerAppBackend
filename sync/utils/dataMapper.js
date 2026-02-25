@@ -677,12 +677,31 @@ export const mapReturn = (row) => {
 export const mapBookingConfirmation = (row) => {
   const mapped = mapReturn(row);
   if (!mapped) return null;
+
+  // External API location: "Brand - Location" or "Brand.Location" (e.g. SG.Kottayam)
+  const rawLocation = row.location || null;
+  let brand = null;
+  let store = rawLocation;
+  if (rawLocation) {
+    if (rawLocation.includes(' - ')) {
+      const parts = rawLocation.split(' - ');
+      brand = parts[0].trim();
+      store = rawLocation.trim();
+    } else if (rawLocation.includes('.')) {
+      const parts = rawLocation.split('.');
+      brand = parts[0].trim();
+      store = rawLocation.trim();
+    }
+  }
+
   const returnDate = mapped.returnDate || mapped.functionDate || mapped.enquiryDate;
   const out = {
     ...mapped,
     source: "Booking Confirmation",
     leadType: "bookingconfirmation", // never "booked"
     ...(returnDate && { returnDate }),
+    brand: brand ?? mapped.brand ?? null,
+    store: (store != null && store !== "") ? store : mapped.store,
     // All external API fields from GetBookingReport
     itemCode: (row.itemCode || row.item_code || "").trim() || undefined,
     itemName: (row.itemName || row.item_name || "").trim() || undefined,
