@@ -13,7 +13,7 @@ const complaintSchema = new mongoose.Schema(
     source: { type: String },
     leadType: {
       type: String,
-      enum: ["enquiry", "return", "booked", "lossOfSale"],
+      enum: ["enquiry", "return", "booked", "lossOfSale", "bookingconfirmation"],
       default: "enquiry"
     },
     brand: { type: String },

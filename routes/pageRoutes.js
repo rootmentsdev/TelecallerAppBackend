@@ -49,8 +49,8 @@
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry, booked]
- *         description: Type of lead to fetch. If omitted, returns leads of all types.
+ *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
+ *         description: Type of lead to fetch. If omitted, returns leads of all types. bookingconfirmation workflow identical to return (source: Booking Report API).
  *       - in: query
  *         name: store
  *         required: false
@@ -552,14 +552,14 @@
  *               closingAction: { type: string }
  *
  *               functionDate: { type: string, format: date-time }
- *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked, bookingconfirmation], default: lossOfSale }
  *               remarks: { type: string }
  *               subCategory: { type: string }
  *               itemCategory: { type: string }
  *               closingAction: { type: string }
 
  *               functionDate: { type: string, format: date-time }
- *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked, bookingconfirmation], default: lossOfSale }
  *               remarks: { type: string, nullable: true }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               mark_as_complaint:
@@ -693,7 +693,7 @@
  *               closingAction: { type: string }
  *
  *               functionDate: { type: string, format: date-time }
- *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: return }
+ *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked, bookingconfirmation], default: return }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               rating:
  *                 type: integer
@@ -1241,7 +1241,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry]
+ *           enum: [lossOfSale, return, enquiry, bookingconfirmation]
  *         description: Type of FollowUp lead to fetch. If omitted, returns FollowUp leads of all types.
  *       - in: query
  *         name: store
@@ -1693,7 +1693,7 @@ router.get(
  *                 format: date-time
  *               leadType:
  *                 type: string
- *                 enum: [lossOfSale, return, enquiry, booked]
+ *                 enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
  *                 default: enquiry
  *               mark_as_complaint:
  *                 type: boolean
@@ -1802,7 +1802,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry, booked]
+ *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
  *         description: Type of lead to fetch. If omitted, returns complaints of all types.
  *       - in: query
  *         name: store
@@ -1897,7 +1897,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry, booked]
+ *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
  *       - in: query
  *         name: store
  *         required: false
@@ -2105,7 +2105,7 @@ router.post("/complaints/:id/call", protect, updateComplaintCall); // Alias for 
  *           description: Store name
  *         leadType:
  *           type: string
- *           enum: [lossOfSale, return, enquiry, booked]
+ *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
  *           description: Lead type
  *         source:
  *           type: string

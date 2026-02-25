@@ -59,6 +59,10 @@ export const updateComplaintCall = async (req, res) => {
             }
         });
 
+        const isReturnOrBooking = (complaint.leadType === 'return' || complaint.lead_type === 'return' || complaint.leadType === 'bookingconfirmation' || complaint.lead_type === 'bookingconfirmation');
+        if (restBody.refund_status !== undefined) complaint.refund_status = isReturnOrBooking ? restBody.refund_status : null;
+        if (!isReturnOrBooking) complaint.refund_status = null;
+
         // Re-call: overwrite callDuration with new value and set complaint_remarks
         complaint.callDuration = parseInt(call_duration, 10) || 0;
         complaint.complaint_remarks = complaint_remarks_val ? String(complaint_remarks_val) : "";

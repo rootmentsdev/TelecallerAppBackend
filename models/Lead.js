@@ -9,9 +9,10 @@ const leadSchema = new mongoose.Schema(
 
     // Source and Type
     source: { type: String },
+    // leadType: "booked" = manual entry; "bookingconfirmation" = API sync (GetBookingReport). Keep them separate.
     leadType: {
       type: String,
-      enum: ["enquiry", "return", "booked", "lossOfSale"],
+      enum: ["enquiry", "return", "booked", "lossOfSale", "bookingconfirmation"],
       default: "enquiry"
     },
     brand: { type: String }, // For Add Lead page
@@ -73,15 +74,17 @@ leadSchema.index({ assignedTo: 1 });
 leadSchema.index({ phone: 1, name: 1, leadType: 1, store: 1 });
 leadSchema.index({ bookingNo: 1, phone: 1, leadType: 1 });
 
-// CRITICAL: Unique partial index for return leads
+// CRITICAL: Unique partial index for return and bookingconfirmation leads
 // Prevents duplicates at database level, even under concurrent syncs
+// Only applies to return/bookingconfirmation leads with bookingNo
+// UPDATED: Now includes brand and store to allow same BookingNo across different brands/stores
 // Only applies to return leads with bookingNo
 leadSchema.index(
   { bookingNo: 1, phone: 1, leadType: 1 },
   {
     unique: true,
     partialFilterExpression: {
-      leadType: { $in: ["return"] },
+      leadType: { $in: ["return", "bookingconfirmation"] },
       bookingNo: { $exists: true, $ne: "" }
     },
     name: "unique_booking_return_index"

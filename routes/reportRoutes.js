@@ -48,8 +48,8 @@ const router = express.Router();
  *         name: leadType
  *         schema:
  *           type: string
- *           enum: [lossOfSale, return, enquiry, booked]
- *         description: Filter by lead type (lossOfSale, return, enquiry, booked, etc.)
+ *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
+ *         description: Filter by lead type. booked and bookingconfirmation are separate.
  *       - in: query
  *         name: editedBy
  *         schema:
@@ -432,8 +432,8 @@ router.get("/:id", protect, getReportById);
  *           description: Store name
  *         lead_type:
  *           type: string
- *           enum: [lossOfSale, return, enquiry, booked]
- *           description: Lead type
+ *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
+ *           description: Lead type (booked and bookingconfirmation are distinct)
  *         call_status:
  *           type: string
  *           description: Call status

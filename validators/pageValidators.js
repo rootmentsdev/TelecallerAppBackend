@@ -32,8 +32,8 @@ export const leadGetValidator = [
 export const leadsListValidator = [
   query('leadType')
     .optional()
-    .isIn(['lossOfSale', 'return', 'enquiry', 'booked'])
-    .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked'),
+    .isIn(['lossOfSale', 'return', 'enquiry', 'booked', 'bookingconfirmation'])
+    .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked, bookingconfirmation'),
   query('page')
     .optional()
     .isInt({ min: 1 })
@@ -239,8 +239,8 @@ export const addLeadPostValidator = [
     .optional()
     .isString()
     .trim()
-    .isIn(['lossOfSale', 'return', 'enquiry', 'booked'])
-    .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked'),
+    .isIn(['lossOfSale', 'return', 'enquiry', 'booked', 'bookingconfirmation'])
+    .withMessage('leadType must be one of: lossOfSale, return, enquiry, booked, bookingconfirmation'),
   dateValidator('functionDate'),
   dateValidator('function_date'),
   body('subCategory')

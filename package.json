@@ -16,6 +16,7 @@
     "import:all:walkin": "node sync/csv/import_all_walkin.js",
     "import:all:lossofsale": "node sync/csv/import_all_lossofsale.js",
     "sync:return": "node sync/api/sync_return.js",
+    "sync:bookingconfirmation": "node sync/api/sync_bookingconfirmation.js",
     "sync:stores": "node sync/api/sync_storelist.js",
     "test:duplicates": "node scripts/test-duplicate-prevention.js",
     "check:duplicates": "node scripts/check-duplicates.js",

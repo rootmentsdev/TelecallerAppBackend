@@ -66,8 +66,22 @@ CSV import scripts (manual): `import:walkin`, `import:lossofsale`, `import:all:w
 |------|--------|-------------|
 | **enquiry** | Manual / Walk-in | Default for general leads. |
 | **return** | API sync | Synced from external ERP. |
+| **bookingconfirmation** | API sync | Synced from Booking Report API. Workflow identical to return. |
 | **lossOfSale** | CSV | Lost-sale leads. |
-| **booked** | Manual | Booked leads (e.g. Add Lead). |
+| **booked** | Manual | Booked leads (e.g. Add Lead). **Distinct from bookingconfirmation.** |
+
+---
+
+## Booking Confirmation Lead Type
+
+- **LeadType:** `bookingconfirmation`
+- **Workflow:** Identical to return leads:
+  - Synced from **Booking Report API** (`/api/Reports/GetBookingReport`)
+  - Visible to all telecallers (same visibility rules as return)
+  - Moves to **Report** / **Complaint** / **FollowUp** based on action
+  - FollowUp behaves the same as return (complaint → Complaint; else → Report)
+- **Uniqueness:** `brand` + `store` + `bookingNo` + `leadType` (so bookingconfirmation does not mix with return or with **booked**; booked and bookingconfirmation are separate lead types).
+- **Refund status:** Same as return (optional `refund_status`; applies only when `leadType` is return or bookingconfirmation).
 
 ---
 
@@ -86,6 +100,23 @@ A lead exists in **exactly one** active collection at a time.
 3. **Complaints** — Re-calls do **not** move the record. Use **PATCH** or **POST** `/api/pages/complaints/:id/call` with `call_duration` and optional `complaint_remarks` (or `remarks`). The complaint’s `callDuration` is overwritten and `complaint_remarks` is set. No history array or extra aggregate fields.
 
 4. **Reports** — Final archive; no further moves.
+
+---
+
+## Refund Status Field (Return & Booking Confirmation Leads)
+
+- **Applicable only to** `lead_type: "return"` or `lead_type: "bookingconfirmation"`.
+- Passed from the frontend in **snake_case** (`refund_status`).
+- **Optional**; default is `null` if not provided.
+- **Preserved across** workflow transitions:
+  - **Lead** → **Report** / **Complaint** / **FollowUp** (value is carried forward; if the client sends a new value on that action, it is used).
+- **Updatable** via:
+  - PATCH/POST `/api/pages/leads/:id`
+  - POST `/api/pages/return/:id`
+  - POST `/api/pages/follow-ups/:id`
+  - PATCH/POST `/api/pages/complaints/:id/call`
+- **Visible** in the Admin Dashboard under **Calls Report** for return-type reports (column “Refund Status”; “-” for non-return).
+- For non-return and non-bookingconfirmation leads, `refund_status` is forced to `null` to avoid data pollution.
 
 ---
 

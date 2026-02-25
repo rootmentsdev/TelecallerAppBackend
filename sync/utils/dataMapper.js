@@ -671,7 +671,19 @@ export const mapReturn = (row) => {
   return leadData;
 };
 
-
+// Map Booking Confirmation API data to Lead model (same structure as return, different source and leadType).
+// IMPORTANT: Always use leadType "bookingconfirmation" — do not use "booked"; they are separate.
+export const mapBookingConfirmation = (row) => {
+  const mapped = mapReturn(row);
+  if (!mapped) return null;
+  const returnDate = mapped.returnDate || mapped.functionDate || mapped.enquiryDate;
+  return {
+    ...mapped,
+    source: "Booking Confirmation",
+    leadType: "bookingconfirmation", // never "booked"
+    ...(returnDate && { returnDate }),
+  };
+};
 
 // Map User API data to User model
 export const mapUser = (row) => {
