@@ -66,8 +66,22 @@ CSV import scripts (manual): `import:walkin`, `import:lossofsale`, `import:all:w
 |------|--------|-------------|
 | **enquiry** | Manual / Walk-in | Default for general leads. |
 | **return** | API sync | Synced from external ERP. |
+| **bookingconfirmation** | API sync | Synced from Booking Report API. Workflow identical to return. |
 | **lossOfSale** | CSV | Lost-sale leads. |
-| **booked** | Manual | Booked leads (e.g. Add Lead). |
+| **booked** | Manual | Booked leads (e.g. Add Lead). **Distinct from bookingconfirmation.** |
+
+---
+
+## Booking Confirmation Lead Type
+
+- **LeadType:** `bookingconfirmation`
+- **Workflow:** Identical to return leads:
+  - Synced from **Booking Report API** (`/api/Reports/GetBookingReport`)
+  - Visible to all telecallers (same visibility rules as return)
+  - Moves to **Report** / **Complaint** / **FollowUp** based on action
+  - FollowUp behaves the same as return (complaint → Complaint; else → Report)
+- **Uniqueness:** `brand` + `store` + `bookingNo` + `leadType` (so bookingconfirmation does not mix with return or with **booked**; booked and bookingconfirmation are separate lead types).
+- **Refund status:** Same as return (optional `refund_status`; applies only when `leadType` is return or bookingconfirmation).
 
 ---
 
@@ -89,9 +103,9 @@ A lead exists in **exactly one** active collection at a time.
 
 ---
 
-## Refund Status Field (Return Leads Only)
+## Refund Status Field (Return & Booking Confirmation Leads)
 
-- **Applicable only to** `lead_type: "return"`.
+- **Applicable only to** `lead_type: "return"` or `lead_type: "bookingconfirmation"`.
 - Passed from the frontend in **snake_case** (`refund_status`).
 - **Optional**; default is `null` if not provided.
 - **Preserved across** workflow transitions:
@@ -102,7 +116,7 @@ A lead exists in **exactly one** active collection at a time.
   - POST `/api/pages/follow-ups/:id`
   - PATCH/POST `/api/pages/complaints/:id/call`
 - **Visible** in the Admin Dashboard under **Calls Report** for return-type reports (column “Refund Status”; “-” for non-return).
-- For non-return leads, `refund_status` is forced to `null` to avoid data pollution.
+- For non-return and non-bookingconfirmation leads, `refund_status` is forced to `null` to avoid data pollution.
 
 ---
 

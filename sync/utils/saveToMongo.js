@@ -80,7 +80,7 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // Check if lead exists in reports or follow-ups (skip if moved)
       const reportOrClauses = [];
-      if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+      if ((leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") && normalized.bookingNo !== "") {
         reportOrClauses.push(
           { "beforeSnapshot.phone": normalized.phone, "beforeSnapshot.bookingNo": normalized.bookingNo },
           { "leadSnapshot.phone": normalized.phone, "leadSnapshot.bookingNo": normalized.bookingNo },
@@ -104,7 +104,7 @@ export const bulkSaveToMongo = async (leadsData) => {
 
       // Also check FollowUps collection - use normalized fields
       const followUpQuery = { phone: normalized.phone };
-      if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+      if ((leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") && normalized.bookingNo !== "") {
         followUpQuery.bookingNo = normalized.bookingNo;
         followUpQuery.leadType = leadData.leadType;
       } else {
@@ -178,7 +178,7 @@ export const bulkSaveToMongo = async (leadsData) => {
       }
 
       // For booking/return: add to bulk insert (don't update to preserve user edits)
-      if (leadData.leadType === "booked" || leadData.leadType === "return") {
+      if (leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") {
         // Add to bulk insert - ensure remarks is included
         const document = { ...leadData };
         if (leadData.hasOwnProperty('remarks')) {
@@ -300,7 +300,7 @@ export const saveToMongo = async (leadData) => {
     const reportOrClauses = [];
 
     // For booking/return, match by phone + bookingNo for accuracy
-    if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+    if ((leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") && normalized.bookingNo !== "") {
       reportOrClauses.push(
         { "beforeSnapshot.phone": normalized.phone, "beforeSnapshot.bookingNo": normalized.bookingNo },
         { "leadSnapshot.phone": normalized.phone, "leadSnapshot.bookingNo": normalized.bookingNo },
@@ -325,7 +325,7 @@ export const saveToMongo = async (leadData) => {
 
     // Also check FollowUps collection - use normalized fields
     const followUpQuery = { phone: normalized.phone };
-    if ((leadData.leadType === "booked" || leadData.leadType === "return") && normalized.bookingNo !== "") {
+    if ((leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") && normalized.bookingNo !== "") {
       followUpQuery.bookingNo = normalized.bookingNo;
       followUpQuery.leadType = leadData.leadType;
     } else {
@@ -339,11 +339,11 @@ export const saveToMongo = async (leadData) => {
       return { skipped: true, reason: "Lead exists in follow-ups (moved after edit)" };
     }
 
-    // DUPLICATE CHECK FOR BOOKING/RETURN: Skip if duplicate (don't update to preserve user edits)
-    // These come from API and should only add new records (incremental sync)
+    // DUPLICATE CHECK FOR BOOKING/RETURN/BOOKINGCONFIRMATION: Skip if duplicate (don't update to preserve user edits)
+    // leadType is always part of the query: "booked" (manual) and "bookingconfirmation" (API) stay separate.
     // ALWAYS check: name, phone, leadType, store, brand
     // CRITICAL: Normalize and trim all fields for accurate comparison
-    if (leadData.leadType === "booked" || leadData.leadType === "return") {
+    if (leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") {
       // Normalize fields
       const normalizedName = (leadData.name || "").trim();
       const normalizedPhone = (leadData.phone || "").trim();
@@ -352,7 +352,7 @@ export const saveToMongo = async (leadData) => {
       const normalizedBookingNo = leadData.bookingNo ? leadData.bookingNo.trim() : "";
 
       // Safety Validation: Brand is required for uniqueness
-      if (!normalizedBrand && leadData.leadType === "return") {
+      if (!normalizedBrand && (leadData.leadType === "return" || leadData.leadType === "bookingconfirmation")) {
         console.warn(`⚠️  Skipping return lead - missing brand (Identity Risk): ${normalizedStore}`);
         return { skipped: true, reason: "Missing brand identity" };
       }

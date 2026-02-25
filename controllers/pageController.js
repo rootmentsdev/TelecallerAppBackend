@@ -7,9 +7,9 @@ import { normalizeQueryParams, parseQueryDate, buildStoreFilter } from "./filter
 // Helper function to check access permissions
 const checkAccess = (lead, user, allowViewAll = false) => {
   if (user.role === "admin") return true;
-  if (user.role === "telecaller") {
-    // If viewing is allowed for all leads (read-only access), OR it is a return lead, bypass assignment check
-    if (allowViewAll || lead.leadType === 'return') return true;
+    if (user.role === "telecaller") {
+    // If viewing is allowed for all leads (read-only access), OR it is a return/bookingconfirmation lead, bypass assignment check
+    if (allowViewAll || lead.leadType === 'return' || lead.leadType === 'bookingconfirmation') return true;
 
     // Otherwise (for updates on non-return leads), enforce assignment check
     if (lead.assignedTo?.toString() !== user._id.toString()) {
@@ -275,7 +275,7 @@ const moveLeadToFollowUp = async (leadDoc, userId, callDuration = 0, auditMetada
     itemCategory: lead.itemCategory || undefined,
     closingAction: lead.closingAction || undefined,
 
-    refund_status: (lead.leadType === "return" || lead.lead_type === "return") ? (lead.refund_status ?? null) : null,
+    refund_status: (lead.leadType === "return" || lead.lead_type === "return" || lead.leadType === "bookingconfirmation" || lead.lead_type === "bookingconfirmation") ? (lead.refund_status ?? null) : null,
 
     // Call Duration
     callDuration: (callDuration !== undefined && callDuration !== null) ? callDuration : (lead.callDuration || lead.call_duration || 0),
@@ -406,8 +406,8 @@ const createReportFromLead = async (leadDoc, userId, userRemarks = null, editedF
   payload.competitor = lead.competitor ?? null;
   payload.securityAmount = lead.securityAmount ?? lead.security_amount ?? null;
 
-  const isReturnLead = (lead.leadType ?? lead.lead_type) === "return";
-  payload.refund_status = isReturnLead ? (lead.refund_status ?? null) : null;
+  const isReturnOrBookingLead = (lead.leadType ?? lead.lead_type) === "return" || (lead.leadType ?? lead.lead_type) === "bookingconfirmation";
+  payload.refund_status = isReturnOrBookingLead ? (lead.refund_status ?? null) : null;
 
   // Also copy any other top-level lead properties dynamically (convert camelCase -> snake_case)
   Object.keys(lead).forEach((k) => {
@@ -673,7 +673,7 @@ const moveLeadToComplaint = async (leadDoc, userId, remarks = null, callDuration
     subCategory: lead.subCategory,
     itemCategory: lead.itemCategory,
     closingAction: lead.closingAction,
-    refund_status: (lead.leadType === "return" || lead.lead_type === "return") ? (lead.refund_status ?? null) : null,
+    refund_status: (lead.leadType === "return" || lead.lead_type === "return" || lead.leadType === "bookingconfirmation" || lead.lead_type === "bookingconfirmation") ? (lead.refund_status ?? null) : null,
     complaintMarkedBy: userId,
     complaintMarkedAt: new Date(),
     sourceLeadId: sourceLeadIdValue,
@@ -784,7 +784,8 @@ export const getLeads = async (req, res) => {
     let dbLeadType = leadType;
     if (leadType) {
       const lowerType = leadType.toLowerCase();
-      if (lowerType.includes('return')) dbLeadType = 'return';
+      if (lowerType === 'bookingconfirmation') dbLeadType = 'bookingconfirmation';
+      else if (lowerType.includes('return')) dbLeadType = 'return';
       else if (lowerType.includes('loss')) dbLeadType = 'lossOfSale';
     }
 
@@ -861,14 +862,15 @@ export const getLeads = async (req, res) => {
         }
       }
 
-      if (dbLeadType === 'return') {
+      if (dbLeadType === 'return' || dbLeadType === 'bookingconfirmation') {
         filters.returnDate = returnFilter;
       } else if (dbLeadType) {
         filters.createdAt = createdFilter;
       } else {
         filters.$or = [
           { leadType: 'return', returnDate: returnFilter },
-          { leadType: { $ne: 'return' }, createdAt: createdFilter }
+          { leadType: 'bookingconfirmation', returnDate: returnFilter },
+          { leadType: { $nin: ['return', 'bookingconfirmation'] }, createdAt: createdFilter }
         ];
       }
     }
@@ -915,9 +917,10 @@ export const getLeads = async (req, res) => {
         refund_status: lead.refund_status ?? null,
       };
 
-      if (lead.leadType === 'return' || lead.leadType === 'booked') {
+      // booked (manual) vs return/bookingconfirmation (API): separate handling; only return/bookingconfirmation get return_date
+      if (lead.leadType === 'return' || lead.leadType === 'booked' || lead.leadType === 'bookingconfirmation') {
         base.booking_number = lead.bookingNo;
-        if (lead.leadType === 'return') {
+        if (lead.leadType === 'return' || lead.leadType === 'bookingconfirmation') {
           base.return_date = lead.returnDate;
         }
       } else if (lead.leadType === 'lossOfSale') {
@@ -1399,7 +1402,7 @@ export const createAddLead = async (req, res) => {
     }
 
     const effectiveLeadType = leadType || lead_type || "enquiry";
-    const isReturn = effectiveLeadType === "return";
+    const isReturnOrBooking = effectiveLeadType === "return" || effectiveLeadType === "bookingconfirmation";
     const commonData = {
       name: customer_name || null,
       phone: phoneClean,
@@ -1413,7 +1416,7 @@ export const createAddLead = async (req, res) => {
       itemCategory: itemCategory || item_category || undefined,
       closingAction: closingAction || closing_action || undefined,
       remarks: remarks ? String(remarks).trim() : undefined,
-      refund_status: isReturn ? (refund_status ?? null) : null,
+      refund_status: isReturnOrBooking ? (refund_status ?? null) : null,
 
       functionDate: validFunctionDate || undefined,
       followUpDate: validFollowUpDate || undefined,
@@ -1900,7 +1903,7 @@ export const updateLead = async (req, res) => {
     if (functionDate !== undefined) updateData.functionDate = functionDate ? new Date(functionDate) : null;
     if (refund_status !== undefined) {
       const effectiveType = updateData.leadType ?? lead.leadType;
-      updateData.refund_status = (effectiveType === "return") ? refund_status : null;
+      updateData.refund_status = (effectiveType === "return" || effectiveType === "bookingconfirmation") ? refund_status : null;
     }
 
     // Ensure leadType is set to enquiry if missing (default for generic update if undefined in doc and update)
@@ -2246,7 +2249,7 @@ export const updateFollowUp = async (req, res) => {
     if (competitor !== undefined) updateData.competitor = competitor;
     if (refund_status !== undefined) {
       const effectiveType = updateData.leadType ?? followUp.leadType;
-      updateData.refund_status = (effectiveType === "return") ? refund_status : null;
+      updateData.refund_status = (effectiveType === "return" || effectiveType === "bookingconfirmation") ? refund_status : null;
     }
 
     // Audit Metadata - ensures telecaller/createdBy is mapped when FollowUp moves to Report

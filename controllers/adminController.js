@@ -415,7 +415,7 @@ export const getAdminReports = async (req, res) => {
 
         // Common optional filters
         if (leadType) query.leadType = leadType;
-        if (refund_status != null && refund_status !== '' && leadType === 'return') query.refund_status = refund_status;
+        if (refund_status != null && refund_status !== '' && (leadType === 'return' || leadType === 'bookingconfirmation')) query.refund_status = refund_status;
         if (telecallerId) query.editedBy = telecallerId; // Legacy/Admin context targetting editor by ObjectId
 
         // NEW: Filter by createdByEmpId

@@ -40,6 +40,7 @@ const verifyData = async () => {
     const enquiryCount = await Lead.countDocuments({ leadType: "enquiry" });
     const lossOfSaleCount = await Lead.countDocuments({ leadType: "lossOfSale" });
     const bookedCount = await Lead.countDocuments({ leadType: "booked" });
+    const bookingConfirmationCount = await Lead.countDocuments({ leadType: "bookingconfirmation" });
 
     const totalStores = await Store.countDocuments();
     const totalUsers = await User.countDocuments();
@@ -48,7 +49,8 @@ const verifyData = async () => {
     console.log(`      • Return:              ${returnCount.toLocaleString()}`);
     console.log(`      • Enquiry:             ${enquiryCount.toLocaleString()}`);
     console.log(`      • Loss of Sale:        ${lossOfSaleCount.toLocaleString()}`);
-    console.log(`      • Booked:              ${bookedCount.toLocaleString()}`);
+    console.log(`      • Booked:              ${bookedCount.toLocaleString()} (manual)`);
+    console.log(`      • Booking Confirmation: ${bookingConfirmationCount.toLocaleString()} (API sync)`);
     console.log();
     console.log(`   📂 Stores Collection:     ${totalStores.toLocaleString()}`);
     console.log(`   📂 Users Collection:      ${totalUsers.toLocaleString()}`);

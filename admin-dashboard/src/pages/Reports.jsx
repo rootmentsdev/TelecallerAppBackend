@@ -54,7 +54,7 @@ const Reports = () => {
                 dateTo: filters.dateTo || undefined,
                 telecaller: filters.telecaller || undefined,
                 leadType: filters.leadType || undefined,
-                refund_status: filters.leadType === 'return' && filters.refundStatus ? filters.refundStatus : undefined,
+                refund_status: (filters.leadType === 'return' || filters.leadType === 'bookingconfirmation') && filters.refundStatus ? filters.refundStatus : undefined,
                 dateField: 'createdAt'
             };
             const result = await getReports(params);
@@ -105,7 +105,7 @@ const Reports = () => {
                 `"${row.createdByName || ''}"`,
                 row.callDuration,
                 `"${row.leadType || row.lead_type || ''}"`,
-                (row.leadType || row.lead_type) === 'return' ? `"${row.refund_status || ''}"` : '"-"',
+                ((row.leadType || row.lead_type) === 'return' || (row.leadType || row.lead_type) === 'bookingconfirmation') ? `"${row.refund_status || ''}"` : '"-"',
                 `"${row.remarks || ''}"`
             ].join(","))
         ].join("\n");
@@ -187,17 +187,18 @@ const Reports = () => {
                     <select
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                         value={filters.leadType}
-                        onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value, refundStatus: e.target.value === 'return' ? prev.refundStatus : '' }))}
+                        onChange={e => setFilters(prev => ({ ...prev, leadType: e.target.value, refundStatus: (e.target.value === 'return' || e.target.value === 'bookingconfirmation') ? prev.refundStatus : '' }))}
                     >
                         <option value="">All Types</option>
                         <option value="enquiry">Enquiry</option>
                         <option value="booked">Booked</option>
                         <option value="return">Return</option>
+                        <option value="bookingconfirmation">Booking Confirmation</option>
                     </select>
                 </div>
 
-                {/* Refund Status Filter - only when Lead Type is Return */}
-                {filters.leadType === 'return' && (
+                {/* Refund Status Filter - when Lead Type is Return or Booking Confirmation */}
+                {(filters.leadType === 'return' || filters.leadType === 'bookingconfirmation') && (
                     <div className="min-w-[150px]">
                         <label className="block text-xs font-medium text-gray-500 mb-1">Refund Status</label>
                         <select
@@ -292,7 +293,7 @@ const Reports = () => {
                                         </td>
 
                                         <td className="px-6 py-4 text-gray-600">
-                                            {(row.leadType || row.lead_type) === 'return'
+                                            {(row.leadType || row.lead_type) === 'return' || (row.leadType || row.lead_type) === 'bookingconfirmation'
                                                 ? (row.refund_status || '-')
                                                 : '-'}
                                         </td>
