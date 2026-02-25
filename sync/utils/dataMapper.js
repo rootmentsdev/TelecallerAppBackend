@@ -673,16 +673,43 @@ export const mapReturn = (row) => {
 
 // Map Booking Confirmation API data to Lead model (same structure as return, different source and leadType).
 // IMPORTANT: Always use leadType "bookingconfirmation" — do not use "booked"; they are separate.
+// Maps ALL external API fields from GetBookingReport response.
 export const mapBookingConfirmation = (row) => {
   const mapped = mapReturn(row);
   if (!mapped) return null;
   const returnDate = mapped.returnDate || mapped.functionDate || mapped.enquiryDate;
-  return {
+  const out = {
     ...mapped,
     source: "Booking Confirmation",
     leadType: "bookingconfirmation", // never "booked"
     ...(returnDate && { returnDate }),
+    // All external API fields from GetBookingReport
+    itemCode: (row.itemCode || row.item_code || "").trim() || undefined,
+    itemName: (row.itemName || row.item_name || "").trim() || undefined,
+    paymentType: (row.paymentType || row.payment_type || "").trim() || undefined,
+    measurement: (row.measurement != null ? String(row.measurement).trim() : "") || undefined,
+    address: (row.address || "").trim() || undefined,
+    bookingDate: parseApiDate(row.bookingDate || row.booking_date),
+    deliveryDate: parseApiDate(row.deliveryDate || row.delivery_date),
+    rentOutDate: parseApiDate(row.rentOutDate || row.rentOut_date || row.rent_out_date),
+    expectedReturnDate: parseApiDate(row.expectedReturnDate || row.expected_return_date),
+    trialDate: parseApiDate(row.trialDate || row.trial_date),
+    cancelDate: parseApiDate(row.cancelDate || row.cancel_date),
+    category: (row.category || "").trim() || undefined,
+    subCategory: (row.subCategory || row.sub_category || "").trim() || mapped.subCategory || undefined,
+    price: row.price != null ? row.price : undefined,
   };
+  // Remove undefined so they are not stored
+  Object.keys(out).forEach((key) => {
+    if (out[key] === undefined || out[key] === "") {
+      if (!["remarks", "attendedBy", "enquiryType", "bookingNo", "measurement"].includes(key)) {
+        delete out[key];
+      } else if (out[key] === undefined) {
+        delete out[key];
+      }
+    }
+  });
+  return out;
 };
 
 // Map User API data to User model

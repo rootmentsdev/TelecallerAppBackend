@@ -60,11 +60,16 @@ const run = async () => {
   }
 
   console.log(`📡 Using API: ${apiUrl}`);
+  if (!apiUrl.includes("rentalapi.rootments.live")) {
+    console.error("❌ API host is not https://rentalapi.rootments.live — aborting.");
+    process.exit(1);
+  }
   if (apiToken) console.log(`🔑 Using authentication token`);
 
   let totalSaved = 0;
   let totalSkipped = 0;
   let totalErrors = 0;
+  let totalRowsReceived = 0;
   let locationsProcessed = 0;
   const locationIds = Object.keys(LOCATION_ID_TO_STORE_NAME);
   const CONCURRENCY_LIMIT = parseInt(process.env.SYNC_CONCURRENCY) || 5;
@@ -102,11 +107,11 @@ const run = async () => {
 
       if (!data) {
         console.log(`   ⚠️  API returned null/undefined for location ID ${locationId}`);
-        return { saved: 0, skipped: 0, errors: 0 };
+        return { saved: 0, skipped: 0, errors: 0, rowsReceived: 0 };
       }
       if (data.status === false) {
         console.log(`   ℹ️  API returned status=false for location ID ${locationId}`);
-        return { saved: 0, skipped: 0, errors: 0 };
+        return { saved: 0, skipped: 0, errors: 0, rowsReceived: 0 };
       }
 
       let dataArray = null;
@@ -114,7 +119,7 @@ const run = async () => {
         if (data.dataSet) {
           if (data.dataSet === null) {
             console.log(`   ℹ️  dataSet is null - no booking data available`);
-            return { saved: 0, skipped: 0, errors: 0 };
+            return { saved: 0, skipped: 0, errors: 0, rowsReceived: 0 };
           }
           if (data.dataSet.data && Array.isArray(data.dataSet.data)) dataArray = data.dataSet.data;
           else if (Array.isArray(data.dataSet)) dataArray = data.dataSet;
@@ -124,7 +129,7 @@ const run = async () => {
           dataArray = data.result;
         } else {
           console.warn(`   ⚠️  Invalid response format`);
-          return { saved: 0, skipped: 0, errors: 1 };
+          return { saved: 0, skipped: 0, errors: 1, rowsReceived: 0 };
         }
       } else {
         dataArray = data;
@@ -132,10 +137,11 @@ const run = async () => {
 
       if (!dataArray || dataArray.length === 0) {
         console.log(`   ℹ️  No data for location ID ${locationId}`);
-        return { saved: 0, skipped: 0, errors: 0 };
+        return { saved: 0, skipped: 0, errors: 0, rowsReceived: 0 };
       }
 
-      console.log(`   📊 Found ${dataArray.length} booking records for location ID ${locationId}`);
+      const rowsReceived = dataArray.length;
+      console.log(`   📊 Found ${rowsReceived} booking records for location ID ${locationId}`);
 
       let saved = 0;
       let skipped = 0;
@@ -154,7 +160,7 @@ const run = async () => {
       }
 
       console.log(`   ✅ New records saved: ${saved}, ⏭️  Skipped: ${skipped}, ❌ Errors: ${errors}`);
-      return { saved, skipped, errors };
+      return { saved, skipped, errors, rowsReceived };
     });
 
     const batchResults = await Promise.all(batchPromises);
@@ -166,11 +172,13 @@ const run = async () => {
     totalSaved += r.saved;
     totalSkipped += r.skipped;
     totalErrors += r.errors;
+    totalRowsReceived += r.rowsReceived ?? (r.saved + r.skipped + r.errors);
     locationsProcessed++;
   });
 
   const syncEndTime = new Date();
   const trigger = process.env.SYNC_TRIGGER || "auto";
+  let syncLogResult = "not saved";
   try {
     await SyncLog.create({
       syncType: "bookingconfirmation",
@@ -180,16 +188,20 @@ const run = async () => {
       status: totalErrors > 0 ? "partial" : "success",
       errorMessage: totalErrors > 0 ? `${totalErrors} errors occurred` : null,
     });
+    syncLogResult = "saved";
     console.log(`📝 Sync log saved`);
   } catch (error) {
     console.error("❌ Error saving sync log:", error.message);
   }
 
   console.log(`\n✅ Booking Confirmation sync completed!`);
+  console.log(`   📡 Full API URL: ${apiUrl}`);
+  console.log(`   📥 Rows received: ${totalRowsReceived}`);
+  console.log(`   💾 Rows inserted: ${totalSaved}`);
+  console.log(`   ⏭️  Rows skipped: ${totalSkipped}`);
+  console.log(`   ❌ Errors: ${totalErrors}`);
+  console.log(`   📝 SyncLog update: ${syncLogResult}`);
   console.log(`   📊 Locations processed: ${locationsProcessed}/${locationIds.length}`);
-  console.log(`   💾 Total new records saved: ${totalSaved}`);
-  console.log(`   ⏭️  Total skipped: ${totalSkipped}`);
-  console.log(`   ❌ Total errors: ${totalErrors}`);
 };
 
 export { run };

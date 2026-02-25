@@ -334,14 +334,7 @@ export const saveToMongo = async (leadData) => {
     // DUPLICATE CHECK FOR BOOKING/RETURN/BOOKINGCONFIRMATION: Skip if duplicate (don't update to preserve user edits)
     // leadType is always part of the query: "booked" (manual) and "bookingconfirmation" (API) stay separate.
     // ALWAYS check: name, phone, leadType, store, brand
-    // CRITICAL: Normalize and trim all fields for accurate comparison
     if (leadData.leadType === "booked" || leadData.leadType === "return" || leadData.leadType === "bookingconfirmation") {
-      // Normalize fields
-    // DUPLICATE CHECK FOR BOOKING/RETURN: Skip if duplicate (don't update to preserve user edits)
-    // These come from API and should only add new records (incremental sync)
-    // ALWAYS check: name, phone, leadType, store
-    // CRITICAL: Normalize and trim all fields for accurate comparison
-    if (leadData.leadType === "booked" || leadData.leadType === "return") {
       // Normalize fields: trim and ensure consistent format
       const normalizedName = (leadData.name || "").trim();
       const normalizedPhone = (leadData.phone || "").trim();
@@ -354,9 +347,7 @@ export const saveToMongo = async (leadData) => {
         return { skipped: true, reason: "Missing brand identity" };
       }
 
-      // Build comprehensive duplicate check query
-      // Identity: Brand + Store + BookingNo (or Phone)
-      // Build comprehensive duplicate check query with normalized fields
+      // Build comprehensive duplicate check query with normalized fields (identity: brand + store + bookingNo or phone)
       const duplicateQuery = {
         name: normalizedName,
         phone: normalizedPhone,

@@ -50,71 +50,32 @@
  *         schema:
  *           type: string
  *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
- *         description: Type of lead to fetch. If omitted, returns leads of all types. bookingconfirmation workflow identical to return (source: Booking Report API).
+ *         description: "Type of lead to fetch. If omitted, returns leads of all types. bookingconfirmation workflow identical to return (source Booking Report API)."
  *       - in: query
  *         name: store
  *         required: false
  *         schema:
  *           type: string
  *           example: "Suitor Guy - Edappally"
- *         description: |
- *           Filter leads by store name using "Brand - Location" format.
- *           
- *           **Supported Formats:**
- *           - **Full Format**: `"Suitor Guy - Edappally"`, `"Zorucci - Kottayam"`
- *           - **Location Only**: `"Edappally"`, `"Kottayam"`, `"Manjeri"`
- *           
- *           **Brand Abbreviations:**
- *           - `"SG"` = `"Suitor Guy"` (e.g., `"SG-Edappally"` matches `"Suitor Guy - Edappally"`)
- *           - `"Z"` = `"Zorucci"` (e.g., `"Z-Kottayam"` matches `"Zorucci - Kottayam"`)
- *           
- *           **How Filtering Works:**
- *           1. **Exact Match**: Searches for the exact store name
- *           2. **Brand + Location Match**: Finds stores containing both brand and location
- *              - `"Suitor Guy - Edappally"` matches stores with both "Suitor Guy" (or "SG") AND "Edappally"
- *           3. **Location Match**: Also matches stores with just the location name
- *              - `"Suitor Guy - Kottayam"` will also match stores named just `"Kottayam"`
- *           
- *           **Important Notes:**
- *           - **Edappal vs Edappally**: These are DIFFERENT locations (not variations)
- *             - Searching `"Suitor Guy - Edappally"` will NOT match stores with `"Edappal"`
- *             - Searching `"Suitor Guy - Edappal"` will NOT match stores with `"Edappally"`
- *           - Case-insensitive matching (e.g., `"kottayam"` matches `"Kottayam"`)
- *           - Works with all lead types (lossOfSale, return, enquiry)
- *           
- *           **Examples:**
- *           - Get all leads for a store: `?store=Suitor Guy - Edappally`
- *           - Get specific lead type: `?leadType=return&store=Suitor Guy - Edappally`
- *           - Get all leads for location: `?store=Kottayam`
- *           - Get return leads: `?leadType=return&store=Suitor Guy - Kottayam`
- *           - Get loss of sale leads: `?leadType=lossOfSale&store=Suitor Guy - Manjeri`
- *           
- *           **Use Cases:**
- *           - **Loss of Sale Area**: Filter by store for loss of sale leads
- *             - `?leadType=lossOfSale&store=Suitor Guy - Edappally`
- *           - **Return Area**: Filter by store for return leads
- *             - `?leadType=return&store=Suitor Guy - Kottayam`
- *             - `?leadType=return&store=Suitor Guy - Edappally`
- *           - **All Leads**: Get all lead types for a store
- *             - `?store=Suitor Guy - Edappally`
+ *         description: "Filter by store name (Brand - Location format). Supports full format, location only, SG/Z abbreviations. Edappal and Edappally are separate. Case-insensitive."
  *       - in: query
  *         name: callStatus
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by call status.
+ *         description: "Filter by call status."
  *       - in: query
  *         name: leadStatus
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by lead status.
+ *         description: "Filter by lead status."
  *       - in: query
  *         name: source
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by source (e.g., "Walk-in", "Booking", "Return", "Loss of Sale").
+ *         description: "Filter by source (e.g. Walk-in, Booking, Return, Loss of Sale)."
  *       - in: query
  *         name: enquiryDateFrom
  *         required: false
@@ -550,14 +511,6 @@
  *               sub_category: { type: string, description: "Alias for subCategory (snake_case)" }
  *               itemCategory: { type: string }
  *               closingAction: { type: string }
- *
- *               functionDate: { type: string, format: date-time }
- *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked, bookingconfirmation], default: lossOfSale }
- *               remarks: { type: string }
- *               subCategory: { type: string }
- *               itemCategory: { type: string }
- *               closingAction: { type: string }
-
  *               functionDate: { type: string, format: date-time }
  *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked, bookingconfirmation], default: lossOfSale }
  *               remarks: { type: string, nullable: true }
@@ -1242,32 +1195,32 @@ router.post(
  *         schema:
  *           type: string
  *           enum: [lossOfSale, return, enquiry, bookingconfirmation]
- *         description: Type of FollowUp lead to fetch. If omitted, returns FollowUp leads of all types.
+ *         description: "Type of FollowUp lead to fetch. If omitted, returns FollowUp leads of all types."
  *       - in: query
  *         name: store
  *         required: false
  *         schema:
  *           type: string
  *           example: "Suitor Guy - Edappally"
- *         description: Filter FollowUp leads by store name using "Brand - Location" format. Note: Edappal and Edappally are treated as strictly separate locations.
+ *         description: "Filter FollowUp leads by store name (Brand - Location format). Edappal and Edappally are separate."
  *       - in: query
  *         name: callStatus
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by call status.
+ *         description: "Filter by call status."
  *       - in: query
  *         name: leadStatus
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by lead status.
+ *         description: "Filter by lead status."
  *       - in: query
  *         name: source
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by source (e.g., "Walk-in", "Booking", "Return", "Loss of Sale").
+ *         description: "Filter by source (e.g. Walk-in, Booking, Return, Loss of Sale)."
  *       - in: query
  *         name: enquiryDateFrom
  *         required: false
@@ -1803,14 +1756,14 @@ router.post(
  *         schema:
  *           type: string
  *           enum: [lossOfSale, return, enquiry, booked, bookingconfirmation]
- *         description: Type of lead to fetch. If omitted, returns complaints of all types.
+ *         description: "Type of lead to fetch. If omitted, returns complaints of all types."
  *       - in: query
  *         name: store
  *         required: false
  *         schema:
  *           type: string
  *           example: "Suitor Guy - Edappally"
- *         description: Filter by store name using "Brand - Location" format.
+ *         description: "Filter by store name (Brand - Location format)."
  *       - in: query
  *         name: page
  *         required: false
@@ -1903,7 +1856,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by store name (supports "Brand - Location" matching). Note: Edappal and Edappally are treated as strictly separate locations.
+ *         description: "Filter by store name (Brand - Location matching). Edappal and Edappally are separate."
  *       - in: query
  *         name: createdAt
  *         required: false

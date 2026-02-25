@@ -30,10 +30,24 @@ const leadSchema = new mongoose.Schema(
     // Booking/Rent-Out Information
     bookingNo: { type: String },
     securityAmount: { type: mongoose.Schema.Types.Mixed },
-    service: { type: String }, // NEW
-    numberOfFunctions: { type: Number }, // NEW
-    numberOfAttires: { type: Number }, // NEW
-    competitor: { type: String }, // NEW
+    service: { type: String },
+    numberOfFunctions: { type: Number },
+    numberOfAttires: { type: Number },
+    competitor: { type: String },
+    // Booking Confirmation API fields (GetBookingReport)
+    itemCode: { type: String },
+    itemName: { type: String },
+    paymentType: { type: String },
+    measurement: { type: String },
+    address: { type: String },
+    bookingDate: { type: Date },
+    deliveryDate: { type: Date },
+    rentOutDate: { type: Date },
+    expectedReturnDate: { type: Date },
+    trialDate: { type: Date },
+    cancelDate: { type: Date },
+    category: { type: String },
+    price: { type: mongoose.Schema.Types.Mixed },
 
     // Status Fields
     callStatus: { type: String, default: "Not Called" },
