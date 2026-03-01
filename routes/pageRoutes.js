@@ -553,13 +553,6 @@
  *
  *               functionDate: { type: string, format: date-time }
  *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
- *               remarks: { type: string }
- *               subCategory: { type: string }
- *               itemCategory: { type: string }
- *               closingAction: { type: string }
-
- *               functionDate: { type: string, format: date-time }
- *               leadType: { type: string, enum: [lossOfSale, return, enquiry, booked], default: lossOfSale }
  *               remarks: { type: string, nullable: true }
  *               call_duration: { type: number, description: "Call duration in seconds" }
  *               mark_as_complaint:
@@ -1249,7 +1242,7 @@ router.post(
  *         schema:
  *           type: string
  *           example: "Suitor Guy - Edappally"
- *         description: Filter FollowUp leads by store name using "Brand - Location" format. Note: Edappal and Edappally are treated as strictly separate locations.
+ *         description: "Filter FollowUp leads by store name using 'Brand - Location' format. Note: Edappal and Edappally are treated as strictly separate locations."
  *       - in: query
  *         name: callStatus
  *         required: false
@@ -1903,7 +1896,7 @@ router.post(
  *         required: false
  *         schema:
  *           type: string
- *         description: Filter by store name (supports "Brand - Location" matching). Note: Edappal and Edappally are treated as strictly separate locations.
+ *         description: "Filter by store name (supports 'Brand - Location' matching). Note: Edappal and Edappally are treated as strictly separate locations."
  *       - in: query
  *         name: createdAt
  *         required: false

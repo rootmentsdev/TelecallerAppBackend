@@ -142,7 +142,7 @@ const handleUploadError = (err, req, res, next) => {
  *                   example: false
  *                 message:
  *                   type: string
- *                   example: "No CSV file uploaded" or "Invalid leadType. Must be one of: walkin, lossofsale"
+ *                   example: "Invalid leadType. Must be one of: walkin, lossofsale"
  *       401:
  *         description: Unauthorized - Missing or invalid JWT token
  *       403:
