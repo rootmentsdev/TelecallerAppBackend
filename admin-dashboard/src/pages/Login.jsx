@@ -17,7 +17,7 @@ const Login = () => {
         setError('');
         setLoading(true);
         try {
-            const user = await login(username, password);
+            const user = await login(username.trim(), password.trim());
             authLogin(user);
             navigate('/admin/dashboard');
         } catch (err) {
