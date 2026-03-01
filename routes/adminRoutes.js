@@ -200,7 +200,31 @@ router.get("/complaints/pivot", requireAdminAuth, getComplaintPivot);
  *       - in: query
  *         name: telecallerId
  *         type: string
- *         description: Filter by editor ID (Telecaller)
+ *         description: Filter by editor ID (Telecaller ObjectId)
+ *       - in: query
+ *         name: telecaller
+ *         type: string
+ *         description: Filter by creator EmplId
+ *       - in: query
+ *         name: leadType
+ *         type: string
+ *       - in: query
+ *         name: callStatus
+ *         type: string
+ *       - in: query
+ *         name: leadStatus
+ *         type: string
+ *       - in: query
+ *         name: source
+ *         type: string
+ *       - in: query
+ *         name: refund_status
+ *         type: string
+ *         description: Filter by refund status for return leads
+ *       - in: query
+ *         name: filtersOnly
+ *         type: boolean
+ *         description: If true, returns only filter metadata (telecallers/stores/refundStatuses)
  *     responses:
  *       200:
  *         description: List of reports

@@ -473,6 +473,10 @@ router.get("/:id", protect, getReportById);
  *           type: number
  *           nullable: true
  *           description: Rating (1-5) for return leads
+ *         refund_status:
+ *           type: string
+ *           nullable: true
+ *           description: Refund status for return leads
  */
 
 export default router;
