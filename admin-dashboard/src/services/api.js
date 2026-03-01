@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: "https://telecallerappbackend.onrender.com/api",
+    baseURL: "https://telecallerappbackend.onrender.com",
     withCredentials: true
 });
 
