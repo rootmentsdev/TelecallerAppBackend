@@ -2,7 +2,7 @@ import api from './api';
 
 export const login = async (username, password) => {
     // Call separate Admin Authentication Route
-    const response = await api.post('/admin/auth/login', { username, password });
+    const response = await api.post('https://telecallerappbackend.onrender.com/admin/auth/login', { username, password });
 
     // Response structure from adminAuth is { success: true, token, user: { username, role } }
     const { token, user } = response.data;
