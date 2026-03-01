@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 
 export const requireAdminAuth = (req, res, next) => {
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(200);
+    }
     try {
         const authHeader = req.headers.authorization;
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
