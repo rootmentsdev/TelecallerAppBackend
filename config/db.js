@@ -20,6 +20,7 @@ const connectDB = async () => {
 
     isConnected = true;
     console.log("✅ MongoDB Connected (singleton)");
+    console.log("Connected DB:", mongoose.connection.name);
 
   } catch (err) {
     console.error("❌ MongoDB Connection Error:", err.message);

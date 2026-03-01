@@ -19,8 +19,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/admin/health:
- *   get:
+ * /admin/health:
  *     summary: Check Admin API health
  *     tags: [Admin]
  *     security:
@@ -40,8 +39,7 @@ router.get("/health", requireAdminAuth, getAdminHealth);
 
 /**
  * @swagger
- * /api/admin/telecaller-summary:
- *   get:
+ * /admin/telecaller-summary:
  *     summary: Get telecaller performance summary (Admin Aggregation)
  *     tags: [Admin]
  *     security:
@@ -95,8 +93,7 @@ router.get("/telecaller-summary", requireAdminAuth, getTelecallerSummary);
 
 /**
  * @swagger
- * /api/admin/complaints/pivot:
- *   get:
+ * /admin/complaints/pivot:
  *     summary: Get complaints pivot data (Admin Aggregation)
  *     tags: [Admin]
  *     security:
@@ -158,8 +155,7 @@ router.get("/complaints/pivot", requireAdminAuth, getComplaintPivot);
 
 /**
  * @swagger
- * /api/admin/reports:
- *   get:
+ * /admin/reports:
  *     summary: Browse all system reports (Admin View)
  *     tags: [Admin]
  *     security:
@@ -232,7 +228,7 @@ router.get("/reports", requireAdminAuth, getAdminReports);
 
 /**
  * @swagger
- * /api/admin/users:
+ * /admin/users:
  *   get:
  *     summary: Get list of users (Admin View)
  *     tags: [Admin]
