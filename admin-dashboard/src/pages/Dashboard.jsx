@@ -39,6 +39,7 @@ const Dashboard = () => {
                 dateTo: filters.dateTo || undefined
             };
             const result = await getTelecallerSummary(params);
+            console.log("Dashboard API Response:", result);
             setSummaryData(result.data || []);
         } catch (err) {
             console.error(err);
@@ -102,8 +103,8 @@ const Dashboard = () => {
                                 key={filter}
                                 onClick={() => handleFilterChange(filter)}
                                 className={`px-3 py-1.5 rounded-md capitalize transition-all ${activeFilter === filter
-                                        ? 'bg-white text-blue-600 shadow-sm font-medium'
-                                        : 'text-gray-500 hover:text-gray-700'
+                                    ? 'bg-white text-blue-600 shadow-sm font-medium'
+                                    : 'text-gray-500 hover:text-gray-700'
                                     }`}
                             >
                                 {filter}

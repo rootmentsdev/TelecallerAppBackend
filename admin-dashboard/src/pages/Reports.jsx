@@ -60,6 +60,7 @@ const Reports = () => {
                 dateField: 'createdAt' // Forces filtering by createdAt as requested
             };
             const result = await getReports(params);
+            console.log("Reports API Response:", result);
             setData(result.rows || []);
             setMeta(prev => ({ ...prev, ...result.meta }));
         } catch (err) {
