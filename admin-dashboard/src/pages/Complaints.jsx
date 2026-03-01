@@ -35,7 +35,7 @@ const Complaints = () => {
             const result = await getComplaintPivot(params);
             setRawData(result.rows || []);
         } catch (err) {
-            console.error(err);
+            // error handling
         } finally {
             setLoading(false);
         }

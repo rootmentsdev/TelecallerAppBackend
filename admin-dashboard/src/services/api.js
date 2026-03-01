@@ -1,23 +1,17 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://telecallerappbackend.onrender.com', // Hardcoded for simplified local dev, ideally strictly env
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    baseURL: "https://telecallerappbackend.onrender.com/api",
+    withCredentials: true
 });
 
-// Request interceptor to add token
-api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('adminToken');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`; // Matches backend "protect" middleware
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("adminToken");
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
 // Response interceptor to handle 401 (Token expiry)
 api.interceptors.response.use(

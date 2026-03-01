@@ -33,7 +33,7 @@ const Reports = () => {
                 setStoreOptions(stores || []);
                 setRefundStatusOptions(refundStatuses || []);
             } catch (err) {
-                console.error("Failed to load report filters", err);
+                // error handling
             } finally {
                 setFiltersLoading(false);
             }
@@ -63,7 +63,7 @@ const Reports = () => {
             setData(result.rows || []);
             setMeta(prev => ({ ...prev, ...result.meta }));
         } catch (err) {
-            console.error("Failed to fetch reports", err);
+            // Error handling
         } finally {
             setLoading(false);
         }
@@ -89,7 +89,7 @@ const Reports = () => {
             setData(result.rows || []);
             setMeta(prev => ({ ...prev, ...result.meta }));
         } catch (err) {
-            console.error(err);
+            // error
         } finally {
             setLoading(false);
         }
